@@ -45,12 +45,10 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Create a `.env` file:
+Create a `.env` file (copy from `.env.example`):
 
-```env
-NPG_BASE_URL=http://your-npg-api:8080
-NPG_USERNAME=your_username
-NPG_PASSWORD=your_password
+```bash
+cp .env.example .env
 ```
 
 Run in stdio mode:
@@ -65,6 +63,13 @@ Pull the image from GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/four2mis/npg-mcp:latest
+```
+
+Create a `.env` file from the template:
+
+```bash
+cp .env.example .env
+# then edit .env with your NPG credentials
 ```
 
 Or run with Docker Compose using the included `docker-compose.yml`:
