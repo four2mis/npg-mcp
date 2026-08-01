@@ -1,6 +1,7 @@
 services:
   npg-mcp:
-    build: .
+    image: ghcr.io/four2mis/npg-mcp:latest
+    # build: .  # uncomment to build from source instead
     container_name: npg-mcp
     restart: unless-stopped
     networks:

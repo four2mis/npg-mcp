@@ -59,12 +59,31 @@ Run in stdio mode:
 python3 -m npg_mcp.main
 ```
 
-### Docker Deployment
+### Docker Deployment (pre-built)
+
+Pull the image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/four2mis/npg-mcp:latest
+```
+
+Or run with Docker Compose using the included `docker-compose.yml`:
+
+```bash
+# Pull & run (uses pre-built image)
+docker compose up -d
+
+# Or build from source
+docker compose up -d --build
+```
+
+The included `docker-compose.yml`:
 
 ```yaml
 services:
   npg-mcp:
-    image: four2mis/npg-mcp:latest
+    image: ghcr.io/four2mis/npg-mcp:latest
+    # build: .  # uncomment to build from source instead
     container_name: npg-mcp
     restart: unless-stopped
     networks:
