@@ -1,0 +1,1 @@
+"""NginxProxyGuard MCP server."""

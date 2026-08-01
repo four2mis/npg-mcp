@@ -1,0 +1,24 @@
+services:
+  npg-mcp:
+    build: .
+    container_name: npg-mcp
+    restart: unless-stopped
+    networks:
+      - npg-network
+    environment:
+      - NPG_BASE_URL=${NPG_BASE_URL:-http://npg-api:8080}
+      - NPG_USERNAME=${NPG_USERNAME}
+      - NPG_PASSWORD=${NPG_PASSWORD}
+      - MCP_PORT=${MCP_PORT:-8081}
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('127.0.0.1',8081)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  npg-network:
+    external: true

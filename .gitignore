@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# Hermes
+.hermes/
+
+# Env files — each deployer creates their own
+.env
+npg-mcp-config.env
+
+# OS
+.DS_Store
+Thumbs.db
