@@ -1,6 +1,6 @@
 # NPG MCP Server
 
-MCP server for [NginxProxyGuard](https://github.com/NginxProxyManager/nginx-proxy-manager) (NPG) — manage proxy hosts, certificates, SSL, security rules, and nginx configuration through MCP tools.
+MCP server for [NginxProxyGuard](https://github.com/svrforum/NginxProxyGuard) (NPG) — manage proxy hosts, certificates, SSL, security rules, and nginx configuration through MCP tools.
 
 Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.python-httpx.org/).
 
