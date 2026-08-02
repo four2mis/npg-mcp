@@ -314,20 +314,20 @@ async def npg_get_certificate(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_certificate", description="Request a new Let's Encrypt certificate. Required: domains (array), email. Optional: provider (e.g. 'dns'), dns_provider, etc.")
+@mcp.tool(name="npg_create_certificate", description="Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc.")
 async def npg_create_certificate(
-    domains: list[str],
+    domain_names: list[str],
     email: str,
     provider: str = "letsencrypt",
-    dns_provider: str | None = None,
+    dns_provider_id: str | None = None,
 ) -> dict:
     c = _get_client()
     try:
         body = {
-            "domains": domains,
+            "domain_names": domain_names,
             "email": email,
             "provider": provider,
-            "dns_provider": dns_provider,
+            "dns_provider_id": dns_provider_id,
         }
         data = c.post("/api/v1/certificates", body)
         return {"success": True, "data": data}
@@ -576,11 +576,11 @@ async def npg_get_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_settings", description="Update global NPG settings. Pass only fields to change.")
-async def npg_update_settings(**kwargs) -> dict:
+@mcp.tool(name="npg_update_settings", description="Update global NPG settings. Pass only fields to change (dict).")
+async def npg_update_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/settings", kwargs)
+        data = c.put("/api/v1/settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -594,11 +594,11 @@ async def npg_get_system_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_system_settings", description="Update system settings. Pass only fields to change.")
-async def npg_update_system_settings(**kwargs) -> dict:
+@mcp.tool(name="npg_update_system_settings", description="Update system settings. Pass only fields to change (dict).")
+async def npg_update_system_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/system-settings", kwargs)
+        data = c.put("/api/v1/system-settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -708,21 +708,25 @@ async def npg_get_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, key, secret.")
-async def npg_create_dns_provider(name: str, key: str, secret: str, **kwargs) -> dict:
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}).")
+async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "key": key, "secret": secret, **kwargs}
+        body = {"name": name, "provider_type": provider_type}
+        if credentials:
+            body["credentials"] = credentials
+        if kwargs:
+            body.update(kwargs)
         data = c.post("/api/v1/dns-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change.")
-async def npg_update_dns_provider(provider_id: str | int, **kwargs) -> dict:
+@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change (dict).")
+async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs)
+        data = c.put(f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -766,21 +770,27 @@ async def npg_get_cloud_provider(slug: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_cloud_provider", description="Create a cloud provider. Required: slug (e.g. 'cloudflare'), key/secret or token.")
-async def npg_create_cloud_provider(slug: str, key: str | None = None, secret: str | None = None, token: str | None = None, **kwargs) -> dict:
+@mcp.tool(name="npg_create_cloud_provider", description="Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description.")
+async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], region: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"slug": slug, "key": key, "secret": secret, "token": token, **kwargs}
+        body = {"name": name, "slug": slug, "ip_ranges": ip_ranges}
+        if region:
+            body["region"] = region
+        if description:
+            body["description"] = description
+        if kwargs:
+            body.update(kwargs)
         data = c.post("/api/v1/cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change.")
-async def npg_update_cloud_provider(slug: str, **kwargs) -> dict:
+@mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change (dict).")
+async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/cloud-providers/{slug}", kwargs)
+        data = c.put(f"/api/v1/cloud-providers/{slug}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -969,11 +979,11 @@ async def npg_get_global_uri_block() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_global_uri_block", description="Update global URI block settings.")
-async def npg_update_global_uri_block(**kwargs) -> dict:
+@mcp.tool(name="npg_update_global_uri_block", description="Update global URI block settings. Pass only fields to change (dict).")
+async def npg_update_global_uri_block(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/global-uri-block", kwargs)
+        data = c.put("/api/v1/global-uri-block", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1008,21 +1018,27 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: name, rule_type, rule_value.")
-async def npg_create_exploit_rule(name: str, rule_type: str, rule_value: str, **kwargs) -> dict:
+@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description.")
+async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "rule_type": rule_type, "rule_value": rule_value, **kwargs}
+        body = {"category": category, "name": name, "pattern": pattern, "pattern_type": pattern_type}
+        if severity:
+            body["severity"] = severity
+        if description:
+            body["description"] = description
+        if kwargs:
+            body.update(kwargs)
         data = c.post("/api/v1/exploit-rules", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change.")
-async def npg_update_exploit_rule(rule_id: str | int, **kwargs) -> dict:
+@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change (dict).")
+async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs)
+        data = c.put(f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1104,11 +1120,11 @@ async def npg_get_log_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change.")
-async def npg_update_log_settings(**kwargs) -> dict:
+@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change (dict).")
+async def npg_update_log_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/logs/settings", kwargs)
+        data = c.put("/api/v1/logs/settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1209,21 +1225,21 @@ async def npg_get_api_token(token_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, scopes (array). Optional: expires_at.")
-async def npg_create_api_token(name: str, scopes: list[str], expires_at: str | None = None) -> dict:
+@mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, permissions (array). Optional: expires_at.")
+async def npg_create_api_token(name: str, permissions: list[str], expires_at: str | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "scopes": scopes, "expires_at": expires_at}
+        body = {"name": name, "permissions": permissions, "expires_at": expires_at}
         data = c.post("/api/v1/api-tokens", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change.")
-async def npg_update_api_token(token_id: str | int, **kwargs) -> dict:
+@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change (dict).")
+async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs)
+        data = c.put(f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
