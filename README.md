@@ -4,6 +4,8 @@ MCP server for [NginxProxyGuard](https://github.com/svrforum/NginxProxyGuard) (N
 
 Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.python-httpx.org/).
 
+> **⚠️ Vibe-coded with an AI agent.** This codebase was generated at speed by an AI agent, not hand-crafted by a human. Expect rough edges, unhandled edge cases, and bugs. Do **not** deploy it to an active/production NginxProxyGuard instance without first testing against a **sandboxed / disposable NPG environment** and reviewing the code. It can create, update, delete, and reconfigure live proxy hosts, so verify in isolation before pointing it at real infrastructure.
+
 ## Features
 
 108+ MCP tools across all NPG API categories:
