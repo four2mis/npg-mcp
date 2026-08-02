@@ -93,11 +93,9 @@ services:
     restart: unless-stopped
     networks:
       - npg-network
-    environment:
-      - NPG_BASE_URL=http://npg-api:8080
-      - NPG_USERNAME=${NPG_USERNAME}
-      - NPG_PASSWORD=${NPG_PASSWORD}
-      - MCP_PORT=8081
+    # All runtime config comes from .env (see .env.example). No secrets here.
+    env_file:
+      - .env
     ports:
       - "8081:8081"
 
@@ -106,7 +104,15 @@ networks:
     external: true
 ```
 
-### Hermes MCP Config
+## Connecting to MCP Clients
+
+Deploying the server (Docker section above) publishes the MCP endpoint at `http://<host>:8081/mcp`. Add it to any MCP-capable agent by pointing at that URL.
+
+> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), every MCP request MUST carry the `Authorization: Bearer <MCP_API_TOKEN>` header** — requests without it get `401`. Every client config below shows where the header goes. The token (`openssl rand -hex 32`) is set in the server's `.env` as `MCP_API_TOKEN`.
+
+### Hermes Agent
+
+Add to `~/.hermes/config.yaml` under `mcp_servers`, then restart Hermes (MCP servers are discovered at startup; no hot-reload):
 
 ```yaml
 mcp_servers:
@@ -117,7 +123,55 @@ mcp_servers:
       Authorization: "Bearer <MCP_API_TOKEN>"
 ```
 
-> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), the client MUST send the `Authorization: Bearer <token>` header** — requests without it get `401`. Configure the header in your MCP client as shown above.
+Or set it with the CLI instead of hand-editing the config:
+
+```bash
+hermes config set mcp_servers.npg-mcp.url 'http://<host>:8081/mcp'
+hermes config set mcp_servers.npg-mcp.headers.Authorization 'Bearer <MCP_API_TOKEN>'
+```
+
+Tools then appear as `mcp_npg_mcp_*` (e.g. `mcp_npg_mcp_npg_list_proxy_hosts`).
+
+### Claude Code / Claude Desktop
+
+Add to your Claude MCP settings (Claude Desktop: `claude_desktop_config.json`);
+Claude Code: `~/.claude.json` — `mcpServers` key, or `claude mcp add`):
+
+```json
+{
+  "mcpServers": {
+    "npg-mcp": {
+      "url": "http://<host>:8081/mcp",
+      "headers": { "Authorization": "Bearer <MCP_API_TOKEN>" }
+    }
+  }
+}
+```
+
+### OpenAI Codex CLI
+
+Add to `~/.codex/config.toml` under `[mcp_servers.npg-mcp]`:
+
+```toml
+[mcp_servers.npg-mcp]
+url = "http://<host>:8081/mcp"
+headers = { Authorization = "Bearer <MCP_API_TOKEN>" }
+```
+
+### Cursor / VS Code / Other MCP Clients
+
+Add a **remote / SSE+HTTP MCP server** entry in the client's MCP settings with:
+
+- **URL:** `http://<host>:8081/mcp`
+- **Headers:** `Authorization: Bearer <MCP_API_TOKEN>` (if a token is configured)
+
+Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) can connect. The endpoint is a standard FastMCP Streamable HTTP server.
+
+### Network & Firewall Notes
+
+- The server listens on `MCP_PORT` (default `8081`) bound to `MCP_HOST` (default `0.0.0.0`).
+- **DNS-rebinding protection** (`MCP_REBINDING_PROTECTION=true` by default) rejects requests whose `Host` header isn't in `MCP_ALLOWED_HOSTS`. If clients connect by hostname/IP not covered by the default (`localhost:8081,127.0.0.1:8081`), add it to `MCP_ALLOWED_HOSTS` in `.env`, e.g. `MCP_ALLOWED_HOSTS=127.0.0.1:8081,mynas.local:8081,192.168.1.50:8081`.
+- **Security first:** only expose the MCP endpoint to trusted networks. If you must expose it publicly, set `MCP_API_TOKEN` and keep `MCP_ALLOWED_HOSTS`/`MCP_ALLOWED_ORIGINS` scoped (README §Environment Variables).
 
 ## Authentication
 
