@@ -8,256 +8,1001 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 > **⚠️ Vibe-coded with an AI agent.** This codebase was generated at speed by an AI agent, not hand-crafted by a human. Expect rough edges, unhandled edge cases, and bugs. Do **not** deploy it to an active/production NginxProxyGuard instance without first testing against a **sandboxed / disposable NPG environment** and reviewing the code. It can create, update, delete, and reconfigure live proxy hosts, so verify in isolation before pointing it at real infrastructure.
 
-## Features
-
-108+ MCP tools across all NPG API categories:
-
-| Category | Tools |
-|----------|-------|
-| **Auth** | login, logout, me |
-| **Dashboard** | overview, health, geoip stats |
-| **Proxy Hosts** | list, get, create, update, delete, test, clone, sync, regenerate |
-| **Security (per-host)** | rate limit, bot filter, security headers (+presets), upstream, URI block, fail2ban, challenge/CAPTCHA |
-| **Geo Restriction** | get, create, update, delete (per-host) |
-| **Certificates** | list, get, create, delete, renew |
-| **Redirect Hosts** | list, get, create, update, delete |
-| **Access Lists** | list, get, create, update, delete |
-| **DNS Providers** | list, get, create, update, delete, test |
-| **Cloud Providers** | list, get, create, update, delete |
-| **WAF** | list rules, get hosts/config, disable rules |
-| **Exploit Rules** | list, get, create, update, delete, toggle |
-| **Settings** | global settings, system settings, nginx sync |
-| **Logs** | access logs, audit logs, system logs, stats |
-| **Backups** | list, get, create, delete, restore |
-| **API Tokens** | list, get, create, update, revoke, delete |
-
 ## Tools Reference
 
-The server exposes **108 MCP tools** across the following categories:
+The server exposes **108 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
-- **Auth** (4)
-- **Dashboard** (3)
-- **Proxy Hosts** (10)
-- **SSL / Nginx** (8)
-- **Redirect Hosts** (5)
-- **Security (per-host)** (12)
-- **Geo Restriction** (5)
-- **Fail2ban & Challenge** (6)
-- **Access Lists** (5)
-- **DNS Providers** (6)
-- **Cloud Providers** (5)
-- **GeoIP** (2)
-- **Banned IPs & Bots** (4)
-- **URI Block** (2)
-- **WAF & Exploit Rules** (10)
-- **Settings** (4)
-- **Logs** (6)
-- **Backups** (5)
-- **API Tokens** (6)
+- **Auth** — 4 tools
+- **Dashboard** — 3 tools
+- **Proxy Hosts** — 10 tools
+- **SSL / Nginx** — 8 tools
+- **Redirect Hosts** — 5 tools
+- **Security (per-host)** — 12 tools
+- **Geo Restriction** — 5 tools
+- **Fail2ban & Challenge** — 6 tools
+- **Access Lists** — 5 tools
+- **DNS Providers** — 6 tools
+- **Cloud Providers** — 5 tools
+- **GeoIP** — 2 tools
+- **Banned IPs & Bots** — 4 tools
+- **URI Block** — 2 tools
+- **WAF & Exploit Rules** — 10 tools
+- **Settings** — 4 tools
+- **Logs** — 6 tools
+- **Backups** — 5 tools
+- **API Tokens** — 6 tools
 
 ### Auth (4)
 
-| Tool | Description |
-|------|-------------|
-| `npg_auth_login` | Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client. |
-| `npg_auth_logout` | Invalidate the current session token. |
-| `npg_auth_me` | Get the current authenticated user's info. |
-| `npg_change_password` | Change the current user's password. REQUIRED: current_password, new_password (min 8 chars). |
+#### `npg_auth_login`
+
+Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `username` | `string` | ✔ |  |
+| `password` | `string` | ✔ |  |
+| `tfa_code` | `string/null` | — | `null` |
+
+#### `npg_auth_logout`
+
+Invalidate the current session token.
+
+_No parameters._
+
+#### `npg_auth_me`
+
+Get the current authenticated user's info.
+
+_No parameters._
+
+#### `npg_change_password`
+
+Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `current_password` | `string` | ✔ |  |
+| `new_password` | `string` | ✔ |  |
 
 ### Dashboard (3)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_dashboard` | Get dashboard data (summary of proxy hosts, certificates, etc.). |
-| `npg_get_dashboard_health` | Get system health status. |
-| `npg_get_dashboard_geoip_stats` | GET GeoIP statistics by country for the dashboard. |
+#### `npg_get_dashboard`
+
+Get dashboard data (summary of proxy hosts, certificates, etc.).
+
+_No parameters._
+
+#### `npg_get_dashboard_health`
+
+Get system health status.
+
+_No parameters._
+
+#### `npg_get_dashboard_geoip_stats`
+
+GET GeoIP statistics by country for the dashboard.
+
+_No parameters._
 
 ### Proxy Hosts (10)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_proxy_hosts` | List all proxy hosts. Returns a list of proxy host objects. |
-| `npg_get_proxy_host` | Get a single proxy host by its ID. |
-| `npg_get_proxy_host_by_domain` | Get a proxy host by its domain name. |
-| `npg_create_proxy_host` | Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled, block_http, ssl_forced, ssl_cert_id, cache_enabled, etc. |
-| `npg_update_proxy_host` | Update an existing proxy host. Pass only the fields you want to change. Use `?skip_nginx=true` to skip nginx regeneration. |
-| `npg_delete_proxy_host` | Delete a proxy host by its ID. |
-| `npg_test_proxy_host` | Test upstream connectivity for a proxy host. |
-| `npg_regenerate_config` | Regenerate nginx config for a specific proxy host without touching others. |
-| `npg_sync_proxy_hosts` | Sync all proxy host configs and reload nginx. |
-| `npg_clone_proxy_host` | Clone a proxy host with new domain names. Returns the new proxy host. |
+#### `npg_list_proxy_hosts`
+
+List all proxy hosts. Returns a list of proxy host objects.
+
+_No parameters._
+
+#### `npg_get_proxy_host`
+
+Get a single proxy host by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_get_proxy_host_by_domain`
+
+Get a proxy host by its domain name.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `domain` | `string` | ✔ |  |
+
+#### `npg_create_proxy_host`
+
+Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled, block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `domain_names` | `array<string>` | ✔ |  |
+| `forward_host` | `string` | ✔ |  |
+| `forward_port` | `int` | ✔ |  |
+| `forward_scheme` | `string` | — | `"http"` |
+| `block_normal` | `bool` | — | `false` |
+| `waf_enabled` | `bool` | — | `false` |
+| `block_http` | `bool` | — | `false` |
+| `ssl_enabled` | `bool` | — | `true` |
+| `ssl_forced` | `bool` | — | `true` |
+| `ssl_cert_id` | `string/int/null` | — | `null` |
+| `cache_enabled` | `bool` | — | `false` |
+| `cache_template` | `string` | — | `"ignore"` |
+| `advanced_config` | `string` | — | `""` |
+| `enable_proxy_headers` | `bool` | — | `true` |
+| `host_header` | `string/null` | — | `null` |
+| `extra_domains` | `array<any>/null` | — | `null` |
+| `block_exploits` | `bool` | — | `false` |
+
+#### `npg_update_proxy_host`
+
+Update an existing proxy host. Pass only the fields you want to change. Use `?skip_nginx=true` to skip nginx regeneration.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `domain_names` | `array<any>/null` | — | `null` |
+| `forward_host` | `string/null` | — | `null` |
+| `forward_port` | `int/null` | — | `null` |
+| `forward_scheme` | `string/null` | — | `null` |
+| `block_normal` | `bool/null` | — | `null` |
+| `waf_enabled` | `bool/null` | — | `null` |
+| `block_http` | `bool/null` | — | `null` |
+| `ssl_forced` | `bool/null` | — | `null` |
+| `ssl_cert_id` | `string/int/null` | — | `null` |
+| `cache_enabled` | `bool/null` | — | `null` |
+| `cache_template` | `string/null` | — | `null` |
+| `advanced_config` | `string/null` | — | `null` |
+| `enable_proxy_headers` | `bool/null` | — | `null` |
+| `host_header` | `string/null` | — | `null` |
+| `extra_domains` | `array<any>/null` | — | `null` |
+| `enabled` | `bool/null` | — | `null` |
+| `ssl_http2` | `bool/null` | — | `null` |
+| `ssl_http3` | `bool/null` | — | `null` |
+| `block_exploits` | `bool/null` | — | `null` |
+| `skip_nginx` | `bool` | — | `false` |
+
+#### `npg_delete_proxy_host`
+
+Delete a proxy host by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_test_proxy_host`
+
+Test upstream connectivity for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_regenerate_config`
+
+Regenerate nginx config for a specific proxy host without touching others.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_sync_proxy_hosts`
+
+Sync all proxy host configs and reload nginx.
+
+_No parameters._
+
+#### `npg_clone_proxy_host`
+
+Clone a proxy host with new domain names. Returns the new proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `domain_names` | `array<string>` | ✔ |  |
 
 ### SSL / Nginx (8)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_certificates` | List all SSL/TLS certificates. |
-| `npg_get_certificate` | Get a certificate by its ID. |
-| `npg_create_certificate` | Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc. |
-| `npg_delete_certificate` | Delete a certificate by its ID. |
-| `npg_renew_certificate` | Renew a certificate by its ID. |
-| `npg_reload_nginx` | Reload nginx configuration without full restart. |
-| `npg_sync_nginx` | Sync all configs and reload nginx. |
-| `npg_test_nginx` | Test nginx configuration for validity. |
+#### `npg_list_certificates`
+
+List all SSL/TLS certificates.
+
+_No parameters._
+
+#### `npg_get_certificate`
+
+Get a certificate by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `cert_id` | `string/int` | ✔ |  |
+
+#### `npg_create_certificate`
+
+Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `domain_names` | `array<string>` | ✔ |  |
+| `email` | `string` | ✔ |  |
+| `provider` | `string` | — | `"letsencrypt"` |
+| `dns_provider_id` | `string/null` | — | `null` |
+
+#### `npg_delete_certificate`
+
+Delete a certificate by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `cert_id` | `string/int` | ✔ |  |
+
+#### `npg_renew_certificate`
+
+Renew a certificate by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `cert_id` | `string/int` | ✔ |  |
+
+#### `npg_reload_nginx`
+
+Reload nginx configuration without full restart.
+
+_No parameters._
+
+#### `npg_sync_nginx`
+
+Sync all configs and reload nginx.
+
+_No parameters._
+
+#### `npg_test_nginx`
+
+Test nginx configuration for validity.
+
+_No parameters._
 
 ### Redirect Hosts (5)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_redirect_hosts` | List all redirect hosts. |
-| `npg_get_redirect_host` | Get a redirect host by its ID. |
-| `npg_create_redirect_host` | Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, default 301). |
-| `npg_update_redirect_host` | Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code. |
-| `npg_delete_redirect_host` | Delete a redirect host by its ID. |
+#### `npg_list_redirect_hosts`
+
+List all redirect hosts.
+
+_No parameters._
+
+#### `npg_get_redirect_host`
+
+Get a redirect host by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_create_redirect_host`
+
+Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, default 301).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `domain_names` | `array<string>` | ✔ |  |
+| `forward_domain_name` | `string` | ✔ |  |
+| `forward_scheme` | `string` | — | `"auto"` |
+| `preserve_path` | `bool` | — | `true` |
+| `redirect_code` | `int` | — | `301` |
+
+#### `npg_update_redirect_host`
+
+Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `domain_names` | `array<any>/null` | — | `null` |
+| `forward_domain_name` | `string/null` | — | `null` |
+| `forward_scheme` | `string/null` | — | `null` |
+| `preserve_path` | `bool/null` | — | `null` |
+| `redirect_code` | `int/null` | — | `null` |
+
+#### `npg_delete_redirect_host`
+
+Delete a redirect host by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
 
 ### Security (per-host) (12)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_proxy_host_rate_limit` | GET rate limit configuration for a proxy host. |
-| `npg_update_proxy_host_rate_limit` | UPDATE rate limit configuration for a proxy host. Body: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response |
-| `npg_get_proxy_host_bot_filter` | GET bot filter configuration for a proxy host. |
-| `npg_update_proxy_host_bot_filter` | UPDATE bot filter configuration for a proxy host. Required: host_id (str\|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list). |
-| `npg_get_proxy_host_security_headers` | GET security headers configuration for a proxy host. |
-| `npg_update_proxy_host_security_headers` | UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy |
-| `npg_apply_security_header_preset` | APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. |
-| `npg_get_proxy_host_upstream` | GET upstream/load balancing configuration for a proxy host. |
-| `npg_update_proxy_host_upstream` | UPDATE upstream/load balancing configuration. Body: name, scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval |
-| `npg_get_proxy_host_uri_block` | GET URI block configuration for a proxy host. |
-| `npg_update_proxy_host_uri_block` | UPDATE URI block configuration. Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips |
-| `npg_get_security_headers_presets` | Get available security header presets. |
+#### `npg_get_proxy_host_rate_limit`
+
+GET rate limit configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_rate_limit`
+
+UPDATE rate limit configuration for a proxy host. Body: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `requests_per_second` | `int` | ✔ |  |
+| `burst_size` | `int` | ✔ |  |
+| `zone_size` | `string` | — | `"10m"` |
+| `limit_by` | `string` | — | `"ip"` |
+| `limit_response` | `int` | — | `429` |
+
+#### `npg_get_proxy_host_bot_filter`
+
+GET bot filter configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_bot_filter`
+
+UPDATE bot filter configuration for a proxy host. Required: host_id (str\|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `block_bad_bots` | `bool` | — | `true` |
+| `block_ai_bots` | `bool` | — | `false` |
+| `allow_search_engines` | `bool` | — | `true` |
+| `block_suspicious_clients` | `bool` | — | `false` |
+| `challenge_suspicious` | `bool` | — | `false` |
+| `disable_global` | `bool` | — | `false` |
+| `custom_blocked_agents` | `string/null` | — | `null` |
+
+#### `npg_get_proxy_host_security_headers`
+
+GET security headers configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_security_headers`
+
+UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `hsts_enabled` | `bool` | — | `true` |
+| `hsts_max_age` | `int` | — | `31536000` |
+| `hsts_include_subdomains` | `bool` | — | `true` |
+| `hsts_preload` | `bool` | — | `false` |
+| `x_frame_options` | `string` | — | `"SAMEORIGIN"` |
+| `x_content_type_options` | `bool` | — | `true` |
+| `x_xss_protection` | `bool` | — | `true` |
+| `referrer_policy` | `string` | — | `"strict-origin-when-cross-origin"` |
+| `content_security_policy` | `string` | — | `""` |
+
+#### `npg_apply_security_header_preset`
+
+APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `preset` | `string` | ✔ |  |
+
+#### `npg_get_proxy_host_upstream`
+
+GET upstream/load balancing configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_upstream`
+
+UPDATE upstream/load balancing configuration. Body: name, scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `scheme` | `string` | — | `"http"` |
+| `servers` | `array<any>/null` | — | `null` |
+| `load_balance` | `string` | — | `"round_robin"` |
+| `health_check_enabled` | `bool` | — | `false` |
+| `health_check_path` | `string` | — | `"/"` |
+| `health_check_interval` | `int` | — | `10` |
+
+#### `npg_get_proxy_host_uri_block`
+
+GET URI block configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_uri_block`
+
+UPDATE URI block configuration. Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `rules` | `array<any>/null` | — | `null` |
+| `exception_ips` | `array<any>/null` | — | `null` |
+| `allow_private_ips` | `bool` | — | `true` |
+
+#### `npg_get_security_headers_presets`
+
+Get available security header presets.
+
+_No parameters._
 
 ### Geo Restriction (5)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_proxy_host_geo` | GET geo restriction configuration for a proxy host. |
-| `npg_create_proxy_host_geo` | CREATE geo restriction for a proxy host. Body: enabled, mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode |
-| `npg_update_proxy_host_geo` | UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed_ips, challenge_mode |
-| `npg_delete_proxy_host_geo` | DELETE geo restriction for a proxy host. |
-| `npg_list_countries` | List available country codes for GeoIP blocking. |
+#### `npg_get_proxy_host_geo`
+
+GET geo restriction configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_create_proxy_host_geo`
+
+CREATE geo restriction for a proxy host. Body: enabled, mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `mode` | `string` | — | `"blacklist"` |
+| `countries` | `array<any>/null` | — | `null` |
+| `allowed_ips` | `array<any>/null` | — | `null` |
+| `challenge_mode` | `bool` | — | `false` |
+
+#### `npg_update_proxy_host_geo`
+
+UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed_ips, challenge_mode
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `mode` | `string` | — | `"blacklist"` |
+| `countries` | `array<any>/null` | — | `null` |
+| `allowed_ips` | `array<any>/null` | — | `null` |
+| `challenge_mode` | `bool` | — | `false` |
+
+#### `npg_delete_proxy_host_geo`
+
+DELETE geo restriction for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_list_countries`
+
+List available country codes for GeoIP blocking.
+
+_No parameters._
 
 ### Fail2ban & Challenge (6)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_proxy_host_fail2ban` | GET fail2ban configuration for a proxy host. |
-| `npg_update_proxy_host_fail2ban` | UPDATE fail2ban configuration. Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge) |
-| `npg_get_proxy_host_challenge` | GET CAPTCHA/challenge configuration for a proxy host. |
-| `npg_update_proxy_host_challenge` | UPDATE CAPTCHA/challenge configuration. Body: enabled, challenge_type (captcha/js_challenge), difficulty, site_key, token_validity, min_score, apply_to, page_title, challenge_ips |
-| `npg_delete_proxy_host_challenge` | DELETE CAPTCHA/challenge configuration for a proxy host. |
-| `npg_verify_challenge` | Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution. |
+#### `npg_get_proxy_host_fail2ban`
+
+GET fail2ban configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_fail2ban`
+
+UPDATE fail2ban configuration. Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge)
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `max_retries` | `int` | — | `5` |
+| `find_time` | `int` | — | `600` |
+| `ban_time` | `int` | — | `3600` |
+| `fail_codes` | `string` | — | `"401,403"` |
+| `action` | `string` | — | `"block"` |
+
+#### `npg_get_proxy_host_challenge`
+
+GET CAPTCHA/challenge configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_challenge`
+
+UPDATE CAPTCHA/challenge configuration. Body: enabled, challenge_type (captcha/js_challenge), difficulty, site_key, token_validity, min_score, apply_to, page_title, challenge_ips
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `enabled` | `bool` | ✔ |  |
+| `challenge_type` | `string` | — | `"captcha"` |
+| `difficulty` | `string` | — | `"medium"` |
+| `site_key` | `string` | — | `""` |
+| `token_validity` | `int` | — | `86400` |
+| `min_score` | `number` | — | `0.5` |
+| `apply_to` | `string` | — | `"both"` |
+| `page_title` | `string` | — | `"Security Check"` |
+
+#### `npg_delete_proxy_host_challenge`
+
+DELETE CAPTCHA/challenge configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_verify_challenge`
+
+Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `token` | `string` | ✔ |  |
+| `solution` | `string` | ✔ |  |
 
 ### Access Lists (5)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_access_lists` | List all access lists (authentication/restriction lists). |
-| `npg_get_access_list` | Get an access list by its ID. |
-| `npg_create_access_list` | Create a new access list. Required: name, advanced_config (block/allow rules). |
-| `npg_update_access_list` | Update an access list. Pass only fields to change. |
-| `npg_delete_access_list` | Delete an access list by its ID. |
+#### `npg_list_access_lists`
+
+List all access lists (authentication/restriction lists).
+
+_No parameters._
+
+#### `npg_get_access_list`
+
+Get an access list by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `list_id` | `string/int` | ✔ |  |
+
+#### `npg_create_access_list`
+
+Create a new access list. Required: name, advanced_config (block/allow rules).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `advanced_config` | `string` | — | `""` |
+| `clients` | `array<any>/null` | — | `null` |
+
+#### `npg_update_access_list`
+
+Update an access list. Pass only fields to change.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `list_id` | `string/int` | ✔ |  |
+| `name` | `string/null` | — | `null` |
+| `advanced_config` | `string/null` | — | `null` |
+| `clients` | `array<any>/null` | — | `null` |
+
+#### `npg_delete_access_list`
+
+Delete an access list by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `list_id` | `string/int` | ✔ |  |
 
 ### DNS Providers (6)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_dns_providers` | List all DNS providers configured for DNS-01 challenges. |
-| `npg_get_dns_provider` | Get a DNS provider by its ID. |
-| `npg_create_dns_provider` | Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}). |
-| `npg_update_dns_provider` | Update a DNS provider. Pass only fields to change (dict). |
-| `npg_delete_dns_provider` | Delete a DNS provider by its ID. |
-| `npg_test_dns_provider` | Test DNS provider credentials. |
+#### `npg_list_dns_providers`
+
+List all DNS providers configured for DNS-01 challenges.
+
+_No parameters._
+
+#### `npg_get_dns_provider`
+
+Get a DNS provider by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+
+#### `npg_create_dns_provider`
+
+Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `provider_type` | `string` | ✔ |  |
+| `credentials` | `object/null` | — | `null` |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_update_dns_provider`
+
+Update a DNS provider. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_delete_dns_provider`
+
+Delete a DNS provider by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+
+#### `npg_test_dns_provider`
+
+Test DNS provider credentials.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
 
 ### Cloud Providers (5)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_cloud_providers` | List all cloud providers (for certificate DNS challenges). |
-| `npg_get_cloud_provider` | Get a cloud provider by its slug. |
-| `npg_create_cloud_provider` | Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description. |
-| `npg_update_cloud_provider` | Update a cloud provider by its slug. Pass only fields to change (dict). |
-| `npg_delete_cloud_provider` | Delete a cloud provider by its slug. |
+#### `npg_list_cloud_providers`
+
+List all cloud providers (for certificate DNS challenges).
+
+_No parameters._
+
+#### `npg_get_cloud_provider`
+
+Get a cloud provider by its slug.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `slug` | `string` | ✔ |  |
+
+#### `npg_create_cloud_provider`
+
+Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `slug` | `string` | ✔ |  |
+| `ip_ranges` | `array<string>` | ✔ |  |
+| `region` | `string/null` | — | `null` |
+| `description` | `string/null` | — | `null` |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_update_cloud_provider`
+
+Update a cloud provider by its slug. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `slug` | `string` | ✔ |  |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_delete_cloud_provider`
+
+Delete a cloud provider by its slug.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `slug` | `string` | ✔ |  |
 
 ### GeoIP (2)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_geoip_status` | Get GeoIP database update status. |
-| `npg_update_geoip` | Update GeoIP databases. |
+#### `npg_get_geoip_status`
+
+Get GeoIP database update status.
+
+_No parameters._
+
+#### `npg_update_geoip`
+
+Update GeoIP databases.
+
+_No parameters._
 
 ### Banned IPs & Bots (4)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_banned_ips` | List banned IP addresses. |
-| `npg_ban_ip` | Ban an IP address. Required: ip. Optional: ban_time (seconds). |
-| `npg_unban_ip` | Unban an IP by its ID. |
-| `npg_get_bots_known` | Get list of known bot user-agent signatures. |
+#### `npg_list_banned_ips`
+
+List banned IP addresses.
+
+_No parameters._
+
+#### `npg_ban_ip`
+
+Ban an IP address. Required: ip. Optional: ban_time (seconds).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `ip_address` | `string` | ✔ |  |
+| `reason` | `string` | — | `"Manual ban via API"` |
+| `duration` | `int` | — | `3600` |
+
+#### `npg_unban_ip`
+
+Unban an IP by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `ip_id` | `string/int` | ✔ |  |
+
+#### `npg_get_bots_known`
+
+Get list of known bot user-agent signatures.
+
+_No parameters._
 
 ### URI Block (2)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_global_uri_block` | Get global URI block settings. |
-| `npg_update_global_uri_block` | Update global URI block settings. Pass only fields to change (dict). |
+#### `npg_get_global_uri_block`
+
+Get global URI block settings.
+
+_No parameters._
+
+#### `npg_update_global_uri_block`
+
+Update global URI block settings. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `kwargs` | `object/null` | — | `null` |
 
 ### WAF & Exploit Rules (10)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_exploit_rules` | List exploit block rules. |
-| `npg_get_exploit_rule` | Get an exploit rule by its ID. |
-| `npg_create_exploit_rule` | Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description. |
-| `npg_update_exploit_rule` | Update an exploit rule. Pass only fields to change (dict). |
-| `npg_delete_exploit_rule` | Delete an exploit rule by its ID. |
-| `npg_toggle_exploit_rule` | Toggle an exploit rule's enabled status. |
-| `npg_list_waf_rules` | List all WAF (Web Application Firewall) rules. |
-| `npg_get_waf_hosts` | Get WAF config for all proxy hosts. |
-| `npg_get_waf_host_config` | Get WAF config for a specific proxy host. |
-| `npg_disable_waf_rule` | Disable a WAF rule for a specific proxy host. |
+#### `npg_list_exploit_rules`
+
+List exploit block rules.
+
+_No parameters._
+
+#### `npg_get_exploit_rule`
+
+Get an exploit rule by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
+
+#### `npg_create_exploit_rule`
+
+Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `category` | `string` | ✔ |  |
+| `name` | `string` | ✔ |  |
+| `pattern` | `string` | ✔ |  |
+| `pattern_type` | `string` | ✔ |  |
+| `severity` | `string/null` | — | `null` |
+| `description` | `string/null` | — | `null` |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_update_exploit_rule`
+
+Update an exploit rule. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_delete_exploit_rule`
+
+Delete an exploit rule by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
+
+#### `npg_toggle_exploit_rule`
+
+Toggle an exploit rule's enabled status.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
+
+#### `npg_list_waf_rules`
+
+List all WAF (Web Application Firewall) rules.
+
+_No parameters._
+
+#### `npg_get_waf_hosts`
+
+Get WAF config for all proxy hosts.
+
+_No parameters._
+
+#### `npg_get_waf_host_config`
+
+Get WAF config for a specific proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_disable_waf_rule`
+
+Disable a WAF rule for a specific proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `rule_id` | `string/int` | ✔ |  |
 
 ### Settings (4)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_settings` | Get global NPG settings. |
-| `npg_update_settings` | Update global NPG settings. Pass only fields to change (dict). |
-| `npg_get_system_settings` | Get system settings (server name, timezone, locale). |
-| `npg_update_system_settings` | Update system settings. Pass only fields to change (dict). |
+#### `npg_get_settings`
+
+Get global NPG settings.
+
+_No parameters._
+
+#### `npg_update_settings`
+
+Update global NPG settings. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_get_system_settings`
+
+Get system settings (server name, timezone, locale).
+
+_No parameters._
+
+#### `npg_update_system_settings`
+
+Update system settings. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `kwargs` | `object/null` | — | `null` |
 
 ### Logs (6)
 
-| Tool | Description |
-|------|-------------|
-| `npg_get_logs` | Get access logs. |
-| `npg_get_log_settings` | Get log settings. |
-| `npg_update_log_settings` | Update log settings. Pass only fields to change (dict). |
-| `npg_get_log_stats` | Get log statistics. |
-| `npg_list_audit_logs` | List audit log entries. |
-| `npg_list_system_logs` | List system logs. |
+#### `npg_get_logs`
+
+Get access logs.
+
+_No parameters._
+
+#### `npg_get_log_settings`
+
+Get log settings.
+
+_No parameters._
+
+#### `npg_update_log_settings`
+
+Update log settings. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_get_log_stats`
+
+Get log statistics.
+
+_No parameters._
+
+#### `npg_list_audit_logs`
+
+List audit log entries.
+
+_No parameters._
+
+#### `npg_list_system_logs`
+
+List system logs.
+
+_No parameters._
 
 ### Backups (5)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_backups` | List all backups. |
-| `npg_get_backup` | Get a backup by its ID. |
-| `npg_create_backup` | Create a new backup. |
-| `npg_delete_backup` | Delete a backup by its ID. |
-| `npg_restore_backup` | Restore from a backup. Required: backup_id. |
+#### `npg_list_backups`
+
+List all backups.
+
+_No parameters._
+
+#### `npg_get_backup`
+
+Get a backup by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `backup_id` | `string/int` | ✔ |  |
+
+#### `npg_create_backup`
+
+Create a new backup.
+
+_No parameters._
+
+#### `npg_delete_backup`
+
+Delete a backup by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `backup_id` | `string/int` | ✔ |  |
+
+#### `npg_restore_backup`
+
+Restore from a backup. Required: backup_id.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `backup_id` | `string/int` | ✔ |  |
 
 ### API Tokens (6)
 
-| Tool | Description |
-|------|-------------|
-| `npg_list_api_tokens` | List all API tokens. |
-| `npg_get_api_token` | Get an API token by its ID. |
-| `npg_create_api_token` | Create a new API token. Required: name, permissions (array). Optional: expires_at. |
-| `npg_update_api_token` | Update an API token. Pass only fields to change (dict). |
-| `npg_revoke_api_token` | Revoke an API token by its ID. |
-| `npg_delete_api_token` | Delete an API token by its ID. |
+#### `npg_list_api_tokens`
 
+List all API tokens.
+
+_No parameters._
+
+#### `npg_get_api_token`
+
+Get an API token by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `token_id` | `string/int` | ✔ |  |
+
+#### `npg_create_api_token`
+
+Create a new API token. Required: name, permissions (array). Optional: expires_at.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `permissions` | `array<string>` | ✔ |  |
+| `expires_at` | `string/null` | — | `null` |
+
+#### `npg_update_api_token`
+
+Update an API token. Pass only fields to change (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `token_id` | `string/int` | ✔ |  |
+| `kwargs` | `object/null` | — | `null` |
+
+#### `npg_revoke_api_token`
+
+Revoke an API token by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `token_id` | `string/int` | ✔ |  |
+
+#### `npg_delete_api_token`
+
+Delete an API token by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `token_id` | `string/int` | ✔ |  |
 
 ## Quick Start
 
