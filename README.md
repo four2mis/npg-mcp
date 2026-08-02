@@ -113,13 +113,17 @@ mcp_servers:
   npg-mcp:
     url: http://<host>:8081/mcp
     connect_timeout: 30
+    headers:
+      Authorization: "Bearer <MCP_API_TOKEN>"
 ```
+
+> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), the client MUST send the `Authorization: Bearer <token>` header** — requests without it get `401`. Configure the header in your MCP client as shown above.
 
 ## Authentication
 
 The server **auto-authenticates** on first use using `NPG_USERNAME` and `NPG_PASSWORD`. No manual token management needed — every tool call automatically refreshes auth.
 
-Alternatively, call `npg_auth_login` directly for explicit authentication.
+Alternatively, call `npg_auth_login` directly for explicit authentication. The resulting NPG session token is stored **server-side only** and is never returned to the client.
 
 ## Environment Variables
 
@@ -129,6 +133,11 @@ Alternatively, call `npg_auth_login` directly for explicit authentication.
 | `NPG_USERNAME` | — | NPG login username (required) |
 | `NPG_PASSWORD` | — | NPG login password (required) |
 | `MCP_PORT` | `8081` | MCP server listening port |
+| `MCP_HOST` | `0.0.0.0` | MCP server bind host |
+| `MCP_API_TOKEN` | *(empty)* | Bearer token required on the MCP endpoint. **Leave empty for open (local/LAN-only) mode.** Generate with `openssl rand -hex 32`. |
+| `MCP_ALLOWED_HOSTS` | `localhost:port` | Comma-separated `host:port` whose `Host` header the endpoint accepts (e.g. your reverse-proxy public host) |
+| `MCP_ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins accepted for cross-origin requests; restricts CSRF |
+| `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 
 ## Project Structure
 

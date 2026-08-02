@@ -7,21 +7,43 @@ from contextvars import ContextVar
 from urllib.parse import quote
 
 from mcp.server import transport_security
-
-# Patch TransportSecuritySettings to allow Docker reverse-proxy access
-_original_tss_init = transport_security.TransportSecuritySettings.__init__
-def _patched_tss_init(self, **kwargs):
-    _original_tss_init(self, **kwargs)
-    self.enable_dns_rebinding_protection = False
-    self.allowed_hosts = ['*:*']
-    self.allowed_origins = ['*']
-transport_security.TransportSecuritySettings.__init__ = _patched_tss_init
-
 from mcp.server.fastmcp import FastMCP
 import npg_mcp.client as client_mod
 
 # Context variable for per-request token (future use)
 _current_token: ContextVar[str] = ContextVar("npg_token", default="")
+
+
+def _load_transport_security() -> transport_security.TransportSecuritySettings:
+    """Build scoped transport-security settings from env config.
+
+    Restricts which Host headers and Origins the MCP endpoint will accept,
+    and keeps DNS-rebinding protection enabled by default. Configure via:
+      - MCP_ALLOWED_HOSTS   comma-separated "host:port" (e.g. "localhost:8081,proxy.example.com:443")
+      - MCP_ALLOWED_ORIGINS comma-separated origins (e.g. "https://proxy.example.com")
+      - MCP_REBINDING_PROTECTION  "true"/"false" (default true)
+    """
+    default_hosts = [
+        f"127.0.0.1:{os.environ.get('MCP_PORT', '8081')}",
+        f"localhost:{os.environ.get('MCP_PORT', '8081')}",
+    ]
+    hosts = os.environ.get("MCP_ALLOWED_HOSTS", "").strip()
+    if hosts:
+        host_list = [h.strip() for h in hosts.split(",") if h.strip()]
+    else:
+        host_list = list(default_hosts)
+
+    origins = os.environ.get("MCP_ALLOWED_ORIGINS", "").strip()
+    origin_list = [o.strip() for o in origins.split(",") if o.strip()] if origins else []
+
+    rebinding = os.environ.get("MCP_REBINDING_PROTECTION", "true").lower() not in ("false", "0", "no")
+
+    return transport_security.TransportSecuritySettings(
+        enable_dns_rebinding_protection=rebinding,
+        allowed_hosts=host_list,
+        allowed_origins=origin_list,
+    )
+
 
 mcp = FastMCP(
     name="npg-mcp",
@@ -29,6 +51,7 @@ mcp = FastMCP(
     stateless_http=True,
     host=os.environ.get("MCP_HOST", "0.0.0.0"),
     port=int(os.environ.get("MCP_PORT", "8081")),
+    transport_security=_load_transport_security(),
 )
 
 
@@ -60,14 +83,14 @@ def _id_path(id_val) -> str:
 
 # ── Auth ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_auth_login", description="Authenticate with NPG credentials and return a JWT token. Use this to obtain a token for subsequent tools.")
+@mcp.tool(name="npg_auth_login", description="Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client.")
 async def npg_auth_login(username: str, password: str, tfa_code: str | None = None) -> dict:
     c = _get_client()
     try:
         result = c.login(username, password, tfa_code)
-        return {"success": True, "token": result["token"], "user": result.get("user", {})}
+        return {"success": True, "message": "Authenticated", "user": result.get("user", {})}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "login failed"}
 
 @mcp.tool(name="npg_auth_logout", description="Invalidate the current session token.")
 async def npg_auth_logout() -> dict:
@@ -1224,6 +1247,34 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
         return {"success": False, "error": str(e)}
 
 
+def _bearer_auth_middleware(app, expected_token: str):
+    """Require `Authorization: Bearer <token>` on every request.
+
+    Returns the app unchanged if no MCP_API_TOKEN is configured (open mode,
+    for local/LAN-only use). When set, unauthenticated/non-matching requests
+    get a 401 and are never forwarded to MCP.
+    """
+    if not expected_token:
+        return app
+
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse
+
+    expected_bearer = f"Bearer {expected_token}"
+
+    class _AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            auth = request.headers.get("authorization", "")
+            if auth != expected_bearer:
+                return JSONResponse(
+                    {"error": "unauthorized: invalid or missing bearer token"},
+                    status_code=401,
+                )
+            return await call_next(request)
+
+    return _AuthMiddleware(app)
+
+
 def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "http":
@@ -1232,7 +1283,24 @@ def main() -> None:
         pass
     else:
         transport = "stdio"
-    mcp.run(transport=transport)
+
+    if transport == "stdio":
+        mcp.run(transport=transport)
+        return
+
+    # HTTP transport: build the Starlette app and wrap it with bearer auth.
+    import uvicorn
+
+    app = mcp.streamable_http_app()
+    token = os.environ.get("MCP_API_TOKEN", "").strip()
+    app = _bearer_auth_middleware(app, token)
+
+    host = os.environ.get("MCP_HOST", "0.0.0.0")
+    port = int(os.environ.get("MCP_PORT", "8081"))
+    server = uvicorn.Server(
+        uvicorn.Config(app, host=host, port=port, log_level="info")
+    )
+    server.run()
 
 
 if __name__ == "__main__":
