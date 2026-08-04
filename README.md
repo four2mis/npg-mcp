@@ -10,9 +10,8 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 ## Tools Reference
 
-The server exposes **105 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
+The server exposes **104 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
-- **Auth** — 1 tool
 - **Dashboard** — 3 tools
 - **Proxy Hosts** — 10 tools
 - **SSL / Nginx** — 8 tools
@@ -31,17 +30,6 @@ The server exposes **105 MCP tools**. Each tool is documented below with a short
 - **Logs** — 6 tools
 - **Backups** — 5 tools
 - **API Tokens** — 6 tools
-
-### Auth (1)
-
-#### `npg_change_password`
-
-Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).
-
-|| Param | Type | Required | Default |
-||-------|------|:---:|--------|
-|| `current_password` | `string` | ✔ |  |
-|| `new_password` | `string` | ✔ |  |
 
 ### Dashboard (3)
 

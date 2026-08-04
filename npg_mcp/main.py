@@ -80,18 +80,6 @@ def _id_path(id_val) -> str:
     return str(id_val)
 
 
-# ── Auth ──────────────────────────────────────────────────────────────
-
-@mcp.tool(name="npg_change_password", description="Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).")
-async def npg_change_password(current_password: str, new_password: str) -> dict:
-    c = _get_client()
-    try:
-        data = c.post("/api/v1/auth/change-password", {"current_password": current_password, "new_password": new_password})
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_list_proxy_hosts", description="List all proxy hosts. Returns a list of proxy host objects.")

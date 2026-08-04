@@ -10,9 +10,8 @@
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **105개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
+이 서버는 **104개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
 
-- **인증(Auth)** — 1개 도구
 - **대시보드(Dashboard)** — 3개 도구
 - **프록시 호스트(Proxy Hosts)** — 10개 도구
 - **SSL / Nginx** — 8개 도구
@@ -31,17 +30,6 @@
 - **로그(Logs)** — 6개 도구
 - **백업(Backups)** — 5개 도구
 - **API 토큰(API Tokens)** — 6개 도구
-
-### 인증(Auth) (1)
-
-#### `npg_change_password`
-
-Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).
-
-| 매개변수 | 유형 | 필수 | 기본값 |
-|---------|------|:---:|--------|
-| `current_password` | `str` | ✔ |  |
-| `new_password` | `str` | ✔ |  |
 
 ### 대시보드(Dashboard) (3)
 
