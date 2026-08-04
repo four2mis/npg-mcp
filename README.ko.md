@@ -10,9 +10,9 @@
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **108개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
+이 서버는 **105개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
 
-- **인증(Auth)** — 4개 도구
+- **인증(Auth)** — 1개 도구
 - **대시보드(Dashboard)** — 3개 도구
 - **프록시 호스트(Proxy Hosts)** — 10개 도구
 - **SSL / Nginx** — 8개 도구
@@ -32,29 +32,7 @@
 - **백업(Backups)** — 5개 도구
 - **API 토큰(API Tokens)** — 6개 도구
 
-### 인증(Auth) (4)
-
-#### `npg_auth_login`
-
-Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client.
-
-| 매개변수 | 유형 | 필수 | 기본값 |
-|---------|------|:---:|--------|
-| `username` | `str` | ✔ |  |
-| `password` | `str` | ✔ |  |
-| `tfa_code` | `str/null` | — | `null` |
-
-#### `npg_auth_logout`
-
-Invalidate the current session token.
-
-_매개변수 없음._
-
-#### `npg_auth_me`
-
-Get the current authenticated user's info.
-
-_매개변수 없음._
+### 인증(Auth) (1)
 
 #### `npg_change_password`
 
@@ -1154,8 +1132,6 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 서버는 `NPG_USERNAME`과 `NPG_PASSWORD`를 사용해 **첫 사용 시 자동 인증**합니다. 수동 토큰 관리가 필요 없습니다 — 모든 도구 호출이 인증을 자동으로 갱신합니다.
 
-또는 명시적 인증을 위해 `npg_auth_login`을 직접 호출할 수 있습니다. 생성된 NPG 세션 토큰은 **서버 측에만 저장**되며 클라이언트에 반환되지 않습니다.
-
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |
@@ -1174,7 +1150,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ```
 npg_mcp/
-  main.py       # 108+ 개의 모든 MCP 도구
+  main.py       # 105개의 모든 MCP 도구
   client.py     # 자동 인증을 갖춘 HTTP 클라이언트 래퍼
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드

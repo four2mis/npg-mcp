@@ -10,9 +10,9 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 ## Tools Reference
 
-The server exposes **108 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
+The server exposes **105 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
-- **Auth** — 4 tools
+- **Auth** — 1 tool
 - **Dashboard** — 3 tools
 - **Proxy Hosts** — 10 tools
 - **SSL / Nginx** — 8 tools
@@ -32,38 +32,16 @@ The server exposes **108 MCP tools**. Each tool is documented below with a short
 - **Backups** — 5 tools
 - **API Tokens** — 6 tools
 
-### Auth (4)
-
-#### `npg_auth_login`
-
-Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client.
-
-| Param | Type | Required | Default |
-|-------|------|:---:|--------|
-| `username` | `string` | ✔ |  |
-| `password` | `string` | ✔ |  |
-| `tfa_code` | `string/null` | — | `null` |
-
-#### `npg_auth_logout`
-
-Invalidate the current session token.
-
-_No parameters._
-
-#### `npg_auth_me`
-
-Get the current authenticated user's info.
-
-_No parameters._
+### Auth (1)
 
 #### `npg_change_password`
 
 Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).
 
-| Param | Type | Required | Default |
-|-------|------|:---:|--------|
-| `current_password` | `string` | ✔ |  |
-| `new_password` | `string` | ✔ |  |
+|| Param | Type | Required | Default |
+||-------|------|:---:|--------|
+|| `current_password` | `string` | ✔ |  |
+|| `new_password` | `string` | ✔ |  |
 
 ### Dashboard (3)
 
@@ -1154,8 +1132,6 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 The server **auto-authenticates** on first use using `NPG_USERNAME` and `NPG_PASSWORD`. No manual token management needed — every tool call automatically refreshes auth.
 
-Alternatively, call `npg_auth_login` directly for explicit authentication. The resulting NPG session token is stored **server-side only** and is never returned to the client.
-
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -1174,7 +1150,7 @@ Alternatively, call `npg_auth_login` directly for explicit authentication. The r
 
 ```
 npg_mcp/
-  main.py       # All 108+ MCP tools
+  main.py       # All 105 MCP tools
   client.py     # HTTP client wrapper with auto-auth
   __init__.py
 Dockerfile      # Multi-stage Docker build

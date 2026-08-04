@@ -72,10 +72,7 @@ def _get_client() -> client_mod.NPGClient:
         c.login(username, password)
         return c
 
-    raise RuntimeError(
-        "NPG_USERNAME/NPG_PASSWORD not set. "
-        "Use `npg_auth_login` tool to authenticate first."
-    )
+    raise RuntimeError("NPG_USERNAME/NPG_PASSWORD environment variables not set.")
 
 
 def _id_path(id_val) -> str:
@@ -84,32 +81,6 @@ def _id_path(id_val) -> str:
 
 
 # ── Auth ──────────────────────────────────────────────────────────────
-
-@mcp.tool(name="npg_auth_login", description="Authenticate with NPG credentials. The resulting session token is stored server-side; it is not returned to the client.")
-async def npg_auth_login(username: str, password: str, tfa_code: str | None = None) -> dict:
-    c = _get_client()
-    try:
-        result = c.login(username, password, tfa_code)
-        return {"success": True, "message": "Authenticated", "user": result.get("user", {})}
-    except Exception as e:
-        return {"success": False, "error": "login failed"}
-
-@mcp.tool(name="npg_auth_logout", description="Invalidate the current session token.")
-async def npg_auth_logout() -> dict:
-    c = _get_client()
-    try:
-        c.logout()
-        return {"success": True, "message": "Logged out"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_auth_me", description="Get the current authenticated user's info.")
-async def npg_auth_me() -> dict:
-    c = _get_client()
-    try:
-        return {"success": True, "data": c.me()}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_change_password", description="Change the current user's password. REQUIRED: current_password, new_password (min 8 chars).")
 async def npg_change_password(current_password: str, new_password: str) -> dict:
