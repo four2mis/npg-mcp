@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from contextvars import ContextVar
+from typing import Literal
 from urllib.parse import quote
 
 from mcp.server import transport_security
@@ -412,7 +414,7 @@ async def npg_create_redirect_host(
     forward_domain_name: str,
     forward_scheme: str = "auto",
     preserve_path: bool = True,
-    redirect_code: int = 301,
+    redirect_code: Literal[301, 302, 303, 307, 308] = 301,
 ) -> dict:
     c = _get_client()
     try:
@@ -520,7 +522,7 @@ async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bo
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed.")
-async def npg_apply_security_header_preset(host_id: str | int, preset: str) -> dict:
+async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["strict", "balanced", "relaxed"]) -> dict:
     c = _get_client()
     try:
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers/preset/{preset}")
@@ -844,7 +846,7 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Body: enabled, mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode")
-async def npg_create_proxy_host_geo(host_id: str | int, enabled: bool, mode: str = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False) -> dict:
+async def npg_create_proxy_host_geo(host_id: str | int, enabled: bool, mode: Literal["whitelist", "blacklist"] = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False) -> dict:
     c = _get_client()
     try:
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "challenge_mode": challenge_mode})
@@ -853,7 +855,7 @@ async def npg_create_proxy_host_geo(host_id: str | int, enabled: bool, mode: str
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed_ips, challenge_mode")
-async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool, mode: str = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False) -> dict:
+async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool, mode: Literal["whitelist", "blacklist"] = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False) -> dict:
     c = _get_client()
     try:
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "challenge_mode": challenge_mode})
@@ -883,7 +885,7 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration. Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge)")
-async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool, max_retries: int = 5, find_time: int = 600, ban_time: int = 3600, fail_codes: str = "401,403", action: str = "block") -> dict:
+async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool, max_retries: int = 5, find_time: int = 600, ban_time: int = 3600, fail_codes: str = "401,403", action: Literal["block", "challenge"] = "block") -> dict:
     c = _get_client()
     try:
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban", {"enabled": enabled, "max_retries": max_retries, "find_time": find_time, "ban_time": ban_time, "fail_codes": fail_codes, "action": action})
@@ -1281,7 +1283,7 @@ def _bearer_auth_middleware(app, expected_token: str):
     class _AuthMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
             auth = request.headers.get("authorization", "")
-            if auth != expected_bearer:
+            if not hmac.compare_digest(auth, expected_bearer):
                 return JSONResponse(
                     {"error": "unauthorized: invalid or missing bearer token"},
                     status_code=401,
