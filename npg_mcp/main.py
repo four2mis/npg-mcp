@@ -129,6 +129,7 @@ async def npg_create_proxy_host(
     host_header: str | None = None,
     extra_domains: list[str] | None = None,
     block_exploits: bool = False,
+    allow_websocket_upgrade: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -150,6 +151,7 @@ async def npg_create_proxy_host(
             "pass_host_header": host_header,
             "extra_domains": extra_domains or [],
             "block_exploits": block_exploits,
+            "allow_websocket_upgrade": allow_websocket_upgrade,
         }
         data = c.post("/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
@@ -178,6 +180,7 @@ async def npg_update_proxy_host(
     ssl_http2: bool | None = None,
     ssl_http3: bool | None = None,
     block_exploits: bool | None = None,
+    allow_websocket_upgrade: bool | None = None,
     skip_nginx: bool = False,
 ) -> dict:
     c = _get_client()
@@ -202,6 +205,7 @@ async def npg_update_proxy_host(
         if ssl_http2 is not None: body["ssl_http2"] = ssl_http2
         if ssl_http3 is not None: body["ssl_http3"] = ssl_http3
         if block_exploits is not None: body["block_exploits"] = block_exploits
+        if allow_websocket_upgrade is not None: body["allow_websocket_upgrade"] = allow_websocket_upgrade
         
         params = {"skip_nginx": "true"} if skip_nginx else None
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}", body, params=params)
