@@ -21,3 +21,9 @@ npg-mcp-config.env
 # OS
 .DS_Store
 Thumbs.db
+
+# AGENTS.md — project rules, never push to public repo
+AGENTS.md
+
+# Generated / attached files
+swagger(1).yaml
