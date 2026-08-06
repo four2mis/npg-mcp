@@ -110,17 +110,19 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled, block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.")
+@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), fail2ban_enabled (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.")
 async def npg_create_proxy_host(
     domain_names: list[str],
     forward_host: str,
     forward_port: int,
     forward_scheme: str = "http",
     block_normal: bool = False,
-    waf_enabled: bool = False,
+    waf_enabled: bool = True,
     block_http: bool = False,
     ssl_enabled: bool = True,
     ssl_forced: bool = True,
+    ssl_http2: bool = True,
+    ssl_http3: bool = False,
     ssl_cert_id: str | int | None = None,
     cache_enabled: bool = False,
     cache_template: str = "ignore",
@@ -129,7 +131,8 @@ async def npg_create_proxy_host(
     host_header: str | None = None,
     extra_domains: list[str] | None = None,
     block_exploits: bool = False,
-    allow_websocket_upgrade: bool = False,
+    allow_websocket_upgrade: bool = True,
+    fail2ban_enabled: bool = True,
 ) -> dict:
     c = _get_client()
     try:
@@ -143,6 +146,8 @@ async def npg_create_proxy_host(
             "block_http_requests": block_http,
             "ssl_enabled": ssl_enabled,
             "ssl_force_https": ssl_forced,
+            "ssl_http2": ssl_http2,
+            "ssl_http3": ssl_http3,
             "certificate_id": ssl_cert_id,
             "cache_enabled": cache_enabled,
             "cache_template": cache_template,
@@ -152,6 +157,7 @@ async def npg_create_proxy_host(
             "extra_domains": extra_domains or [],
             "block_exploits": block_exploits,
             "allow_websocket_upgrade": allow_websocket_upgrade,
+            "fail2ban_enabled": fail2ban_enabled,
         }
         data = c.post("/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
