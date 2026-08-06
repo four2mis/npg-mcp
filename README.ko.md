@@ -77,7 +77,7 @@ Get a proxy host by its domain name.
 
 #### `npg_create_proxy_host`
 
-Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled, block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
+Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), fail2ban_enabled (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
@@ -86,10 +86,12 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `forward_port` | `int` | ✔ |  |
 | `forward_scheme` | `str` | — | `"http"` |
 | `block_normal` | `bool` | — | `false` |
-| `waf_enabled` | `bool` | — | `false` |
+| `waf_enabled` | `bool` | — | `true` |
 | `block_http` | `bool` | — | `false` |
 | `ssl_enabled` | `bool` | — | `true` |
 | `ssl_forced` | `bool` | — | `true` |
+| `ssl_http2` | `bool` | — | `true` |
+| `ssl_http3` | `bool` | — | `false` |
 | `ssl_cert_id` | `str/int/null` | — | `null` |
 | `cache_enabled` | `bool` | — | `false` |
 | `cache_template` | `str` | — | `"ignore"` |
@@ -98,6 +100,8 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `host_header` | `str/null` | — | `null` |
 | `extra_domains` | `array<any>/null` | — | `null` |
 | `block_exploits` | `bool` | — | `false` |
+| `allow_websocket_upgrade` | `bool` | — | `true` |
+| `fail2ban_enabled` | `bool` | — | `true` |
 
 #### `npg_update_proxy_host`
 
