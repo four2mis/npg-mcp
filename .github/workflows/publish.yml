@@ -1,0 +1,43 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_SHORT=${VERSION%.*}" >> $GITHUB_ENV
+          echo "TAG=v$VERSION" >> $GITHUB_ENV
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u four2mis --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t ghcr.io/four2mis/npg-mcp:${{ env.VERSION }} \
+                       -t ghcr.io/four2mis/npg-mcp:${{ env.VERSION_SHORT }} \
+                       -t ghcr.io/four2mis/npg-mcp:latest .
+          docker push ghcr.io/four2mis/npg-mcp:${{ env.VERSION }}
+          docker push ghcr.io/four2mis/npg-mcp:${{ env.VERSION_SHORT }}
+          docker push ghcr.io/four2mis/npg-mcp:latest
+
+      - name: Create release
+        run: |
+          gh release create ${{ env.TAG }} --title "${{ env.TAG }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
