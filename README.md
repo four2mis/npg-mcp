@@ -77,7 +77,7 @@ Get a proxy host by its domain name.
 
 #### `npg_create_proxy_host`
 
-Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), fail2ban_enabled (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
+Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -101,7 +101,6 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `extra_domains` | `array<any>/null` | — | `null` |
 | `block_exploits` | `bool` | — | `false` |
 | `allow_websocket_upgrade` | `bool` | — | `true` |
-| `fail2ban_enabled` | `bool` | — | `true` |
 
 #### `npg_update_proxy_host`
 
