@@ -77,7 +77,7 @@ Get a proxy host by its domain name.
 
 #### `npg_create_proxy_host`
 
-Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, etc.
+Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global, waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering/request_buffering, client_max_body_size, proxy_max_temp_file_size, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -94,13 +94,45 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `ssl_http3` | `bool` | — | `false` |
 | `ssl_cert_id` | `string/int/null` | — | `null` |
 | `cache_enabled` | `bool` | — | `false` |
+| `cache_static_only` | `bool` | — | `false` |
+| `cache_ttl` | `string` | — | `"ignore"` |
 | `cache_template` | `string` | — | `"ignore"` |
 | `advanced_config` | `string` | — | `""` |
 | `enable_proxy_headers` | `bool` | — | `true` |
 | `host_header` | `string/null` | — | `null` |
 | `extra_domains` | `array<any>/null` | — | `null` |
 | `block_exploits` | `bool` | — | `false` |
+| `block_exploits_exceptions` | `str/null` | — | `null` |
 | `allow_websocket_upgrade` | `bool` | — | `true` |
+| `waf_use_global` | `bool` | — | `false` |
+| `waf_paranoia_level` | `int` | — | `1` |
+| `waf_anomaly_threshold` | `int` | — | `5` |
+| `waf_mode` | `string` | — | `"blocking"` |
+| `proxy_connect_timeout` | `int` | — | `0` |
+| `proxy_send_timeout` | `int` | — | `0` |
+| `proxy_read_timeout` | `int` | — | `0` |
+| `proxy_buffering` | `string` | — | `"on"` |
+| `proxy_request_buffering` | `string` | — | `"on"` |
+| `client_max_body_size` | `string` | — | `"off"` |
+| `proxy_max_temp_file_size` | `string` | — | `"off"` |
+| `access_list_id` | `str/int/null` | — | `null` |
+| `auth_provider_id` | `str/int/null` | — | `null` |
+| `auth_bypass_paths` | `array<str>/null` | — | `null` |
+| `ddns_enabled` | `bool` | — | `false` |
+| `ddns_provider_id` | `str/int/null` | — | `null` |
+| `ddns_proxied` | `bool` | — | `false` |
+| `forward_container_name` | `str/null` | — | `null` |
+| `forward_container_network` | `str/null` | — | `null` |
+| `proxy_type` | `string` | — | `"proxy"` |
+| `enabled` | `bool` | — | `true` |
+| `stream_listen_host` | `str/null` | — | `null` |
+| `stream_listen_port` | `int/null` | — | `null` |
+| `stream_protocol` | `string` | — | `"tcp"` |
+| `stream_ssl_preread` | `bool` | — | `false` |
+| `stream_accept_proxy_protocol` | `bool` | — | `false` |
+| `stream_send_proxy_protocol` | `bool` | — | `false` |
+| `stream_proxy_connect_timeout` | `int` | — | `0` |
+| `stream_proxy_timeout` | `int` | — | `0` |
 
 #### `npg_update_proxy_host`
 
