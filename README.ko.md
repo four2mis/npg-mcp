@@ -10,7 +10,7 @@
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **104개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
+이 서버는 **106개의 MCP 도구**를 노출합니다. 각 도구는 간단한 설명과 **입력 매개변수 스키마**(매개변수, 유형, 필수 여부, 기본값)와 함께 아래에 문서화되어 있습니다. 도구는 다음 카테고리로 그룹화됩니다:
 
 - **대시보드(Dashboard)** — 3개 도구
 - **프록시 호스트(Proxy Hosts)** — 10개 도구
@@ -21,7 +21,7 @@
 - **Fail2ban & 챌린지** — 6개 도구
 - **액세스 목록(Access Lists)** — 5개 도구
 - **DNS 제공자(DNS Providers)** — 6개 도구
-- **클라우드 제공자(Cloud Providers)** — 5개 도구
+- **클라우드 제공자(Cloud Providers)** — 7개 도구
 - **GeoIP** — 2개 도구
 - **차단 IP & 봇(Banned IPs & Bots)** — 4개 도구
 - **URI 차단(URI Block)** — 2개 도구
@@ -668,6 +668,26 @@ Delete a cloud provider by its slug.
 |---------|------|:---:|--------|
 | `slug` | `str` | ✔ |  |
 
+#### `npg_get_proxy_host_cloud_blocking`
+
+GET 프록시 호스트의 클라우드 제공자 차단 구성.
+
+| 매개변수 | 유형 | 필수 | 기본값 |
+|---------|------|:---:|--------|
+| `host_id` | `str/int` | ✔ |  |
+
+#### `npg_update_proxy_host_cloud_blocking`
+
+UPDATE 프록시 호스트의 클라우드 제공자 차단. Body: blocked_providers (슬러그 목록), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool).
+
+| 매개변수 | 유형 | 필수 | 기본값 |
+|---------|------|:---:|--------|
+| `host_id` | `str/int` | ✔ |  |
+| `blocked_providers` | `array<str>/null` | — | `null` |
+| `challenge_mode` | `bool` | — | `false` |
+| `allow_search_bots` | `bool` | — | `true` |
+| `cloud_disable_global` | `bool` | — | `false` |
+
 ### GeoIP (2)
 
 #### `npg_get_geoip_status`
@@ -1141,7 +1161,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ```
 npg_mcp/
-  main.py       # 105개의 모든 MCP 도구
+  main.py       # 106개의 모든 MCP 도구
   client.py     # 자동 인증을 갖춘 HTTP 클라이언트 래퍼
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드

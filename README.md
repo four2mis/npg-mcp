@@ -10,7 +10,7 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 ## Tools Reference
 
-The server exposes **104 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
+This server exposes **106 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
 - **Dashboard** — 3 tools
 - **Proxy Hosts** — 10 tools
@@ -21,7 +21,7 @@ The server exposes **104 MCP tools**. Each tool is documented below with a short
 - **Fail2ban & Challenge** — 6 tools
 - **Access Lists** — 5 tools
 - **DNS Providers** — 6 tools
-- **Cloud Providers** — 5 tools
+- **Cloud Providers** — 7 tools
 - **GeoIP** — 2 tools
 - **Banned IPs & Bots** — 4 tools
 - **URI Block** — 2 tools
@@ -622,7 +622,7 @@ Test DNS provider credentials.
 |-------|------|:---:|--------|
 | `provider_id` | `string/int` | ✔ |  |
 
-### Cloud Providers (5)
+### Cloud Providers (7)
 
 #### `npg_list_cloud_providers`
 
@@ -667,6 +667,26 @@ Delete a cloud provider by its slug.
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `slug` | `string` | ✔ |  |
+
+#### `npg_get_proxy_host_cloud_blocking`
+
+GET cloud provider blocking configuration for a proxy host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_update_proxy_host_cloud_blocking`
+
+UPDATE cloud provider blocking for a proxy host. Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `blocked_providers` | `array<string>/null` | — | `null` |
+| `challenge_mode` | `bool` | — | `false` |
+| `allow_search_bots` | `bool` | — | `true` |
+| `cloud_disable_global` | `bool` | — | `false` |
 
 ### GeoIP (2)
 
@@ -1141,7 +1161,7 @@ The server **auto-authenticates** on first use using `NPG_USERNAME` and `NPG_PAS
 
 ```
 npg_mcp/
-  main.py       # All 105 MCP tools
+  main.py       # All 106 MCP tools
   client.py     # HTTP client wrapper with auto-auth
   __init__.py
 Dockerfile      # Multi-stage Docker build
