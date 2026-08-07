@@ -10,9 +10,9 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 ## Tools Reference
 
-This server exposes **106 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
+This server exposes **180 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
-- **Dashboard** — 3 tools
+- **Dashboard** — 6 tools
 - **Proxy Hosts** — 10 tools
 - **SSL / Nginx** — 8 tools
 - **Redirect Hosts** — 5 tools
@@ -21,17 +21,25 @@ This server exposes **106 MCP tools**. Each tool is documented below with a shor
 - **Fail2ban & Challenge** — 6 tools
 - **Access Lists** — 5 tools
 - **DNS Providers** — 6 tools
-- **Cloud Providers** — 7 tools
+- **Cloud Providers** — 9 tools
 - **GeoIP** — 2 tools
 - **Banned IPs & Bots** — 4 tools
-- **URI Block** — 2 tools
+- **URI Block** — 4 tools
+- **Global URI Block** — 4 tools
 - **WAF & Exploit Rules** — 10 tools
 - **Settings** — 4 tools
-- **Logs** — 6 tools
-- **Backups** — 5 tools
+- **Global Settings** — 7 tools
+- **Logs** — 10 tools
+- **Backups** — 8 tools
 - **API Tokens** — 6 tools
+- **Users** — 8 tools
+- **Roles** — 5 tools
+- **SSO Providers** — 6 tools
+- **Notification Channels** — 8 tools
+- **Catalog** — 2 tools
+- **Docker** — 2 tools
 
-### Dashboard (3)
+### Dashboard (6)
 
 #### `npg_get_dashboard`
 
@@ -48,6 +56,24 @@ _No parameters._
 #### `npg_get_dashboard_geoip_stats`
 
 GET GeoIP statistics by country for the dashboard.
+
+_No parameters._
+
+#### `npg_get_dashboard_containers`
+
+Get Docker container statistics for the dashboard.
+
+_No parameters._
+
+#### `npg_get_dashboard_stats`
+
+Get hourly statistics for the dashboard.
+
+_No parameters._
+
+#### `npg_get_dashboard_health_history`
+
+Get system health history for the dashboard.
 
 _No parameters._
 
@@ -391,7 +417,7 @@ GET security headers configuration for a proxy host.
 
 #### `npg_update_proxy_host_security_headers`
 
-UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy
+UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/'''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -498,21 +524,6 @@ UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed
 | `mode` | `string` | — | `"blacklist"` |
 | `countries` | `array<any>/null` | — | `null` |
 | `allowed_ips` | `array<any>/null` | — | `null` |
-| `challenge_mode` | `bool` | — | `false` |
-
-#### `npg_delete_proxy_host_geo`
-
-DELETE geo restriction for a proxy host.
-
-| Param | Type | Required | Default |
-|-------|------|:---:|--------|
-| `host_id` | `string/int` | ✔ |  |
-
-#### `npg_list_countries`
-
-List available country codes for GeoIP blocking.
-
-_No parameters._
 
 ### Fail2ban & Challenge (6)
 
@@ -526,21 +537,18 @@ GET fail2ban configuration for a proxy host.
 
 #### `npg_update_proxy_host_fail2ban`
 
-UPDATE fail2ban configuration. Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge)
+UPDATE fail2ban configuration for a proxy host. Body: enabled, ban_duration, max_retries, etc.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `host_id` | `string/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
+| `enabled` | `bool` | — | `false` |
+| `ban_duration` | `int` | — | `3600` |
 | `max_retries` | `int` | — | `5` |
-| `find_time` | `int` | — | `600` |
-| `ban_time` | `int` | — | `3600` |
-| `fail_codes` | `string` | — | `"401,403"` |
-| `action` | `string` | — | `"block"` |
 
 #### `npg_get_proxy_host_challenge`
 
-GET CAPTCHA/challenge configuration for a proxy host.
+GET challenge configuration for a proxy host.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -548,23 +556,17 @@ GET CAPTCHA/challenge configuration for a proxy host.
 
 #### `npg_update_proxy_host_challenge`
 
-UPDATE CAPTCHA/challenge configuration. Body: enabled, challenge_type (captcha/js_challenge), difficulty, site_key, token_validity, min_score, apply_to, page_title, challenge_ips
+UPDATE challenge configuration for a proxy host. Body: enabled, type, etc.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `host_id` | `string/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `challenge_type` | `string` | — | `"captcha"` |
-| `difficulty` | `string` | — | `"medium"` |
-| `site_key` | `string` | — | `""` |
-| `token_validity` | `int` | — | `86400` |
-| `min_score` | `number` | — | `0.5` |
-| `apply_to` | `string` | — | `"both"` |
-| `page_title` | `string` | — | `"Security Check"` |
+| `enabled` | `bool` | — | `false` |
+| `type` | `string` | — | `"default"` |
 
 #### `npg_delete_proxy_host_challenge`
 
-DELETE CAPTCHA/challenge configuration for a proxy host.
+DELETE challenge configuration for a proxy host.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -572,12 +574,12 @@ DELETE CAPTCHA/challenge configuration for a proxy host.
 
 #### `npg_verify_challenge`
 
-Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution.
+Verify a challenge response. Required: challenge_id, response.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `token` | `string` | ✔ |  |
-| `solution` | `string` | ✔ |  |
+| `challenge_id` | `string/int` | ✔ |  |
+| `response` | `string` | ✔ |  |
 
 ### Access Lists (5)
 
@@ -648,17 +650,18 @@ Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g.
 |-------|------|:---:|--------|
 | `name` | `string` | ✔ |  |
 | `provider_type` | `string` | ✔ |  |
-| `credentials` | `object/null` | — | `null` |
-| `kwargs` | `object/null` | — | `null` |
+| `credentials` | `dict/null` | — | `null` |
 
 #### `npg_update_dns_provider`
 
-Update a DNS provider. Pass only fields to change (dict).
+Update a DNS provider. Pass only fields to change.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `provider_id` | `string/int` | ✔ |  |
-| `kwargs` | `object/null` | — | `null` |
+| `name` | `string/null` | — | `null` |
+| `provider_type` | `string/null` | — | `null` |
+| `credentials` | `dict/null` | — | `null` |
 
 #### `npg_delete_dns_provider`
 
@@ -670,17 +673,17 @@ Delete a DNS provider by its ID.
 
 #### `npg_test_dns_provider`
 
-Test DNS provider credentials.
+Test DNS provider configuration.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `provider_id` | `string/int` | ✔ |  |
 
-### Cloud Providers (7)
+### Cloud Providers (9)
 
 #### `npg_list_cloud_providers`
 
-List all cloud providers (for certificate DNS challenges).
+List all cloud providers (IP range CIDR databases).
 
 _No parameters._
 
@@ -694,25 +697,25 @@ Get a cloud provider by its slug.
 
 #### `npg_create_cloud_provider`
 
-Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description.
+Create a cloud provider. Required: slug, name, region, cidr_ranges.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `name` | `string` | ✔ |  |
 | `slug` | `string` | ✔ |  |
-| `ip_ranges` | `array<string>` | ✔ |  |
-| `region` | `string/null` | — | `null` |
-| `description` | `string/null` | — | `null` |
-| `kwargs` | `object/null` | — | `null` |
+| `name` | `string` | ✔ |  |
+| `region` | `string` | — | `"all"` |
+| `cidr_ranges` | `array<string>` | ✔ |  |
 
 #### `npg_update_cloud_provider`
 
-Update a cloud provider by its slug. Pass only fields to change (dict).
+Update a cloud provider. Pass only fields to change.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `slug` | `string` | ✔ |  |
-| `kwargs` | `object/null` | — | `null` |
+| `name` | `string/null` | — | `null` |
+| `region` | `string/null` | — | `null` |
+| `cidr_ranges` | `array<string>/null` | — | `null` |
 
 #### `npg_delete_cloud_provider`
 
@@ -732,120 +735,220 @@ GET cloud provider blocking configuration for a proxy host.
 
 #### `npg_update_proxy_host_cloud_blocking`
 
-UPDATE cloud provider blocking for a proxy host. Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool).
+UPDATE cloud provider blocking for a proxy host. Body: blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `host_id` | `string/int` | ✔ |  |
 | `blocked_providers` | `array<string>/null` | — | `null` |
-| `challenge_mode` | `bool` | — | `false` |
-| `allow_search_bots` | `bool` | — | `true` |
-| `cloud_disable_global` | `bool` | — | `false` |
+| `challenge_mode` | `bool/null` | — | `null` |
+| `allow_search_bots` | `bool/null` | — | `null` |
+| `cloud_disable_global` | `bool/null` | — | `null` |
+
+#### `npg_list_cloud_providers_by_region`
+
+List cloud providers filtered by region.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `region` | `string/null` | — | `null` |
 
 ### GeoIP (2)
 
 #### `npg_get_geoip_status`
 
-Get GeoIP database update status.
+GET GeoIP status and database version.
 
 _No parameters._
 
 #### `npg_update_geoip`
 
-Update GeoIP databases.
+UPDATE GeoIP database. Triggers an update of the GeoIP database.
 
 _No parameters._
 
 ### Banned IPs & Bots (4)
 
-#### `npg_list_banned_ips`
-
-List banned IP addresses.
-
-_No parameters._
-
 #### `npg_ban_ip`
 
-Ban an IP address. Required: ip. Optional: ban_time (seconds).
+BAN an IP address. Required: ip_address, reason.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `ip_address` | `string` | ✔ |  |
-| `reason` | `string` | — | `"Manual ban via API"` |
-| `duration` | `int` | — | `3600` |
+| `reason` | `string` | — | `""` |
 
 #### `npg_unban_ip`
 
-Unban an IP by its ID.
+UNBAN an IP address. Required: ip_address.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `ip_id` | `string/int` | ✔ |  |
+| `ip_address` | `string` | ✔ |  |
 
 #### `npg_get_bots_known`
 
-Get list of known bot user-agent signatures.
+GET known bot list.
 
 _No parameters._
 
-### URI Block (2)
+#### `npg_list_banned_ips`
+
+List banned IPs.
+
+_No parameters._
+
+### URI Block (4)
+
+#### `npg_list_uri_blocks`
+
+List all URI blocks (global and per-host).
+
+_No parameters._
+
+#### `npg_create_uri_block`
+
+Create a URI block for a proxy host. Required: host_id, pattern, action (block/allow). Optional: is_regex.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+| `pattern` | `string` | ✔ |  |
+| `action` | `string` | — | `"block"` |
+| `is_regex` | `bool` | — | `false` |
+
+#### `npg_get_uri_block`
+
+Get a URI block by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `block_id` | `string/int` | ✔ |  |
+
+#### `npg_update_uri_block`
+
+Update a URI block. Pass only fields to change.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `block_id` | `string/int` | ✔ |  |
+| `pattern` | `string/null` | — | `null` |
+| `action` | `string/null` | — | `null` |
+| `is_regex` | `bool/null` | — | `null` |
+
+#### `npg_delete_uri_block`
+
+Delete a URI block by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `block_id` | `string/int` | ✔ |  |
+
+### Global URI Block (4)
 
 #### `npg_get_global_uri_block`
 
-Get global URI block settings.
+GET global URI block configuration.
 
 _No parameters._
 
 #### `npg_update_global_uri_block`
 
-Update global URI block settings. Pass only fields to change (dict).
+UPDATE global URI block configuration. Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `kwargs` | `object/null` | — | `null` |
+| `enabled` | `bool` | — | `false` |
+| `rules` | `array<any>/null` | — | `null` |
+| `exception_ips` | `array<string>/null` | — | `null` |
+| `allow_private_ips` | `bool` | — | `true` |
+
+#### `npg_add_global_uri_block_rule`
+
+Add a rule to the global URI block. Required: pattern, action. Optional: is_regex.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `pattern` | `string` | ✔ |  |
+| `action` | `string` | — | `"block"` |
+| `is_regex` | `bool` | — | `false` |
+
+#### `npg_delete_global_uri_block_rule`
+
+Delete a rule from the global URI block by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
 
 ### WAF & Exploit Rules (10)
 
-#### `npg_list_exploit_rules`
+#### `npg_get_waf_hosts`
 
-List exploit block rules.
+GET WAF hosts configuration.
+
+_No parameters._
+
+#### `npg_get_waf_host_config`
+
+GET WAF configuration for a specific host.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `host_id` | `string/int` | ✔ |  |
+
+#### `npg_list_waf_rules`
+
+List all WAF rules.
 
 _No parameters._
 
 #### `npg_get_exploit_rule`
 
-Get an exploit rule by its ID.
+Get an exploit block rule by its ID.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `rule_id` | `string/int` | ✔ |  |
+
+#### `npg_list_exploit_rules`
+
+List all exploit block rules.
+
+_No parameters._
 
 #### `npg_create_exploit_rule`
 
-Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description.
+Create an exploit block rule. Required: name, pattern, action.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `category` | `string` | ✔ |  |
 | `name` | `string` | ✔ |  |
 | `pattern` | `string` | ✔ |  |
-| `pattern_type` | `string` | ✔ |  |
-| `severity` | `string/null` | — | `null` |
-| `description` | `string/null` | — | `null` |
-| `kwargs` | `object/null` | — | `null` |
+| `action` | `string` | — | `"block"` |
 
 #### `npg_update_exploit_rule`
 
-Update an exploit rule. Pass only fields to change (dict).
+Update an exploit block rule. Pass only fields to change.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `rule_id` | `string/int` | ✔ |  |
-| `kwargs` | `object/null` | — | `null` |
+| `name` | `string/null` | — | `null` |
+| `pattern` | `string/null` | — | `null` |
+| `action` | `string/null` | — | `null` |
 
 #### `npg_delete_exploit_rule`
 
-Delete an exploit rule by its ID.
+Delete an exploit block rule by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `rule_id` | `string/int` | ✔ |  |
+
+#### `npg_disable_waf_rule`
+
+Disable a WAF rule.
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
@@ -853,39 +956,10 @@ Delete an exploit rule by its ID.
 
 #### `npg_toggle_exploit_rule`
 
-Toggle an exploit rule's enabled status.
+Toggle an exploit block rule (enable/disable).
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `rule_id` | `string/int` | ✔ |  |
-
-#### `npg_list_waf_rules`
-
-List all WAF (Web Application Firewall) rules.
-
-_No parameters._
-
-#### `npg_get_waf_hosts`
-
-Get WAF config for all proxy hosts.
-
-_No parameters._
-
-#### `npg_get_waf_host_config`
-
-Get WAF config for a specific proxy host.
-
-| Param | Type | Required | Default |
-|-------|------|:---:|--------|
-| `host_id` | `string/int` | ✔ |  |
-
-#### `npg_disable_waf_rule`
-
-Disable a WAF rule for a specific proxy host.
-
-| Param | Type | Required | Default |
-|-------|------|:---:|--------|
-| `host_id` | `string/int` | ✔ |  |
 | `rule_id` | `string/int` | ✔ |  |
 
 ### Settings (4)
@@ -902,7 +976,7 @@ Update global NPG settings. Pass only fields to change (dict).
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `kwargs` | `object/null` | — | `null` |
+| `kwargs` | `dict/null` | — | `null` |
 
 #### `npg_get_system_settings`
 
@@ -916,9 +990,129 @@ Update system settings. Pass only fields to change (dict).
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `kwargs` | `object/null` | — | `null` |
+| `kwargs` | `dict/null` | — | `null` |
 
-### Logs (6)
+### Global Settings (7)
+
+#### `npg_get_global_security_headers`
+
+GET global security headers configuration.
+
+_No parameters._
+
+#### `npg_update_global_security_headers`
+
+UPDATE global security headers configuration. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `true` |
+| `hsts_enabled` | `bool` | — | `true` |
+| `hsts_max_age` | `int` | — | `31536000` |
+| `hsts_include_subdomains` | `bool` | — | `true` |
+| `hsts_preload` | `bool` | — | `false` |
+| `x_frame_options` | `string` | — | `"SAMEORIGIN"` |
+| `x_content_type_options` | `bool` | — | `true` |
+| `x_xss_protection` | `bool` | — | `true` |
+| `referrer_policy` | `string` | — | `"strict-origin-when-cross-origin"` |
+| `content_security_policy` | `string` | — | `""` |
+
+#### `npg_get_global_bot_filter`
+
+GET global bot filter configuration.
+
+_No parameters._
+
+#### `npg_update_global_bot_filter`
+
+UPDATE global bot filter configuration. Body: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked_agents, custom_allowed_agents.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `false` |
+| `block_bad_bots` | `bool` | — | `true` |
+| `block_ai_bots` | `bool` | — | `false` |
+| `allow_search_engines` | `bool` | — | `true` |
+| `block_suspicious_clients` | `bool` | — | `false` |
+| `challenge_suspicious` | `bool` | — | `false` |
+| `custom_blocked_agents` | `string/null` | — | `null` |
+| `custom_allowed_agents` | `string/null` | — | `null` |
+
+#### `npg_get_global_cloud_providers`
+
+GET global cloud providers configuration.
+
+_No parameters._
+
+#### `npg_update_global_cloud_providers`
+
+UPDATE global cloud providers configuration. Body: enabled, blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `false` |
+| `blocked_providers` | `array<string>/null` | — | `null` |
+| `challenge_mode` | `bool` | — | `false` |
+| `allow_search_bots` | `bool` | — | `true` |
+| `cloud_disable_global` | `bool` | — | `false` |
+
+#### `npg_get_global_geo`
+
+GET global GeoIP restriction configuration.
+
+_No parameters._
+
+#### `npg_update_global_geo`
+
+UPDATE global GeoIP restriction configuration. Body: enabled, mode, countries, allowed_ips, allow_private_ips, allow_search_bots, disable_global.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `false` |
+| `mode` | `string` | — | `"blacklist"` |
+| `countries` | `array<string>/null` | — | `null` |
+| `allowed_ips` | `array<string>/null` | — | `null` |
+| `allow_private_ips` | `bool` | — | `true` |
+| `allow_search_bots` | `bool` | — | `true` |
+| `disable_global` | `bool` | — | `false` |
+
+#### `npg_get_global_rate_limit`
+
+GET global rate limit configuration.
+
+_No parameters._
+
+#### `npg_update_global_rate_limit`
+
+UPDATE global rate limit configuration. Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `false` |
+| `requests_per_second` | `int` | — | `10` |
+| `burst_size` | `int` | — | `20` |
+| `zone_size` | `string` | — | `"10m"` |
+| `limit_by` | `string` | — | `"ip"` |
+| `limit_response` | `int` | — | `429` |
+
+#### `npg_get_global_waf`
+
+GET global WAF configuration.
+
+_No parameters._
+
+#### `npg_update_global_waf`
+
+UPDATE global WAF configuration. Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled}).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `enabled` | `bool` | — | `false` |
+| `paranoia_level` | `int` | — | `1` |
+| `anomaly_threshold` | `int` | — | `5` |
+| `rules` | `array<any>/null` | — | `null` |
+
+### Logs (10)
 
 #### `npg_get_logs`
 
@@ -938,7 +1132,7 @@ Update log settings. Pass only fields to change (dict).
 
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
-| `kwargs` | `object/null` | — | `null` |
+| `kwargs` | `dict/null` | — | `null` |
 
 #### `npg_get_log_stats`
 
@@ -958,7 +1152,52 @@ List system logs.
 
 _No parameters._
 
-### Backups (5)
+#### `npg_list_log_files`
+
+List all log files.
+
+_No parameters._
+
+#### `npg_get_log_file`
+
+Get a log file by its filename.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `filename` | `string` | ✔ |  |
+
+#### `npg_download_log_file`
+
+Download a log file by its filename.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `filename` | `string` | ✔ |  |
+
+#### `npg_view_log_file`
+
+View the contents of a log file.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `filename` | `string` | ✔ |  |
+| `lines` | `int` | — | `100` |
+
+#### `npg_rotate_log_file`
+
+Rotate a log file by its filename.
+
+_No parameters._
+
+#### `npg_delete_log_file`
+
+Delete a log file by its filename.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `filename` | `string` | ✔ |  |
+
+### Backups (8)
 
 #### `npg_list_backups`
 
@@ -996,6 +1235,28 @@ Restore from a backup. Required: backup_id.
 |-------|------|:---:|--------|
 | `backup_id` | `string/int` | ✔ |  |
 
+#### `npg_download_backup`
+
+Download a backup by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `backup_id` | `string/int` | ✔ |  |
+
+#### `npg_upload_restore_backup`
+
+Upload and restore from a backup file.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `file_content` | `string` | ✔ |  |
+
+#### `npg_get_backup_stats`
+
+Get backup statistics.
+
+_No parameters._
+
 ### API Tokens (6)
 
 #### `npg_list_api_tokens`
@@ -1029,7 +1290,7 @@ Update an API token. Pass only fields to change (dict).
 | Param | Type | Required | Default |
 |-------|------|:---:|--------|
 | `token_id` | `string/int` | ✔ |  |
-| `kwargs` | `object/null` | — | `null` |
+| `kwargs` | `dict/null` | — | `null` |
 
 #### `npg_revoke_api_token`
 
@@ -1047,182 +1308,259 @@ Delete an API token by its ID.
 |-------|------|:---:|--------|
 | `token_id` | `string/int` | ✔ |  |
 
-## Quick Start
+### Users (8)
 
-### Prerequisites
+#### `npg_list_users`
 
-- A running NginxProxyGuard (NPG) instance with API access
-- Docker and Docker Compose (for containerized deployment)
-- Python 3.11+ (for local development)
+List all users.
 
-### Local Development
+_No parameters._
 
-```bash
-git clone https://github.com/four2mis/npg-mcp.git
-cd npg-mcp
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
+#### `npg_get_user`
 
-Create a `.env` file (copy from `.env.example`):
+Get a user by their ID.
 
-```bash
-cp .env.example .env
-```
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `user_id` | `string/int` | ✔ |  |
 
-Run in stdio mode:
+#### `npg_create_user`
 
-```bash
-python3 -m npg_mcp.main
-```
+Create a new user. Required: username, email, password. Optional: role_id, is_active.
 
-### Docker Deployment (pre-built)
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `username` | `string` | ✔ |  |
+| `email` | `string` | ✔ |  |
+| `password` | `string` | ✔ |  |
+| `role_id` | `str/int/null` | — | `null` |
+| `is_active` | `bool` | — | `true` |
 
-Pull the image from GitHub Container Registry:
+#### `npg_set_user_password`
 
-```bash
-docker pull ghcr.io/four2mis/npg-mcp:latest
-```
+Set/reset a user's password. Required: user_id, new_password.
 
-Create a `.env` file from the template:
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `user_id` | `string/int` | ✔ |  |
+| `new_password` | `string` | ✔ |  |
 
-```bash
-cp .env.example .env
-# then edit .env with your NPG credentials
-```
+#### `npg_assign_user_role`
 
-Or run with Docker Compose using the included `docker-compose.yml`:
+Assign a role to a user. Required: user_id, role_id.
 
-```bash
-# Pull & run (uses pre-built image)
-docker compose up -d
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `user_id` | `string/int` | ✔ |  |
+| `role_id` | `str/int` | ✔ |  |
 
-# Or build from source
-docker compose up -d --build
-```
+#### `npg_end_user_sessions`
 
-The included `docker-compose.yml`:
+End all sessions for a user (force logout). Required: user_id.
 
-```yaml
-services:
-  npg-mcp:
-    image: ghcr.io/four2mis/npg-mcp:latest
-    # build: .  # uncomment to build from source instead
-    container_name: npg-mcp
-    restart: unless-stopped
-    networks:
-      - npg-network
-    # All runtime config comes from .env (see .env.example). No secrets here.
-    env_file:
-      - .env
-    ports:
-      - "8081:8081"
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `user_id` | `string/int` | ✔ |  |
 
-networks:
-  npg-network:
-    external: true
-```
+#### `npg_delete_user`
 
-## Connecting to MCP Clients
+Delete a user by their ID.
 
-Deploying the server (Docker section above) publishes the MCP endpoint at `http://<host>:8081/mcp`. Add it to any MCP-capable agent by pointing at that URL.
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `user_id` | `string/int` | ✔ |  |
 
-> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), every MCP request MUST carry the `Authorization: Bearer <MCP_API_TOKEN>` header** — requests without it get `401`. Every client config below shows where the header goes. The token (`openssl rand -hex 32`) is set in the server's `.env` as `MCP_API_TOKEN`.
+### Roles (5)
 
-### Hermes Agent
+#### `npg_list_roles`
 
-Add to `~/.hermes/config.yaml` under `mcp_servers`, then restart Hermes (MCP servers are discovered at startup; no hot-reload):
+List all roles.
 
-```yaml
-mcp_servers:
-  npg-mcp:
-    url: http://<host>:8081/mcp
-    connect_timeout: 30
-    headers:
-      Authorization: "Bearer <MCP_API_TOKEN>"
-```
+_No parameters._
 
-Or set it with the CLI instead of hand-editing the config:
+#### `npg_get_role`
 
-```bash
-hermes config set mcp_servers.npg-mcp.url 'http://<host>:8081/mcp'
-hermes config set mcp_servers.npg-mcp.headers.Authorization 'Bearer <MCP_API_TOKEN>'
-```
+Get a role by its ID.
 
-Tools then appear as `mcp_npg_mcp_*` (e.g. `mcp_npg_mcp_npg_list_proxy_hosts`).
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `role_id` | `string/int` | ✔ |  |
 
-### Claude Code / Claude Desktop
+#### `npg_create_role`
 
-Add to your Claude MCP settings (Claude Desktop: `claude_desktop_config.json`);
-Claude Code: `~/.claude.json` — `mcpServers` key, or `claude mcp add`):
+Create a new role. Required: name, permissions (array of permission strings).
 
-```json
-{
-  "mcpServers": {
-    "npg-mcp": {
-      "url": "http://<host>:8081/mcp",
-      "headers": { "Authorization": "Bearer <MCP_API_TOKEN>" }
-    }
-  }
-}
-```
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `permissions` | `array<string>` | ✔ |  |
 
-### OpenAI Codex CLI
+#### `npg_update_role`
 
-Add to `~/.codex/config.toml` under `[mcp_servers.npg-mcp]`:
+Update a role. Pass only fields to change.
 
-```toml
-[mcp_servers.npg-mcp]
-url = "http://<host>:8081/mcp"
-headers = { Authorization = "Bearer <MCP_API_TOKEN>" }
-```
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `role_id` | `string/int` | ✔ |  |
+| `name` | `string/null` | — | `null` |
+| `permissions` | `array<string>/null` | — | `null` |
 
-### Cursor / VS Code / Other MCP Clients
+#### `npg_delete_role`
 
-Add a **remote / SSE+HTTP MCP server** entry in the client's MCP settings with:
+Delete a role by its ID.
 
-- **URL:** `http://<host>:8081/mcp`
-- **Headers:** `Authorization: Bearer <MCP_API_TOKEN>` (if a token is configured)
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `role_id` | `string/int` | ✔ |  |
 
-Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) can connect. The endpoint is a standard FastMCP Streamable HTTP server.
+### SSO Providers (6)
 
-### Network & Firewall Notes
+#### `npg_list_sso_providers`
 
-- The server listens on `MCP_PORT` (default `8081`) bound to `MCP_HOST` (default `0.0.0.0`).
-- **DNS-rebinding protection** (`MCP_REBINDING_PROTECTION=true` by default) rejects requests whose `Host` header isn't in `MCP_ALLOWED_HOSTS`. If clients connect by hostname/IP not covered by the default (`localhost:8081,127.0.0.1:8081`), add it to `MCP_ALLOWED_HOSTS` in `.env`, e.g. `MCP_ALLOWED_HOSTS=127.0.0.1:8081,mynas.local:8081,192.168.1.50:8081`.
-- **Security first:** only expose the MCP endpoint to trusted networks. If you must expose it publicly, set `MCP_API_TOKEN` and keep `MCP_ALLOWED_HOSTS`/`MCP_ALLOWED_ORIGINS` scoped (README §Environment Variables).
+List all SSO providers.
 
-## Authentication
+_No parameters._
 
-The server **auto-authenticates** on first use using `NPG_USERNAME` and `NPG_PASSWORD`. No manual token management needed — every tool call automatically refreshes auth.
+#### `npg_get_sso_provider`
 
-## Environment Variables
+Get an SSO provider by its ID.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NPG_BASE_URL` | `http://npg-api:8080` | NPG API base URL |
-| `NPG_USERNAME` | — | NPG login username (required) |
-| `NPG_PASSWORD` | — | NPG login password (required) |
-| `MCP_PORT` | `8081` | MCP server listening port |
-| `MCP_HOST` | `0.0.0.0` | MCP server bind host |
-| `MCP_API_TOKEN` | *(empty)* | Bearer token required on the MCP endpoint. **Leave empty for open (local/LAN-only) mode.** Generate with `openssl rand -hex 32`. |
-| `MCP_ALLOWED_HOSTS` | `localhost:port` | Comma-separated `host:port` whose `Host` header the endpoint accepts (e.g. your reverse-proxy public host) |
-| `MCP_ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins accepted for cross-origin requests; restricts CSRF |
-| `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
 
-## Project Structure
+#### `npg_create_sso_provider`
 
-```
-npg_mcp/
-  main.py       # All 106 MCP tools
-  client.py     # HTTP client wrapper with auto-auth
-  __init__.py
-Dockerfile      # Multi-stage Docker build
-docker-compose.yml
-pyproject.toml  # Dependencies: mcp>=1.0, httpx>=0.27
-```
+Create a new SSO provider. Required: name, provider_type (e.g. 'google', 'github', 'oidc'). Optional: config (dict).
 
-## License
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `provider_type` | `string` | ✔ |  |
+| `config` | `dict/null` | — | `null` |
 
-MIT
+#### `npg_update_sso_provider`
+
+Update an SSO provider. Pass only fields to change.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+| `name` | `string/null` | — | `null` |
+| `provider_type` | `string/null` | — | `null` |
+| `config` | `dict/null` | — | `null` |
+
+#### `npg_delete_sso_provider`
+
+Delete an SSO provider by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+
+#### `npg_test_sso_provider`
+
+Test SSO provider configuration by initiating a test login flow.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `provider_id` | `string/int` | ✔ |  |
+
+### Notification Channels (8)
+
+#### `npg_list_notification_channels`
+
+List all notification channels.
+
+_No parameters._
+
+#### `npg_get_notification_channel`
+
+Get a notification channel by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `channel_id` | `string/int` | ✔ |  |
+
+#### `npg_create_notification_channel`
+
+Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `name` | `string` | ✔ |  |
+| `channel_type` | `string` | ✔ |  |
+| `config` | `dict/null` | — | `null` |
+
+#### `npg_update_notification_channel`
+
+Update a notification channel. Pass only fields to change.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `channel_id` | `string/int` | ✔ |  |
+| `name` | `string/null` | — | `null` |
+| `channel_type` | `string/null` | — | `null` |
+| `config` | `dict/null` | — | `null` |
+
+#### `npg_delete_notification_channel`
+
+Delete a notification channel by its ID.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `channel_id` | `string/int` | ✔ |  |
+
+#### `npg_test_notification_channel`
+
+Test a notification channel by sending a test message.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `channel_id` | `string/int` | ✔ |  |
+
+#### `npg_get_notification_deliveries`
+
+Get delivery history for a notification channel.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `channel_id` | `string/int` | ✔ |  |
+
+#### `npg_detect_telegram_chats`
+
+Detect available Telegram chats for notification delivery.
+
+_No parameters._
+
+### Catalog (2)
+
+#### `npg_get_catalog`
+
+Get the exploit block rule catalog.
+
+_No parameters._
+
+#### `npg_subscribe_catalog`
+
+Subscribe to a catalog entry. Required: catalog_id.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `catalog_id` | `string/int` | ✔ |  |
+
+### Docker (2)
+
+#### `npg_get_docker_containers`
+
+Get status of all Docker containers managed by NPG.
+
+_No parameters._
+
+#### `npg_get_upstream_health`
+
+GET health status of an upstream server.
+
+| Param | Type | Required | Default |
+|-------|------|:---:|--------|
+| `upstream_id` | `string/int` | ✔ |  |

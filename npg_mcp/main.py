@@ -1362,6 +1362,808 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# ── Notification Channels ──────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_notification_channels", description="List all notification channels.")
+async def npg_list_notification_channels() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/notification-channels")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_notification_channel", description="Get a notification channel by its ID.")
+async def npg_get_notification_channel(channel_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).")
+async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"name": name, "type": channel_type}
+        if config:
+            body["config"] = config
+        data = c.post("/api/v1/notification-channels", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_notification_channel", description="Update a notification channel. Pass only fields to change.")
+async def npg_update_notification_channel(channel_id: str | int, name: str | None = None, channel_type: str | None = None, config: dict | None = None) -> dict:
+    c = _get_client()
+    try:
+        body: dict = {}
+        if name is not None: body["name"] = name
+        if channel_type is not None: body["type"] = channel_type
+        if config is not None: body["config"] = config
+        data = c.put(f"/api/v1/notification-channels/{_id_path(channel_id)}", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_notification_channel", description="Delete a notification channel by its ID.")
+async def npg_delete_notification_channel(channel_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/notification-channels/{_id_path(channel_id)}")
+        return {"success": True, "message": f"Notification channel {_id_path(channel_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_test_notification_channel", description="Test a notification channel by sending a test message.")
+async def npg_test_notification_channel(channel_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.post(f"/api/v1/notification-channels/{_id_path(channel_id)}/test")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel.")
+async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_detect_telegram_chats", description="Detect available Telegram chats for notification delivery.")
+async def npg_detect_telegram_chats() -> dict:
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/notification-channels/detect-telegram-chats")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Users ──────────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_users", description="List all users.")
+async def npg_list_users() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/users")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_user", description="Get a user by their ID.")
+async def npg_get_user(user_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/users/{_id_path(user_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_create_user", description="Create a new user. Required: username, email, password. Optional: role_id, is_active.")
+async def npg_create_user(username: str, email: str, password: str, role_id: str | int | None = None, is_active: bool = True) -> dict:
+    c = _get_client()
+    try:
+        body = {"username": username, "email": email, "password": password, "is_active": is_active}
+        if role_id is not None:
+            body["role_id"] = _id_path(role_id)
+        data = c.post("/api/v1/users", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_set_user_password", description="Set/reset a user's password. Required: user_id, new_password.")
+async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
+    c = _get_client()
+    try:
+        data = c.put(f"/api/v1/users/{_id_path(user_id)}/password", {"password": new_password})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_assign_user_role", description="Assign a role to a user. Required: user_id, role_id.")
+async def npg_assign_user_role(user_id: str | int, role_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.put(f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_end_user_sessions", description="End all sessions for a user (force logout). Required: user_id.")
+async def npg_end_user_sessions(user_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.post(f"/api/v1/users/{_id_path(user_id)}/end-sessions")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_user", description="Delete a user by their ID.")
+async def npg_delete_user(user_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/users/{_id_path(user_id)}")
+        return {"success": True, "message": f"User {_id_path(user_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Roles ──────────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_roles", description="List all roles.")
+async def npg_list_roles() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/roles")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_role", description="Get a role by its ID.")
+async def npg_get_role(role_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/roles/{_id_path(role_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_create_role", description="Create a new role. Required: name, permissions (array of permission strings).")
+async def npg_create_role(name: str, permissions: list[str]) -> dict:
+    c = _get_client()
+    try:
+        body = {"name": name, "permissions": permissions}
+        data = c.post("/api/v1/roles", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_role", description="Update a role. Pass only fields to change.")
+async def npg_update_role(role_id: str | int, name: str | None = None, permissions: list[str] | None = None) -> dict:
+    c = _get_client()
+    try:
+        body: dict = {}
+        if name is not None: body["name"] = name
+        if permissions is not None: body["permissions"] = permissions
+        data = c.put(f"/api/v1/roles/{_id_path(role_id)}", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_role", description="Delete a role by its ID.")
+async def npg_delete_role(role_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/roles/{_id_path(role_id)}")
+        return {"success": True, "message": f"Role {_id_path(role_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── SSO Providers ──────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_sso_providers", description="List all SSO providers.")
+async def npg_list_sso_providers() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/sso-providers")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_sso_provider", description="Get an SSO provider by its ID.")
+async def npg_get_sso_provider(provider_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/sso-providers/{_id_path(provider_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_create_sso_provider", description="Create a new SSO provider. Required: name, provider_type (e.g. 'google', 'github', 'oidc'). Optional: config (dict).")
+async def npg_create_sso_provider(name: str, provider_type: str, config: dict | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"name": name, "type": provider_type}
+        if config:
+            body["config"] = config
+        data = c.post("/api/v1/sso-providers", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_sso_provider", description="Update an SSO provider. Pass only fields to change.")
+async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, provider_type: str | None = None, config: dict | None = None) -> dict:
+    c = _get_client()
+    try:
+        body: dict = {}
+        if name is not None: body["name"] = name
+        if provider_type is not None: body["type"] = provider_type
+        if config is not None: body["config"] = config
+        data = c.put(f"/api/v1/sso-providers/{_id_path(provider_id)}", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_sso_provider", description="Delete an SSO provider by its ID.")
+async def npg_delete_sso_provider(provider_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/sso-providers/{_id_path(provider_id)}")
+        return {"success": True, "message": f"SSO provider {_id_path(provider_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_test_sso_provider", description="Test SSO provider configuration by initiating a test login flow.")
+async def npg_test_sso_provider(provider_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.post(f"/api/v1/sso-providers/{_id_path(provider_id)}/test")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Log Files ──────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_log_files", description="List all log files.")
+async def npg_list_log_files() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/log-files")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_log_file", description="Get a log file by its filename.")
+async def npg_get_log_file(filename: str) -> dict:
+    c = _get_client()
+    try:
+        encoded = quote(filename, safe="")
+        data = c.get(f"/api/v1/log-files/{encoded}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename.")
+async def npg_download_log_file(filename: str) -> dict:
+    c = _get_client()
+    try:
+        encoded = quote(filename, safe="")
+        data = c.get(f"/api/v1/log-files/{encoded}/download")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_view_log_file", description="View the contents of a log file.")
+async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
+    c = _get_client()
+    try:
+        encoded = quote(filename, safe="")
+        data = c.get(f"/api/v1/log-files/{encoded}/view", params={"lines": lines})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_rotate_log_file", description="Rotate a log file by its filename.")
+async def npg_rotate_log_file() -> dict:
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/log-files/rotate")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_log_file", description="Delete a log file by its filename.")
+async def npg_delete_log_file(filename: str) -> dict:
+    c = _get_client()
+    try:
+        encoded = quote(filename, safe="")
+        c.delete(f"/api/v1/log-files/{encoded}")
+        return {"success": True, "message": f"Log file {filename} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Certificates ───────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_expiring_certificates", description="Get certificates that are expiring soon.")
+async def npg_get_expiring_certificates() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/certificates/expiring")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_certificate_errors", description="Get certificate errors.")
+async def npg_get_certificate_errors() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/certificates/errors")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_certificate_history", description="Get certificate history.")
+async def npg_get_certificate_history() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/certificates/history")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_upload_certificate", description="Upload a certificate file. Required: domain_names, cert_content, key_content.")
+async def npg_upload_certificate(domain_names: list[str], cert_content: str, key_content: str) -> dict:
+    c = _get_client()
+    try:
+        body = {"domain_names": domain_names, "cert": cert_content, "key": key_content}
+        data = c.post("/api/v1/certificates/upload", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_import_from_hosts", description="Import certificates from existing hosts.")
+async def npg_import_from_hosts() -> dict:
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/certificates/import-from-hosts")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── URI Blocks ─────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_list_uri_blocks", description="List all URI blocks (global and per-host).")
+async def npg_list_uri_blocks() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/uri-blocks")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_create_uri_block", description="Create a URI block for a proxy host. Required: host_id, pattern, action (block/allow). Optional: is_regex.")
+async def npg_create_uri_block(host_id: str | int, pattern: str, action: str = "block", is_regex: bool = False) -> dict:
+    c = _get_client()
+    try:
+        body = {"pattern": pattern, "action": action, "is_regex": is_regex}
+        data = c.post(f"/api/v1/uri-blocks", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_uri_block", description="Get a URI block by its ID.")
+async def npg_get_uri_block(block_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/uri-blocks/{_id_path(block_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_uri_block", description="Update a URI block. Pass only fields to change.")
+async def npg_update_uri_block(block_id: str | int, pattern: str | None = None, action: str | None = None, is_regex: bool | None = None) -> dict:
+    c = _get_client()
+    try:
+        body: dict = {}
+        if pattern is not None: body["pattern"] = pattern
+        if action is not None: body["action"] = action
+        if is_regex is not None: body["is_regex"] = is_regex
+        data = c.put(f"/api/v1/uri-blocks/{_id_path(block_id)}", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_uri_block", description="Delete a URI block by its ID.")
+async def npg_delete_uri_block(block_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/uri-blocks/{_id_path(block_id)}")
+        return {"success": True, "message": f"URI block {_id_path(block_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_bulk_add_uri_block_rule", description="Bulk add URI block rules. Required: rules (list of {pattern, action, is_regex}).")
+async def npg_bulk_add_uri_block_rule(rules: list[dict]) -> dict:
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/uri-blocks/bulk-add-rule", {"rules": rules})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global URI Block ───────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_uri_block", description="GET global URI block configuration.")
+async def npg_get_global_uri_block() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/global-uri-block")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_uri_block", description="UPDATE global URI block configuration. Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips.")
+async def npg_update_global_uri_block(enabled: bool = False, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool = True) -> dict:
+    c = _get_client()
+    try:
+        body: dict = {"enabled": enabled}
+        if rules is not None: body["rules"] = rules
+        if exception_ips is not None: body["exception_ips"] = exception_ips
+        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
+        data = c.put("/api/v1/global-uri-block", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_add_global_uri_block_rule", description="Add a rule to the global URI block. Required: pattern, action. Optional: is_regex.")
+async def npg_add_global_uri_block_rule(pattern: str, action: str = "block", is_regex: bool = False) -> dict:
+    c = _get_client()
+    try:
+        body = {"pattern": pattern, "action": action, "is_regex": is_regex}
+        data = c.post("/api/v1/global-uri-block/rules", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_delete_global_uri_block_rule", description="Delete a rule from the global URI block by its ID.")
+async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
+        return {"success": True, "message": f"Global URI block rule {_id_path(rule_id)} deleted"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Upstream Health ────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream server.")
+async def npg_get_upstream_health(upstream_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/upstreams/{_id_path(upstream_id)}/health")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Cloud Providers by Region ──────────────────────────────────────────
+
+@mcp.tool(name="npg_list_cloud_providers_by_region", description="List cloud providers filtered by region.")
+async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
+    c = _get_client()
+    try:
+        params = {"region": region} if region else None
+        data = c.get("/api/v1/cloud-providers/by-region", params=params)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Catalog ────────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_catalog", description="Get the exploit block rule catalog.")
+async def npg_get_catalog() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/catalog")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_subscribe_catalog", description="Subscribe to a catalog entry. Required: catalog_id.")
+async def npg_subscribe_catalog(catalog_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.post(f"/api/v1/catalog/{_id_path(catalog_id)}/subscribe")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Docker Containers ──────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_docker_containers", description="Get status of all Docker containers managed by NPG.")
+async def npg_get_docker_containers() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/docker/containers")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Update Check ───────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_check_update", description="Check for available NPG updates.")
+async def npg_check_update() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/update/check")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── ACME Test ──────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_test_acme", description="Test ACME configuration for DNS provider.")
+async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"dns_provider_id": _id_path(dns_provider_id)} if dns_provider_id is not None else {}
+        data = c.post("/api/v1/acme/test", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Public UI Settings ─────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_public_ui_settings", description="Get public UI settings (accessible without auth).")
+async def npg_get_public_ui_settings() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/public/ui-settings")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Dashboard ──────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_dashboard_containers", description="Get Docker container statistics for the dashboard.")
+async def npg_get_dashboard_containers() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/dashboard/containers")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_dashboard_stats", description="Get hourly statistics for the dashboard.")
+async def npg_get_dashboard_stats() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/dashboard/stats/hourly")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_dashboard_health_history", description="Get system health history for the dashboard.")
+async def npg_get_dashboard_health_history() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/dashboard/health/history")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Cloudflare Tunnel ──────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_cloudflare_tunnel", description="Get Cloudflare Tunnel configuration.")
+async def npg_get_cloudflare_tunnel() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/cloudflare-tunnel")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_cloudflare_tunnel", description="Update Cloudflare Tunnel configuration. Pass only fields to change.")
+async def npg_update_cloudflare_tunnel(kwargs: dict | None = None) -> dict:
+    c = _get_client()
+    try:
+        data = c.put("/api/v1/settings/cloudflare-tunnel", kwargs or {})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_cloudflare_tunnel_status", description="Get Cloudflare Tunnel status.")
+async def npg_get_cloudflare_tunnel_status() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/cloudflare-tunnel/status")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global Security Headers ────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_security_headers", description="GET global security headers configuration.")
+async def npg_get_global_security_headers() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-security-headers")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_security_headers", description="UPDATE global security headers configuration. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy.")
+async def npg_update_global_security_headers(enabled: bool = True, hsts_enabled: bool = True, hsts_max_age: int = 31536000, hsts_include_subdomains: bool = True, hsts_preload: bool = False, x_frame_options: str = "SAMEORIGIN", x_content_type_options: bool = True, x_xss_protection: bool = True, referrer_policy: str = "strict-origin-when-cross-origin", content_security_policy: str = "") -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "hsts_enabled": hsts_enabled, "hsts_max_age": hsts_max_age, "hsts_include_subdomains": hsts_include_subdomains, "hsts_preload": hsts_preload, "x_frame_options": x_frame_options, "x_content_type_options": x_content_type_options, "x_xss_protection": x_xss_protection, "referrer_policy": referrer_policy, "content_security_policy": content_security_policy}
+        data = c.put("/api/v1/settings/global-security-headers", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global Bot Filter ──────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_bot_filter", description="GET global bot filter configuration.")
+async def npg_get_global_bot_filter() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-bot-filter")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_bot_filter", description="UPDATE global bot filter configuration. Body: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked_agents, custom_allowed_agents.")
+async def npg_update_global_bot_filter(enabled: bool = False, block_bad_bots: bool = True, block_ai_bots: bool = False, allow_search_engines: bool = True, block_suspicious_clients: bool = False, challenge_suspicious: bool = False, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "block_bad_bots": block_bad_bots, "block_ai_bots": block_ai_bots, "allow_search_engines": allow_search_engines, "block_suspicious_clients": block_suspicious_clients, "challenge_suspicious": challenge_suspicious}
+        if custom_blocked_agents is not None: body["custom_blocked_agents"] = custom_blocked_agents
+        if custom_allowed_agents is not None: body["custom_allowed_agents"] = custom_allowed_agents
+        data = c.put("/api/v1/settings/global-bot-filter", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global Cloud Providers ─────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_cloud_providers", description="GET global cloud providers configuration.")
+async def npg_get_global_cloud_providers() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-cloud-providers")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_cloud_providers", description="UPDATE global cloud providers configuration. Body: enabled, blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global.")
+async def npg_update_global_cloud_providers(enabled: bool = False, blocked_providers: list[str] | None = None, challenge_mode: bool = False, allow_search_bots: bool = True, cloud_disable_global: bool = False) -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "blocked_providers": blocked_providers or [], "challenge_mode": challenge_mode, "allow_search_bots": allow_search_bots, "cloud_disable_global": cloud_disable_global}
+        data = c.put("/api/v1/settings/global-cloud-providers", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global Geo ─────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_geo", description="GET global GeoIP restriction configuration.")
+async def npg_get_global_geo() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-geo")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_geo", description="UPDATE global GeoIP restriction configuration. Body: enabled, mode, countries, allowed_ips, allow_private_ips, allow_search_bots, disable_global.")
+async def npg_update_global_geo(enabled: bool = False, mode: str = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool = True, allow_search_bots: bool = True, disable_global: bool = False) -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots, "disable_global": disable_global}
+        data = c.put("/api/v1/settings/global-geo", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global Rate Limit ──────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_rate_limit", description="GET global rate limit configuration.")
+async def npg_get_global_rate_limit() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-rate-limit")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_rate_limit", description="UPDATE global rate limit configuration. Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response.")
+async def npg_update_global_rate_limit(enabled: bool = False, requests_per_second: int = 10, burst_size: int = 20, zone_size: str = "10m", limit_by: str = "ip", limit_response: int = 429) -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "requests_per_second": requests_per_second, "burst_size": burst_size, "zone_size": zone_size, "limit_by": limit_by, "limit_response": limit_response}
+        data = c.put("/api/v1/settings/global-rate-limit", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Global WAF ─────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_global_waf", description="GET global WAF configuration.")
+async def npg_get_global_waf() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/settings/global-waf")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_waf", description="UPDATE global WAF configuration. Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled}), etc.")
+async def npg_update_global_waf(enabled: bool = False, paranoia_level: int = 1, anomaly_threshold: int = 5, rules: list[dict] | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"enabled": enabled, "paranoia_level": paranoia_level, "anomaly_threshold": anomaly_threshold, "rules": rules or []}
+        data = c.put("/api/v1/settings/global-waf", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ── Backups ────────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_download_backup", description="Download a backup by its ID.")
+async def npg_download_backup(backup_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        data = c.get(f"/api/v1/backups/{_id_path(backup_id)}/download")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_upload_restore_backup", description="Upload and restore from a backup file.")
+async def npg_upload_restore_backup(file_content: str) -> dict:
+    c = _get_client()
+    try:
+        body = {"file": file_content}
+        data = c.post("/api/v1/backups/upload-restore", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_get_backup_stats", description="Get backup statistics.")
+async def npg_get_backup_stats() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/backups/stats")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 def _bearer_auth_middleware(app, expected_token: str):
     """Require `Authorization: Bearer <token>` on every request.
