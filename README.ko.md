@@ -129,6 +129,27 @@ Update an existing proxy host. Pass only the fields you want to change. Use `?sk
 | `ssl_http3` | `bool/null` | — | `null` |
 | `block_exploits` | `bool/null` | — | `null` |
 | `skip_nginx` | `bool` | — | `false` |
+| `waf_use_global` | `bool/null` | — | `null` |
+| `waf_paranoia_level` | `int/null` | — | `null` |
+| `waf_anomaly_threshold` | `int/null` | — | `null` |
+| `block_exploits_exceptions` | `str/null` | — | `null` |
+| `proxy_connect_timeout` | `int/null` | — | `null` |
+| `proxy_send_timeout` | `int/null` | — | `null` |
+| `proxy_read_timeout` | `int/null` | — | `null` |
+| `proxy_buffering` | `bool/null` | — | `null` |
+| `proxy_request_buffering` | `bool/null` | — | `null` |
+| `client_max_body_size` | `int/null` | — | `null` |
+| `proxy_max_temp_file_size` | `int/null` | — | `null` |
+| `access_list_id` | `str/null` | — | `null` |
+| `auth_provider_id` | `str/null` | — | `null` |
+| `auth_bypass_paths` | `str/null` | — | `null` |
+| `ddns_enabled` | `bool/null` | — | `null` |
+| `ddns_provider_id` | `str/null` | — | `null` |
+| `ddns_proxied` | `bool/null` | — | `null` |
+| `forward_container_name` | `str/null` | — | `null` |
+| `forward_container_network` | `str/null` | — | `null` |
+| `cache_static_only` | `bool/null` | — | `null` |
+| `cache_ttl` | `int/null` | — | `null` |
 
 #### `npg_delete_proxy_host`
 
@@ -313,7 +334,7 @@ GET bot filter configuration for a proxy host.
 
 #### `npg_update_proxy_host_bot_filter`
 
-UPDATE bot filter configuration for a proxy host. Required: host_id (str\|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list).
+UPDATE bot filter configuration for a proxy host. Required: host_id (str|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
@@ -326,6 +347,7 @@ UPDATE bot filter configuration for a proxy host. Required: host_id (str\|int), 
 | `challenge_suspicious` | `bool` | — | `false` |
 | `disable_global` | `bool` | — | `false` |
 | `custom_blocked_agents` | `str/null` | — | `null` |
+| `custom_allowed_agents` | `str/null` | — | `null` |
 
 #### `npg_get_proxy_host_security_headers`
 
