@@ -86,7 +86,7 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `forward_port` | `int` | ✔ |  |
 | `forward_scheme` | `str` | — | `"http"` |
 | `block_normal` | `bool` | — | `false` |
-| `waf_enabled` | `bool` | — | `true` |
+| `waf_enabled` | `bool/null` | — | `null` |
 | `block_http` | `bool` | — | `false` |
 | `ssl_enabled` | `bool` | — | `true` |
 | `ssl_forced` | `bool` | — | `true` |
@@ -101,10 +101,10 @@ Create a new reverse proxy host. Required: domain_names (array), forward_host, f
 | `enable_proxy_headers` | `bool` | — | `true` |
 | `host_header` | `str/null` | — | `null` |
 | `extra_domains` | `array<any>/null` | — | `null` |
-| `block_exploits` | `bool` | — | `false` |
+| `block_exploits` | `bool` | — | `true` |
 | `block_exploits_exceptions` | `str/null` | — | `null` |
 | `allow_websocket_upgrade` | `bool` | — | `true` |
-| `waf_use_global` | `bool` | — | `false` |
+| `waf_use_global` | `bool` | — | `true` |
 | `waf_paranoia_level` | `int` | — | `1` |
 | `waf_anomaly_threshold` | `int` | — | `5` |
 | `waf_mode` | `str` | — | `"blocking"` |
