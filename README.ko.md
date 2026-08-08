@@ -344,17 +344,18 @@ GET rate limit configuration for a proxy host.
 
 #### `npg_update_proxy_host_rate_limit`
 
-UPDATE rate limit configuration for a proxy host. Body: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response
+UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `requests_per_second` | `int` | ✔ |  |
-| `burst_size` | `int` | ✔ |  |
-| `zone_size` | `str` | — | `"10m"` |
-| `limit_by` | `str` | — | `"ip"` |
-| `limit_response` | `int` | — | `429` |
+| `enabled` | `bool/null` | — | `null` |
+| `requests_per_second` | `int/null` | — | `null` |
+| `burst_size` | `int/null` | — | `null` |
+| `zone_size` | `str/null` | — | `null` |
+| `limit_by` | `str/null` | — | `null` |
+| `limit_response` | `int/null` | — | `null` |
+| `disable_global` | `bool/null` | — | `null` |
 
 #### `npg_get_proxy_host_bot_filter`
 
@@ -366,18 +367,18 @@ GET bot filter configuration for a proxy host.
 
 #### `npg_update_proxy_host_bot_filter`
 
-UPDATE bot filter configuration for a proxy host. Required: host_id (str|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).
+UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `block_bad_bots` | `bool` | — | `true` |
-| `block_ai_bots` | `bool` | — | `false` |
-| `allow_search_engines` | `bool` | — | `true` |
-| `block_suspicious_clients` | `bool` | — | `false` |
-| `challenge_suspicious` | `bool` | — | `false` |
-| `disable_global` | `bool` | — | `false` |
+| `enabled` | `bool/null` | — | `null` |
+| `block_bad_bots` | `bool/null` | — | `null` |
+| `block_ai_bots` | `bool/null` | — | `null` |
+| `allow_search_engines` | `bool/null` | — | `null` |
+| `block_suspicious_clients` | `bool/null` | — | `null` |
+| `challenge_suspicious` | `bool/null` | — | `null` |
+| `disable_global` | `bool/null` | — | `null` |
 | `custom_blocked_agents` | `str/null` | — | `null` |
 | `custom_allowed_agents` | `str/null` | — | `null` |
 
@@ -391,21 +392,22 @@ GET security headers configuration for a proxy host.
 
 #### `npg_update_proxy_host_security_headers`
 
-UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy
+UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `hsts_enabled` | `bool` | — | `true` |
-| `hsts_max_age` | `int` | — | `31536000` |
-| `hsts_include_subdomains` | `bool` | — | `true` |
-| `hsts_preload` | `bool` | — | `false` |
-| `x_frame_options` | `str` | — | `"SAMEORIGIN"` |
-| `x_content_type_options` | `bool` | — | `true` |
-| `x_xss_protection` | `bool` | — | `true` |
-| `referrer_policy` | `str` | — | `"strict-origin-when-cross-origin"` |
-| `content_security_policy` | `str` | — | `""` |
+| `enabled` | `bool/null` | — | `null` |
+| `hsts_enabled` | `bool/null` | — | `null` |
+| `hsts_max_age` | `int/null` | — | `null` |
+| `hsts_include_subdomains` | `bool/null` | — | `null` |
+| `hsts_preload` | `bool/null` | — | `null` |
+| `x_frame_options` | `str/null` | — | `null` |
+| `x_content_type_options` | `bool/null` | — | `null` |
+| `x_xss_protection` | `bool/null` | — | `null` |
+| `referrer_policy` | `str/null` | — | `null` |
+| `content_security_policy` | `str/null` | — | `null` |
+| `disable_global` | `bool/null` | — | `null` |
 
 #### `npg_apply_security_header_preset`
 
@@ -476,29 +478,35 @@ GET geo restriction configuration for a proxy host.
 
 #### `npg_create_proxy_host_geo`
 
-CREATE geo restriction for a proxy host. Body: enabled, mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode
+CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
+| `countries` | `list<string>` | ✔ |  |
 | `mode` | `str` | — | `"blacklist"` |
-| `countries` | `array<any>/null` | — | `null` |
-| `allowed_ips` | `array<any>/null` | — | `null` |
+| `enabled` | `bool` | — | `true` |
+| `allowed_ips` | `list<string>/null` | — | `null` |
 | `challenge_mode` | `bool` | — | `false` |
+| `disable_global` | `bool` | — | `false` |
+| `allow_private_ips` | `bool` | — | `true` |
+| `allow_search_bots` | `bool` | — | `true` |
 
 #### `npg_update_proxy_host_geo`
 
-UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed_ips, challenge_mode
+UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `mode` | `str` | — | `"blacklist"` |
-| `countries` | `array<any>/null` | — | `null` |
-| `allowed_ips` | `array<any>/null` | — | `null` |
-| `challenge_mode` | `bool` | — | `false` |
+| `enabled` | `bool/null` | — | `null` |
+| `mode` | `str/null` | — | `null` |
+| `countries` | `list<string>/null` | — | `null` |
+| `allowed_ips` | `list<string>/null` | — | `null` |
+| `challenge_mode` | `bool/null` | — | `null` |
+| `disable_global` | `bool/null` | — | `null` |
+| `allow_private_ips` | `bool/null` | — | `null` |
+| `allow_search_bots` | `bool/null` | — | `null` |
 
 #### `npg_delete_proxy_host_geo`
 
@@ -548,19 +556,18 @@ GET CAPTCHA/challenge configuration for a proxy host.
 
 #### `npg_update_proxy_host_challenge`
 
-UPDATE CAPTCHA/challenge configuration. Body: enabled, challenge_type (captcha/js_challenge), difficulty, site_key, token_validity, min_score, apply_to, page_title, challenge_ips
+UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str)
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `enabled` | `bool` | ✔ |  |
-| `challenge_type` | `str` | — | `"captcha"` |
-| `difficulty` | `str` | — | `"medium"` |
-| `site_key` | `str` | — | `""` |
-| `token_validity` | `int` | — | `86400` |
-| `min_score` | `num` | — | `0.5` |
-| `apply_to` | `str` | — | `"both"` |
-| `page_title` | `str` | — | `"Security Check"` |
+| `enabled` | `bool/null` | — | `null` |
+| `challenge_type` | `str/null` | — | `null` |
+| `site_key` | `str/null` | — | `null` |
+| `token_validity` | `int/null` | — | `null` |
+| `min_score` | `float/null` | — | `null` |
+| `apply_to` | `str/null` | — | `null` |
+| `page_title` | `str/null` | — | `null` |
 
 #### `npg_delete_proxy_host_challenge`
 
@@ -732,17 +739,15 @@ GET 프록시 호스트의 클라우드 제공자 차단 구성.
 
 #### `npg_update_proxy_host_cloud_blocking`
 
-UPDATE 프록시 호스트의 클라우드 제공자 차단. Body: blocked_providers (슬러그 목록), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool).
+UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global).
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
 | `host_id` | `str/int` | ✔ |  |
-| `blocked_providers` | `array<str>/null` | — | `null` |
-| `challenge_mode` | `bool` | — | `false` |
-| `allow_search_bots` | `bool` | — | `true` |
-| `cloud_disable_global` | `bool` | — | `false` |
-
-### GeoIP (2)
+| `blocked_providers` | `list<string>/null` | — | `null` |
+| `challenge_mode` | `bool/null` | — | `null` |
+| `allow_search_bots` | `bool/null` | — | `null` |
+| `cloud_disable_global` | `bool/null` | — | `null` |
 
 #### `npg_get_geoip_status`
 

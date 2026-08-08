@@ -110,7 +110,7 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global, waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering/request_buffering, client_max_body_size, proxy_max_temp_file_size, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.")
+@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global (bool | None — None=omit, false=host own WAF, true=inherit global), waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.")
 async def npg_create_proxy_host(
     domain_names: list[str],
     forward_host: str,
@@ -135,7 +135,7 @@ async def npg_create_proxy_host(
     block_exploits: bool = False,
     block_exploits_exceptions: str | None = None,
     allow_websocket_upgrade: bool = True,
-    waf_use_global: bool = False,
+    waf_use_global: bool | None = None,
     waf_paranoia_level: int = 1,
     waf_anomaly_threshold: int = 5,
     waf_mode: str = "blocking",
@@ -226,7 +226,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host", description="Update an existing proxy host. Pass only the fields you want to change. Use `?skip_nginx=true` to skip nginx regeneration. NEW: waf_use_global, waf_paranoia_level, waf_anomaly_threshold, proxy_connect/send/read_timeout, proxy_buffering/request_buffering, client_max_body_size, proxy_max_temp_file_size, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, cache_static_only, cache_ttl, block_exploits_exceptions.")
+@mcp.tool(name="npg_update_proxy_host", description="Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -243,7 +243,7 @@ async def npg_update_proxy_host(
     ssl_cert_id: str | int | None = None,
     cache_enabled: bool | None = None,
     cache_static_only: bool | None = None,
-    cache_ttl: int | None = None,
+    cache_ttl: str | None = None,
     cache_template: str | None = None,
     advanced_config: str | None = None,
     enable_proxy_headers: bool | None = None,
@@ -258,13 +258,13 @@ async def npg_update_proxy_host(
     proxy_connect_timeout: int | None = None,
     proxy_send_timeout: int | None = None,
     proxy_read_timeout: int | None = None,
-    proxy_buffering: bool | None = None,
-    proxy_request_buffering: bool | None = None,
-    client_max_body_size: int | None = None,
-    proxy_max_temp_file_size: int | None = None,
+    proxy_buffering: str | None = None,
+    proxy_request_buffering: str | None = None,
+    client_max_body_size: str | None = None,
+    proxy_max_temp_file_size: str | None = None,
     access_list_id: str | int | None = None,
     auth_provider_id: str | int | None = None,
-    auth_bypass_paths: str | None = None,
+    auth_bypass_paths: list[str] | None = None,
     ddns_enabled: bool | None = None,
     ddns_provider_id: str | int | None = None,
     ddns_proxied: bool | None = None,
@@ -546,11 +546,19 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit configuration for a proxy host. Body: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response")
-async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool, requests_per_second: int, burst_size: int, zone_size: str = "10m", limit_by: str = "ip", limit_response: int = 429) -> dict:
+@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)")
+async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", {"enabled": enabled, "requests_per_second": requests_per_second, "burst_size": burst_size, "zone_size": zone_size, "limit_by": limit_by, "limit_response": limit_response})
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if requests_per_second is not None: body["requests_per_second"] = requests_per_second
+        if burst_size is not None: body["burst_size"] = burst_size
+        if zone_size is not None: body["zone_size"] = zone_size
+        if limit_by is not None: body["limit_by"] = limit_by
+        if limit_response is not None: body["limit_response"] = limit_response
+        if disable_global is not None: body["disable_global"] = disable_global
+        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -564,11 +572,18 @@ async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_bot_filter", description="UPDATE bot filter configuration for a proxy host. Required: host_id (str|int), enabled (bool). Optional: block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).")
-async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool, block_bad_bots: bool = True, block_ai_bots: bool = False, allow_search_engines: bool = True, block_suspicious_clients: bool = False, challenge_suspicious: bool = False, disable_global: bool = False, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_bot_filter", description="UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).")
+async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, disable_global: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"enabled": enabled, "block_bad_bots": block_bad_bots, "block_ai_bots": block_ai_bots, "allow_search_engines": allow_search_engines, "block_suspicious_clients": block_suspicious_clients, "challenge_suspicious": challenge_suspicious, "disable_global": disable_global}
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if block_bad_bots is not None: body["block_bad_bots"] = block_bad_bots
+        if block_ai_bots is not None: body["block_ai_bots"] = block_ai_bots
+        if allow_search_engines is not None: body["allow_search_engines"] = allow_search_engines
+        if block_suspicious_clients is not None: body["block_suspicious_clients"] = block_suspicious_clients
+        if challenge_suspicious is not None: body["challenge_suspicious"] = challenge_suspicious
+        if disable_global is not None: body["disable_global"] = disable_global
         if custom_blocked_agents is not None:
             body["custom_blocked_agents"] = custom_blocked_agents
         if custom_allowed_agents is not None:
@@ -587,11 +602,23 @@ async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host. Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options (DENY/SAMEORIGIN/''), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy")
-async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool, hsts_enabled: bool = True, hsts_max_age: int = 31536000, hsts_include_subdomains: bool = True, hsts_preload: bool = False, x_frame_options: str = "SAMEORIGIN", x_content_type_options: bool = True, x_xss_protection: bool = True, referrer_policy: str = "strict-origin-when-cross-origin", content_security_policy: str = "") -> dict:
+@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)")
+async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", {"enabled": enabled, "hsts_enabled": hsts_enabled, "hsts_max_age": hsts_max_age, "hsts_include_subdomains": hsts_include_subdomains, "hsts_preload": hsts_preload, "x_frame_options": x_frame_options, "x_content_type_options": x_content_type_options, "x_xss_protection": x_xss_protection, "referrer_policy": referrer_policy, "content_security_policy": content_security_policy})
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if hsts_enabled is not None: body["hsts_enabled"] = hsts_enabled
+        if hsts_max_age is not None: body["hsts_max_age"] = hsts_max_age
+        if hsts_include_subdomains is not None: body["hsts_include_subdomains"] = hsts_include_subdomains
+        if hsts_preload is not None: body["hsts_preload"] = hsts_preload
+        if x_frame_options is not None: body["x_frame_options"] = x_frame_options
+        if x_content_type_options is not None: body["x_content_type_options"] = x_content_type_options
+        if x_xss_protection is not None: body["x_xss_protection"] = x_xss_protection
+        if referrer_policy is not None: body["referrer_policy"] = referrer_policy
+        if content_security_policy is not None: body["content_security_policy"] = content_security_policy
+        if disable_global is not None: body["disable_global"] = disable_global
+        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -890,15 +917,18 @@ async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud provider blocking. Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool).")
+@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global).")
 async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None, cloud_disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if blocked_providers is not None: body["blocked_providers"] = blocked_providers
-        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
-        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
-        if cloud_disable_global is not None: body["cloud_disable_global"] = cloud_disable_global
+        # Read-modify-write: upstream SetBlockedProviders full-replaces all 4 fields.
+        current = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
+        body = {
+            "blocked_providers": blocked_providers if blocked_providers is not None else (current.get("blocked_providers") or []),
+            "challenge_mode": challenge_mode if challenge_mode is not None else bool(current.get("challenge_mode", False)),
+            "allow_search_bots": allow_search_bots if allow_search_bots is not None else bool(current.get("allow_search_bots", False)),
+            "cloud_disable_global": cloud_disable_global if cloud_disable_global is not None else bool(current.get("cloud_disable_global", False)),
+        }
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -943,20 +973,31 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Body: enabled, mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global, allow_private_ips, allow_search_bots")
-async def npg_create_proxy_host_geo(host_id: str | int, enabled: bool, mode: Literal["whitelist", "blacklist"] = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
+@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots")
+async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
     c = _get_client()
     try:
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots})
+        body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
+        if allowed_ips is not None: body["allowed_ips"] = allowed_ips
+        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host. Body: enabled, mode, countries, allowed_ips, challenge_mode, disable_global, allow_private_ips, allow_search_bots")
-async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool, mode: Literal["whitelist", "blacklist"] = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
+@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots")
+async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots})
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if mode is not None: body["mode"] = mode
+        if countries is not None: body["countries"] = countries
+        if allowed_ips is not None: body["allowed_ips"] = allowed_ips
+        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
+        if disable_global is not None: body["disable_global"] = disable_global
+        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
+        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
+        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1003,11 +1044,19 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration. Body: enabled, challenge_type (captcha/js_challenge), difficulty, site_key, token_validity, min_score, apply_to, page_title, challenge_ips")
-async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool, challenge_type: str = "captcha", difficulty: str = "medium", site_key: str = "", token_validity: int = 86400, min_score: float = 0.5, apply_to: str = "both", page_title: str = "Security Check") -> dict:
+@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str)")
+async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | None = None, challenge_type: str | None = None, site_key: str | None = None, token_validity: int | None = None, min_score: float | None = None, apply_to: str | None = None, page_title: str | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", {"enabled": enabled, "challenge_type": challenge_type, "difficulty": difficulty, "site_key": site_key, "token_validity": token_validity, "min_score": min_score, "apply_to": apply_to, "page_title": page_title})
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if challenge_type is not None: body["challenge_type"] = challenge_type
+        if site_key is not None: body["site_key"] = site_key
+        if token_validity is not None: body["token_validity"] = token_validity
+        if min_score is not None: body["min_score"] = min_score
+        if apply_to is not None: body["apply_to"] = apply_to
+        if page_title is not None: body["page_title"] = page_title
+        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1066,24 +1115,6 @@ async def npg_get_bots_known() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/bots/known")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_global_uri_block", description="Get global URI block settings.")
-async def npg_get_global_uri_block() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/global-uri-block")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_update_global_uri_block", description="Update global URI block settings. Pass only fields to change (dict).")
-async def npg_update_global_uri_block(kwargs: dict | None = None) -> dict:
-    c = _get_client()
-    try:
-        data = c.put("/api/v1/global-uri-block", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2057,11 +2088,11 @@ async def npg_get_global_cloud_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_global_cloud_providers", description="UPDATE global cloud providers configuration. Body: enabled, blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global.")
-async def npg_update_global_cloud_providers(enabled: bool = False, blocked_providers: list[str] | None = None, challenge_mode: bool = False, allow_search_bots: bool = True, cloud_disable_global: bool = False) -> dict:
+@mcp.tool(name="npg_update_global_cloud_providers", description="UPDATE global cloud providers configuration (full replace — all 3 fields are written; the global default is the singleton inherited by hosts without their own override). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool).")
+async def npg_update_global_cloud_providers(blocked_providers: list[str] | None = None, challenge_mode: bool = False, allow_search_bots: bool = False) -> dict:
     c = _get_client()
     try:
-        body = {"enabled": enabled, "blocked_providers": blocked_providers or [], "challenge_mode": challenge_mode, "allow_search_bots": allow_search_bots, "cloud_disable_global": cloud_disable_global}
+        body = {"blocked_providers": blocked_providers or [], "challenge_mode": challenge_mode, "allow_search_bots": allow_search_bots}
         data = c.put("/api/v1/settings/global-cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2079,11 +2110,18 @@ async def npg_get_global_geo() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_global_geo", description="UPDATE global GeoIP restriction configuration. Body: enabled, mode, countries, allowed_ips, allow_private_ips, allow_search_bots, disable_global.")
-async def npg_update_global_geo(enabled: bool = False, mode: str = "blacklist", countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool = True, allow_search_bots: bool = True, disable_global: bool = False) -> dict:
+@mcp.tool(name="npg_update_global_geo", description="UPDATE global GeoIP restriction configuration (partial update — only provided fields are changed; omitted fields are left as-is. The global default is inherited by hosts without their own override). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode")
+async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None, challenge_mode: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"enabled": enabled, "mode": mode, "countries": countries or [], "allowed_ips": allowed_ips or [], "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots, "disable_global": disable_global}
+        body: dict = {}
+        if enabled is not None: body["enabled"] = enabled
+        if mode is not None: body["mode"] = mode
+        if countries is not None: body["countries"] = countries
+        if allowed_ips is not None: body["allowed_ips"] = allowed_ips
+        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
+        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
+        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
         data = c.put("/api/v1/settings/global-geo", body)
         return {"success": True, "data": data}
     except Exception as e:
