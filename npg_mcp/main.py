@@ -110,117 +110,117 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global (bool | None — None=omit, false=host own WAF, true=inherit global), waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.")
+@mcp.tool(name="npg_create_proxy_host", description="Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: pass only the fields you want to change; omitted fields inherit global defaults or sensible built-in defaults. Fields: proxy_type (default 'http'), forward_scheme (default 'http'), enabled (default True), ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, waf_enabled, waf_use_global, waf_paranoia_level, waf_anomaly_threshold, waf_mode, cache_enabled, cache_static_only, cache_ttl, cache_template, block_normal, block_http, block_exploits, block_exploits_exceptions, enable_proxy_headers, host_header, extra_domains, advanced_config, proxy_buffering (str), proxy_request_buffering (str), client_max_body_size (str), proxy_max_temp_file_size (str), proxy_connect/send/read_timeout, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, stream_* fields.")
 async def npg_create_proxy_host(
     domain_names: list[str],
     forward_host: str,
     forward_port: int,
-    forward_scheme: str = "http",
-    block_normal: bool = False,
-    waf_enabled: bool = True,
-    block_http: bool = False,
-    ssl_enabled: bool = True,
-    ssl_forced: bool = True,
-    ssl_http2: bool = True,
-    ssl_http3: bool = False,
+    forward_scheme: str | None = None,
+    block_normal: bool | None = None,
+    waf_enabled: bool | None = None,
+    block_http: bool | None = None,
+    ssl_enabled: bool | None = None,
+    ssl_forced: bool | None = None,
+    ssl_http2: bool | None = None,
+    ssl_http3: bool | None = None,
     ssl_cert_id: str | int | None = None,
-    cache_enabled: bool = False,
-    cache_static_only: bool = False,
-    cache_ttl: str = "ignore",
-    cache_template: str = "ignore",
-    advanced_config: str = "",
-    enable_proxy_headers: bool = True,
+    cache_enabled: bool | None = None,
+    cache_static_only: bool | None = None,
+    cache_ttl: str | None = None,
+    cache_template: str | None = None,
+    advanced_config: str | None = None,
+    enable_proxy_headers: bool | None = None,
     host_header: str | None = None,
     extra_domains: list[str] | None = None,
-    block_exploits: bool = False,
+    block_exploits: bool | None = None,
     block_exploits_exceptions: str | None = None,
-    allow_websocket_upgrade: bool = True,
+    allow_websocket_upgrade: bool | None = None,
     waf_use_global: bool | None = None,
-    waf_paranoia_level: int = 1,
-    waf_anomaly_threshold: int = 5,
-    waf_mode: str = "blocking",
-    proxy_connect_timeout: int = 0,
-    proxy_send_timeout: int = 0,
-    proxy_read_timeout: int = 0,
-    proxy_buffering: str = "on",
-    proxy_request_buffering: str = "on",
-    client_max_body_size: str = "off",
-    proxy_max_temp_file_size: str = "off",
+    waf_paranoia_level: int | None = None,
+    waf_anomaly_threshold: int | None = None,
+    waf_mode: str | None = None,
+    proxy_connect_timeout: int | None = None,
+    proxy_send_timeout: int | None = None,
+    proxy_read_timeout: int | None = None,
+    proxy_buffering: str | None = None,
+    proxy_request_buffering: str | None = None,
+    client_max_body_size: str | None = None,
+    proxy_max_temp_file_size: str | None = None,
     access_list_id: str | int | None = None,
     auth_provider_id: str | int | None = None,
     auth_bypass_paths: list[str] | None = None,
-    ddns_enabled: bool = False,
+    ddns_enabled: bool | None = None,
     ddns_provider_id: str | int | None = None,
-    ddns_proxied: bool = False,
+    ddns_proxied: bool | None = None,
     forward_container_name: str | None = None,
     forward_container_network: str | None = None,
-    proxy_type: str = "proxy",
+    proxy_type: str = "http",
     enabled: bool = True,
     stream_listen_host: str | None = None,
     stream_listen_port: int | None = None,
     stream_protocol: str = "tcp",
-    stream_ssl_preread: bool = False,
-    stream_accept_proxy_protocol: bool = False,
-    stream_send_proxy_protocol: bool = False,
-    stream_proxy_connect_timeout: int = 0,
-    stream_proxy_timeout: int = 0,
+    stream_ssl_preread: bool | None = None,
+    stream_accept_proxy_protocol: bool | None = None,
+    stream_send_proxy_protocol: bool | None = None,
+    stream_proxy_connect_timeout: int | None = None,
+    stream_proxy_timeout: int | None = None,
 ) -> dict:
     c = _get_client()
     try:
-        body = {
-            "domain_names": domain_names,
-            "forward_host": forward_host,
-            "forward_port": forward_port,
-            "forward_scheme": forward_scheme,
-            "block_normal_access": block_normal,
-            "waf_enabled": waf_enabled,
-            "block_http_requests": block_http,
-            "ssl_enabled": ssl_enabled,
-            "ssl_force_https": ssl_forced,
-            "ssl_http2": ssl_http2,
-            "ssl_http3": ssl_http3,
-            "certificate_id": ssl_cert_id,
-            "cache_enabled": cache_enabled,
-            "cache_static_only": cache_static_only,
-            "cache_ttl": cache_ttl,
-            "cache_template": cache_template,
-            "advanced_config": advanced_config,
-            "enable_proxy_headers": enable_proxy_headers,
-            "pass_host_header": host_header,
-            "extra_domains": extra_domains or [],
-            "block_exploits": block_exploits,
-            "block_exploits_exceptions": block_exploits_exceptions,
-            "allow_websocket_upgrade": allow_websocket_upgrade,
-            "waf_use_global": waf_use_global,
-            "waf_paranoia_level": waf_paranoia_level,
-            "waf_anomaly_threshold": waf_anomaly_threshold,
-            "waf_mode": waf_mode,
-            "proxy_connect_timeout": proxy_connect_timeout,
-            "proxy_send_timeout": proxy_send_timeout,
-            "proxy_read_timeout": proxy_read_timeout,
-            "proxy_buffering": proxy_buffering,
-            "proxy_request_buffering": proxy_request_buffering,
-            "client_max_body_size": client_max_body_size,
-            "proxy_max_temp_file_size": proxy_max_temp_file_size,
-            "access_list_id": _id_path(access_list_id) if access_list_id is not None else None,
-            "auth_provider_id": _id_path(auth_provider_id) if auth_provider_id is not None else None,
-            "auth_bypass_paths": auth_bypass_paths or [],
-            "ddns_enabled": ddns_enabled,
-            "ddns_provider_id": _id_path(ddns_provider_id) if ddns_provider_id is not None else None,
-            "ddns_proxied": ddns_proxied,
-            "forward_container_name": forward_container_name,
-            "forward_container_network": forward_container_network,
-            "proxy_type": proxy_type,
-            "enabled": enabled,
-            "stream_listen_host": stream_listen_host,
-            "stream_listen_port": stream_listen_port,
-            "stream_protocol": stream_protocol,
-            "stream_ssl_preread": stream_ssl_preread,
-            "stream_accept_proxy_protocol": stream_accept_proxy_protocol,
-            "stream_send_proxy_protocol": stream_send_proxy_protocol,
-            "stream_proxy_connect_timeout": stream_proxy_connect_timeout,
-            "stream_proxy_timeout": stream_proxy_timeout,
-        }
+        body: dict = {}
+        body["domain_names"] = domain_names
+        body["forward_host"] = forward_host
+        body["forward_port"] = forward_port
+        if forward_scheme is not None: body["forward_scheme"] = forward_scheme
+        if block_normal is not None: body["block_normal_access"] = block_normal
+        if waf_enabled is not None: body["waf_enabled"] = waf_enabled
+        if block_http is not None: body["block_http_requests"] = block_http
+        if ssl_enabled is not None: body["ssl_enabled"] = ssl_enabled
+        if ssl_forced is not None: body["ssl_force_https"] = ssl_forced
+        if ssl_http2 is not None: body["ssl_http2"] = ssl_http2
+        if ssl_http3 is not None: body["ssl_http3"] = ssl_http3
+        if ssl_cert_id is not None: body["certificate_id"] = ssl_cert_id
+        if cache_enabled is not None: body["cache_enabled"] = cache_enabled
+        if cache_static_only is not None: body["cache_static_only"] = cache_static_only
+        if cache_ttl is not None: body["cache_ttl"] = cache_ttl
+        if cache_template is not None: body["cache_template"] = cache_template
+        if advanced_config is not None: body["advanced_config"] = advanced_config
+        if enable_proxy_headers is not None: body["enable_proxy_headers"] = enable_proxy_headers
+        if host_header is not None: body["pass_host_header"] = host_header
+        if extra_domains is not None: body["extra_domains"] = extra_domains
+        if block_exploits is not None: body["block_exploits"] = block_exploits
+        if block_exploits_exceptions is not None: body["block_exploits_exceptions"] = block_exploits_exceptions
+        if allow_websocket_upgrade is not None: body["allow_websocket_upgrade"] = allow_websocket_upgrade
+        if waf_use_global is not None: body["waf_use_global"] = waf_use_global
+        if waf_paranoia_level is not None: body["waf_paranoia_level"] = waf_paranoia_level
+        if waf_anomaly_threshold is not None: body["waf_anomaly_threshold"] = waf_anomaly_threshold
+        if waf_mode is not None: body["waf_mode"] = waf_mode
+        if proxy_connect_timeout is not None: body["proxy_connect_timeout"] = proxy_connect_timeout
+        if proxy_send_timeout is not None: body["proxy_send_timeout"] = proxy_send_timeout
+        if proxy_read_timeout is not None: body["proxy_read_timeout"] = proxy_read_timeout
+        if proxy_buffering is not None: body["proxy_buffering"] = proxy_buffering
+        if proxy_request_buffering is not None: body["proxy_request_buffering"] = proxy_request_buffering
+        if client_max_body_size is not None: body["client_max_body_size"] = client_max_body_size
+        if proxy_max_temp_file_size is not None: body["proxy_max_temp_file_size"] = proxy_max_temp_file_size
+        if access_list_id is not None: body["access_list_id"] = _id_path(access_list_id)
+        if auth_provider_id is not None: body["auth_provider_id"] = _id_path(auth_provider_id)
+        if auth_bypass_paths is not None: body["auth_bypass_paths"] = auth_bypass_paths
+        if ddns_enabled is not None: body["ddns_enabled"] = ddns_enabled
+        if ddns_provider_id is not None: body["ddns_provider_id"] = _id_path(ddns_provider_id)
+        if ddns_proxied is not None: body["ddns_proxied"] = ddns_proxied
+        if forward_container_name is not None: body["forward_container_name"] = forward_container_name
+        if forward_container_network is not None: body["forward_container_network"] = forward_container_network
+        body["proxy_type"] = proxy_type
+        body["enabled"] = enabled
+        if stream_listen_host is not None: body["stream_listen_host"] = stream_listen_host
+        if stream_listen_port is not None: body["stream_listen_port"] = stream_listen_port
+        if stream_protocol is not None: body["stream_protocol"] = stream_protocol
+        if stream_ssl_preread is not None: body["stream_ssl_preread"] = stream_ssl_preread
+        if stream_accept_proxy_protocol is not None: body["stream_accept_proxy_protocol"] = stream_accept_proxy_protocol
+        if stream_send_proxy_protocol is not None: body["stream_send_proxy_protocol"] = stream_send_proxy_protocol
+        if stream_proxy_connect_timeout is not None: body["stream_proxy_connect_timeout"] = stream_proxy_connect_timeout
+        if stream_proxy_timeout is not None: body["stream_proxy_timeout"] = stream_proxy_timeout
+
         data = c.post("/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
