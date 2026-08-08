@@ -129,7 +129,7 @@ async def npg_create_proxy_host(
     block_normal: bool | None = None,
     waf_enabled: bool | None = None,
     block_http: bool | None = None,
-    ssl_enabled: bool | None = None,
+    ssl_enabled: bool = True,
     ssl_forced: bool = True,
     ssl_http2: bool = True,
     ssl_http3: bool | None = None,
