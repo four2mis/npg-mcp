@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import hmac
 import os
+import warnings
 from contextvars import ContextVar
 from typing import Literal
 from urllib.parse import quote
+
+# Suppress MCP SDK v1.x pydantic-settings warning for unresolved forward
+# reference in FastMCP.lifespan — harmless, fixed in MCP SDK 2.x
+warnings.filterwarnings(
+    "ignore",
+    message=".*lifespan.*incomplete definition.*",
+    category=UserWarning,
+    module="pydantic_settings",
+)
 
 from mcp.server import transport_security
 from mcp.server.fastmcp import FastMCP
