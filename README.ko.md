@@ -77,7 +77,7 @@ Get a proxy host by its domain name.
 
 #### `npg_create_proxy_host`
 
-Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_http2 (default True), ssl_http3 (default True), allow_websocket_upgrade (default True), block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global, waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering/request_buffering, client_max_body_size, proxy_max_temp_file_size, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.
+Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: forward_scheme, block_normal, waf_enabled (default True), ssl_forced (default True), ssl_http2 (default True), ssl_http3, allow_websocket_upgrade (default True), block_http, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl, waf_use_global, waf_paranoia_level, waf_anomaly_threshold, waf_mode, block_exploits_exceptions, proxy_connect/send/read_timeout, proxy_buffering/request_buffering, client_max_body_size, proxy_max_temp_file_size, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, proxy_type, enabled, stream_* fields.
 
 | 매개변수 | 유형 | 필수 | 기본값 |
 |---------|------|:---:|--------|
