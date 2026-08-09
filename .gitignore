@@ -29,3 +29,5 @@ AGENTS.md
 swagger(1).yaml
 swagger.md
 *.txt
+
+swagger.yaml
