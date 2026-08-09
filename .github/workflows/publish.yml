@@ -25,15 +25,22 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
             IS_TAG=true
           else
-            # Plain commit to main: derive the version from pyproject.toml so
-            # the image is (re)published without requiring a version bump.
-            VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+            # Plain commit to main: replace/refresh the image of the LATEST
+            # RELEASED version (e.g. v0.3.9 -> tags 0.3.9/0.3/latest), so a
+            # fix commit ships to the existing release without a version bump.
+            # Falls back to pyproject.toml if no release exists yet.
+            VERSION=$(gh release view --repo ${{ github.repository }} --json tagName --jq .tagName | sed 's/^v//' || true)
+            if [ -z "$VERSION" ]; then
+              VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+            fi
             IS_TAG=false
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION_SHORT=${VERSION%.*}" >> $GITHUB_ENV
           echo "TAG=v$VERSION" >> $GITHUB_ENV
           echo "IS_TAG=$IS_TAG" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u four2mis --password-stdin
