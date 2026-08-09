@@ -1028,8 +1028,8 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
 async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
     c = _get_client()
     try:
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
-        return {"success": True, "data": data}
+        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
+        return {"success": True, "message": f"Geo restriction for host {_id_path(host_id)} deleted"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1094,8 +1094,8 @@ async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | No
 async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     c = _get_client()
     try:
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
-        return {"success": True, "data": data}
+        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
+        return {"success": True, "message": f"Challenge configuration for host {_id_path(host_id)} deleted"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
