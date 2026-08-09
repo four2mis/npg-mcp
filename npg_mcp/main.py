@@ -1618,26 +1618,31 @@ async def npg_list_sso_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_sso_provider", description="Create a new SSO provider. Required: name, provider_type (e.g. 'google', 'github', 'oidc'). Optional: config (dict).")
-async def npg_create_sso_provider(name: str, provider_type: str, config: dict | None = None) -> dict:
+@mcp.tool(name="npg_create_sso_provider", description="Create a new SSO provider. Required: slug, name, issuer_url, client_id. Optional: client_secret (defaults to placeholder), scopes.")
+async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "type": provider_type}
-        if config:
-            body["config"] = config
+        body = {"slug": slug, "name": name, "issuer_url": issuer_url, "client_id": client_id}
+        if client_secret is not None:
+            body["client_secret"] = client_secret
+        if scopes is not None:
+            body["scopes"] = scopes
         data = c.post("/api/v1/sso-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_sso_provider", description="Update an SSO provider. Pass only fields to change.")
-async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, provider_type: str | None = None, config: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_sso_provider", description="Update an SSO provider. Pass only fields to change. Required: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes.")
+async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
         if name is not None: body["name"] = name
-        if provider_type is not None: body["type"] = provider_type
-        if config is not None: body["config"] = config
+        if slug is not None: body["slug"] = slug
+        if issuer_url is not None: body["issuer_url"] = issuer_url
+        if client_id is not None: body["client_id"] = client_id
+        if client_secret is not None: body["client_secret"] = client_secret
+        if scopes is not None: body["scopes"] = scopes
         data = c.put(f"/api/v1/sso-providers/{_id_path(provider_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
