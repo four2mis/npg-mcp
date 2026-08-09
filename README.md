@@ -10,7 +10,7 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 ## Tools Reference
 
-This server exposes **179 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
+This server exposes **175 MCP tools**. Each tool is documented below with a short description and its **input parameter schema** (parameter, type, whether it is required, and default value). Tools are grouped into the following categories:
 
 - **Dashboard** — 6 tools
 - **Proxy Hosts** — 10 tools

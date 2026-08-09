@@ -1433,15 +1433,6 @@ async def npg_list_notification_channels() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_notification_channel", description="Get a notification channel by its ID.")
-async def npg_get_notification_channel(channel_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 @mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).")
 async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None) -> dict:
     c = _get_client()
@@ -1584,15 +1575,6 @@ async def npg_list_roles() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_role", description="Get a role by its ID.")
-async def npg_get_role(role_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.get(f"/api/v1/roles/{_id_path(role_id)}")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 @mcp.tool(name="npg_create_role", description="Create a new role. Required: name, permissions (array of permission strings).")
 async def npg_create_role(name: str, permissions: list[str]) -> dict:
     c = _get_client()
@@ -1632,15 +1614,6 @@ async def npg_list_sso_providers() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/sso-providers")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_sso_provider", description="Get an SSO provider by its ID.")
-async def npg_get_sso_provider(provider_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.get(f"/api/v1/sso-providers/{_id_path(provider_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1695,17 +1668,7 @@ async def npg_test_sso_provider(provider_id: str | int) -> dict:
 async def npg_list_log_files() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/log-files")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_log_file", description="Get a log file by its filename.")
-async def npg_get_log_file(filename: str) -> dict:
-    c = _get_client()
-    try:
-        encoded = quote(filename, safe="")
-        data = c.get(f"/api/v1/log-files/{encoded}")
+        data = c.get("/api/v1/system-settings/log-files")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1715,7 +1678,7 @@ async def npg_download_log_file(filename: str) -> dict:
     c = _get_client()
     try:
         encoded = quote(filename, safe="")
-        data = c.get(f"/api/v1/log-files/{encoded}/download")
+        data = c.get(f"/api/v1/system-settings/log-files/{encoded}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1725,7 +1688,7 @@ async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
     c = _get_client()
     try:
         encoded = quote(filename, safe="")
-        data = c.get(f"/api/v1/log-files/{encoded}/view", params={"lines": lines})
+        data = c.get(f"/api/v1/system-settings/log-files/{encoded}/view", params={"lines": lines})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1734,7 +1697,7 @@ async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
 async def npg_rotate_log_file() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/log-files/rotate")
+        data = c.post("/api/v1/system-settings/log-files/rotate")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1744,7 +1707,7 @@ async def npg_delete_log_file(filename: str) -> dict:
     c = _get_client()
     try:
         encoded = quote(filename, safe="")
-        c.delete(f"/api/v1/log-files/{encoded}")
+        c.delete(f"/api/v1/system-settings/log-files/{encoded}")
         return {"success": True, "message": f"Log file {filename} deleted"}
     except Exception as e:
         return {"success": False, "error": str(e)}
