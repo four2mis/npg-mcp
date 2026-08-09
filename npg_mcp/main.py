@@ -1761,15 +1761,6 @@ async def npg_get_expiring_certificates() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_certificate_errors", description="Get certificate errors.")
-async def npg_get_certificate_errors() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/certificates/errors")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 @mcp.tool(name="npg_get_certificate_history", description="Get certificate history.")
 async def npg_get_certificate_history() -> dict:
     c = _get_client()
@@ -1908,8 +1899,8 @@ async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
 
 # ── Upstream Health ────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream server.")
-async def npg_get_upstream_health(upstream_id: str | int) -> dict:
+@mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream pool. REQUIRED: upstream_id (UUID string).")
+async def npg_get_upstream_health(upstream_id: str) -> dict:
     c = _get_client()
     try:
         data = c.get(f"/api/v1/upstreams/{_id_path(upstream_id)}/health")
