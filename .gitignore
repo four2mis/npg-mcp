@@ -27,4 +27,5 @@ AGENTS.md
 
 # Generated / attached files
 swagger(1).yaml
+swagger.md
 *.txt
