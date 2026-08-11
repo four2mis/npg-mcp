@@ -2383,12 +2383,14 @@ async def npg_list_auth_providers() -> dict:
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_create_auth_provider", description="Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific).")
-async def npg_create_auth_provider(name: str, provider_type: str, config: dict | None = None) -> dict:
+async def npg_create_auth_provider(name: str, provider_type: str, config: dict | None = None, provider_url: str | None = None) -> dict:
     c = _get_client()
     try:
         body = {"name": name, "type": provider_type}
         if config is not None:
             body["config"] = config
+        if provider_url is not None:
+            body["provider_url"] = provider_url
         data = c.post("/api/v1/auth-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2796,10 +2798,10 @@ async def npg_get_dns_provider_default() -> dict:
 # ── Logs Extras ────────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_post_log", description="Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags.")
-async def npg_post_log(level: str, message: str, source: str | None = None, component: str | None = None) -> dict:
+async def npg_post_log(level: str, message: str, source: str | None = None, component: str | None = None, log_type: str = "access") -> dict:
     c = _get_client()
     try:
-        body = {"level": level, "message": message}
+        body = {"level": level, "message": message, "log_type": log_type}
         if source is not None: body["source"] = source
         if component is not None: body["component"] = component
         data = c.post("/api/v1/logs", body)
@@ -3301,10 +3303,10 @@ async def npg_get_waf_test_patterns() -> dict:
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_test_waf_pattern", description="Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, pattern (pattern name or index).")
-async def npg_test_waf_pattern(target_url: str, pattern: str) -> dict:
+async def npg_test_waf_pattern(target_url: str, attack_type: str) -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/waf-test/test", {"target_url": target_url, "pattern": pattern})
+        data = c.post("/api/v1/waf-test/test", {"target_url": target_url, "attack_type": attack_type})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}

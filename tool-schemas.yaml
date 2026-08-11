@@ -2295,7 +2295,7 @@ npg_list_auth_providers:
   description: List ForwardAuth (Authelia, Authentik, custom) providers.
   parameters: []
 npg_create_auth_provider:
-  description: 'Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific).'
+  description: 'Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific). Optional: provider_url.'
   parameters:
   - name: name
     type: str
@@ -2307,6 +2307,10 @@ npg_create_auth_provider:
     default: null
   - name: config
     type: dict | None
+    required: false
+    default: None
+  - name: provider_url
+    type: str | None
     required: false
     default: None
 npg_get_auth_provider:
@@ -2663,7 +2667,7 @@ npg_get_dns_provider_default:
   parameters: []
 npg_post_log:
   description: 'Insert a log entry manually. REQUIRED: level, message. Optional: source,
-    component, tags.'
+    component, log_type (default access), tags.'
   parameters:
   - name: level
     type: str
@@ -2681,6 +2685,10 @@ npg_post_log:
     type: str | None
     required: false
     default: None
+  - name: log_type
+    type: str
+    required: false
+    default: 'access'
 npg_cleanup_logs:
   description: Delete nginx access logs older than the configured retention period.
   parameters: []
@@ -2994,13 +3002,13 @@ npg_get_waf_test_patterns:
   parameters: []
 npg_test_waf_pattern:
   description: 'Fire one attack payload at a target URL for WAF testing. REQUIRED:
-    target_url, pattern (pattern name or index).'
+    target_url, attack_type (attack type name or index).'
   parameters:
   - name: target_url
     type: str
     required: true
     default: null
-  - name: pattern
+  - name: attack_type
     type: str
     required: true
     default: null
