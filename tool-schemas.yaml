@@ -2888,14 +2888,14 @@ npg_get_ban_history_for_ip:
     required: true
     default: null
 npg_add_proxy_host_uri_block_rule:
-  description: 'Add a single URI block rule to a proxy host. REQUIRED: host_id, path
+  description: 'Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern
     (str or regex), action (block/allow). Optional: case_sensitive (bool).'
   parameters:
   - name: host_id
     type: str | int
     required: true
     default: null
-  - name: path
+  - name: pattern
     type: str
     required: true
     default: null
