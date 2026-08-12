@@ -1892,20 +1892,11 @@ async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
 
 # ── Catalog ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_catalog", description="Get the exploit block rule catalog.")
+@mcp.tool(name="npg_get_catalog", description="Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows.")
 async def npg_get_catalog() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/catalog")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_subscribe_catalog", description="Subscribe to a catalog entry. Required: catalog_id.")
-async def npg_subscribe_catalog(catalog_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.post(f"/api/v1/catalog/{_id_path(catalog_id)}/subscribe")
+        data = c.get("/api/v1/filter-subscriptions/catalog")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2526,11 +2517,11 @@ async def npg_get_filter_subscription_catalog() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_subscribe_filter_catalog", description="Subscribe to one or more catalog filter lists. REQUIRED: catalog_ids (list of catalog IDs).")
-async def npg_subscribe_filter_catalog(catalog_ids: list[str]) -> dict:
+@mcp.tool(name="npg_subscribe_filter_catalog", description="Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json').")
+async def npg_subscribe_filter_catalog(paths: list[str]) -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/filter-subscriptions/catalog/subscribe", {"catalog_ids": catalog_ids})
+        data = c.post("/api/v1/filter-subscriptions/catalog/subscribe", {"paths": paths})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
