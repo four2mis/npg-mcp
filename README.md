@@ -156,12 +156,12 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 ## Tools Reference
 
-This server exposes **287 MCP tools** across 28 categories. Each category lists its tools with a brief description; full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **286 MCP tools** across 28 categories. Each category lists its tools with a brief description; full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
 | **Proxy Hosts** | 38 tools |
-| **Logs** | 37 tools |
+| **Logs** | 36 tools |
 | **Security & WAF** | 32 tools |
 | **DNS Providers** | 15 tools |
 | **Authentication** | 15 tools |
@@ -233,7 +233,7 @@ This server exposes **287 MCP tools** across 28 categories. Each category lists 
 | `npg_update_proxy_host_cloud_blocking` | UPDATE per-host cloud provider blocking |
 | `npg_regenerate_config` | Regenerate nginx config for a specific proxy host |
 
-### Logs (37)
+### Logs (36)
 
 | Tool | Description |
 |------|-------------|
@@ -248,10 +248,9 @@ This server exposes **287 MCP tools** across 28 categories. Each category lists 
 | `npg_view_log_file` | View the contents of a log file |
 | `npg_rotate_log_file` | Rotate a log file by filename |
 | `npg_delete_log_file` | Delete a log file by filename |
-| `npg_get_catalog` | Get the exploit block rule catalog |
-| `npg_subscribe_catalog` | Subscribe to a catalog entry |
+| `npg_get_catalog` | Get the curated filter subscription catalog |
 | `npg_get_filter_subscription_catalog` | Get the curated filter catalog |
-| `npg_subscribe_filter_catalog` | Subscribe to one or more filter lists |
+| `npg_subscribe_filter_catalog` | Subscribe to one or more catalog filter lists |
 | `npg_get_certificate_logs` | Get the issuance log stream for a certificate |
 | `npg_post_log` | Insert a log entry manually |
 | `npg_cleanup_logs` | Delete nginx access logs older than retention period |
