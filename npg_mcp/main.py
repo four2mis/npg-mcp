@@ -3001,7 +3001,8 @@ async def npg_get_audit_log_api_tokens() -> dict:
         return {"success": False, "error": str(e)}
 
 
-# ── Notification Channels Extras ───────────────────────────────────────@mcp.tool(name="npg_get_notification_channel_deliveries", description="List recent deliveries for a notification channel. REQUIRED: channel_id.")
+# ── Notification Channels Extras ───────────────────────────────────────
+@mcp.tool(name="npg_get_notification_channel_deliveries", description="List recent deliveries for a notification channel. REQUIRED: channel_id.")
 async def npg_get_notification_channel_deliveries(channel_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -3020,7 +3021,10 @@ async def npg_set_proxy_host_favorite(host_id: str | int, favorite: bool) -> dic
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/favorite", {"favorite": favorite})
         return {"success": True, "data": data}
     except Exception as e:
-        return {"success": False, "error": str(e)}@mcp.tool(name="npg_sync_redirect_hosts", description="Regenerate every redirect host config and reload nginx.")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool(name="npg_sync_redirect_hosts", description="Regenerate every redirect host config and reload nginx.")
 async def npg_sync_redirect_hosts() -> dict:
     c = _get_client()
     try:
@@ -3030,7 +3034,8 @@ async def npg_sync_redirect_hosts() -> dict:
         return {"success": False, "error": str(e)}
 
 
-# ── SSO Extras ─────────────────────────────────────────────────────────@mcp.tool(name="npg_delete_proxy_host_rate_limit", description="Delete the rate limit config for a proxy host — host falls back to global default. REQUIRED: host_id.")
+# ── SSO Extras ─────────────────────────────────────────────────────────
+@mcp.tool(name="npg_delete_proxy_host_rate_limit", description="Delete the rate limit config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_rate_limit(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -3196,7 +3201,10 @@ async def npg_check_npg_update() -> dict:
         data = c.get("/api/v1/system-settings/update/check")
         return {"success": True, "data": data}
     except Exception as e:
-        return {"success": False, "error": str(e)}@mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
     c = _get_client()
     try:
@@ -3333,7 +3341,8 @@ async def npg_get_geoip_history() -> dict:
         return {"success": False, "error": str(e)}
 
 
-# ── Users Extras ───────────────────────────────────────────────────────@mcp.tool(name="npg_set_user_role", description="Assign a role to a user account. REQUIRED: user_id, role_id.")
+# ── Users Extras ───────────────────────────────────────────────────────
+@mcp.tool(name="npg_set_user_role", description="Assign a role to a user account. REQUIRED: user_id, role_id.")
 async def npg_set_user_role(user_id: str | int, role_id: str | int) -> dict:
     c = _get_client()
     try:
