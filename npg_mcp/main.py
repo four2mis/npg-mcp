@@ -3125,11 +3125,11 @@ async def npg_get_ban_history_for_ip(ip: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, path (str or regex), action (block/allow). Optional: case_sensitive (bool).")
-async def npg_add_proxy_host_uri_block_rule(host_id: str | int, path: str, action: str, case_sensitive: bool = False) -> dict:
+@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex), action (block/allow). Optional: case_sensitive (bool).")
+async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, action: str, case_sensitive: bool = False) -> dict:
     c = _get_client()
     try:
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", {"path": path, "action": action, "case_sensitive": case_sensitive})
+        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", {"pattern": pattern, "action": action, "case_sensitive": case_sensitive})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
