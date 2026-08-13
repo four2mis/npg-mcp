@@ -156,462 +156,458 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **287개의 MCP 도구**를 28개 카테고리로 노출합니다. 각 카테고리는 도구명과 간략한 설명을 표로 제공하며, 전체 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **286개의 MCP 도구**를 28개 카테고리에 걸쳐 노출합니다. 각 카테고리는 도구 이름과 간략한 설명을 나열하며, 전체 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
-| 카테고리 | 도구 수 |
-|----------|---------|
-| **프록시 호스트(Proxy Hosts)** | 38개 도구 |
-| **로그(Logs)** | 37개 도구 |
-| **보안 & WAF(Security & WAF)** | 32개 도구 |
-| **DNS 제공자(DNS Providers)** | 15개 도구 |
-| **인증(Authentication)** | 15개 도구 |
-| **인증서(Certificates)** | 12개 도구 |
-| **필터 구독(Filter Subscriptions)** | 12개 도구 |
-| **클라우드 제공자(Cloud Providers)** | 11개 도구 |
-| **URI 차단(URI Block)** | 10개 도구 |
-| **설정(Settings)** | 8개 도구 |
-| **백업(Backups)** | 8개 도구 |
-| **API 토큰(API Tokens)** | 8개 도구 |
-| **사용자(Users)** | 8개 도구 |
-| **SSO 제공자(SSO Providers)** | 7개 도구 |
-| **기타(Other)** | 6개 도구 |
-| **대시보드(Dashboard)** | 6개 도구 |
-| **IP 관리(IP Management)** | 6개 도구 |
-| **알림 채널(Notification Channels)** | 6개 도구 |
-| **리다이렉트 호스트(Redirect Hosts)** | 5개 도구 |
-| **액세스 목록(Access Lists)** | 5개 도구 |
-| **지역 제한(Geo)** | 5개 도구 |
-| **Fail2ban & 챌린지(Fail2ban & Challenge)** | 4개 도구 |
-| **차단 IP & 봇(Banned IPs & Bots)** | 4개 도구 |
-| **역할(Roles)** | 4개 도구 |
-| **시스템(System)** | 4개 도구 |
-| **SSL / Nginx** | 3개 도구 |
-| **시스템 & 상태(System & Health)** | 2개 도구 |
-| **Docker** | 1개 도구 |
+| 카테고리 | 도구 |
+|----------|-------|
+| **프록시 호스트(Proxy Hosts)** | 34 tools |
+| **로그(Logs)** | 32 tools |
+| **보안 및 WAF(Security & WAF)** | 27 tools |
+| **DNS 제공자(DNS Providers)** | 15 tools |
+| **인증(Authentication)** | 18 tools |
+| **인증서(Certificates)** | 15 tools |
+| **필터 구독(Filter Subscriptions)** | 15 tools |
+| **클라우드 제공자(Cloud Providers)** | 13 tools |
+| **URI 차단(URI Block)** | 10 tools |
+| **설정(Settings)** | 11 tools |
+| **백업(Backups)** | 8 tools |
+| **API 토큰(API Tokens)** | 8 tools |
+| **사용자(Users)** | 9 tools |
+| **SSO 제공자(SSO Providers)** | 7 tools |
+| **대시보드(Dashboard)** | 3 tools |
+| **IP 관리(IP Management)** | 4 tools |
+| **알림 채널(Notification Channels)** | 8 tools |
+| **리다이렉트 호스트(Redirect Hosts)** | 6 tools |
+| **액세스 목록(Access Lists)** | 5 tools |
+| **지역(Geo)** | 10 tools |
+| **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3 tools |
+| **차단 IP 및 봇(Banned IPs & Bots)** | 5 tools |
+| **역할(Roles)** | 4 tools |
+| **시스템(System)** | 11 tools |
+| **SSL / Nginx** | 3 tools |
+| **시스템 및 상태(System & Health)** | 1 tool |
+| **Docker** | 1 tool |
 
-### 프록시 호스트(Proxy Hosts) (38)
-
-| 도구 | 설명 |
-|------|------|
-| `npg_list_proxy_hosts` | 모든 프록시 호스트 목록 |
-| `npg_get_proxy_host` | ID로 단일 프록시 호스트 조회 |
-| `npg_get_proxy_host_by_domain` | 도메인명으로 프록시 호스트 조회 |
-| `npg_create_proxy_host` | 새 역방향 프록시 호스트 생성 |
-| `npg_update_proxy_host` | 기존 프록시 호스트 업데이트(부분 업데이트) |
-| `npg_delete_proxy_host` | ID로 프록시 호스트 삭제 |
-| `npg_test_proxy_host` | 업스트림 연결성 테스트 |
-| `npg_sync_proxy_hosts` | 모든 프록시 호스트 구성 동기화 및 nginx 재로드 |
-| `npg_clone_proxy_host` | 새 도메인명으로 프록시 호스트 복제 |
-| `npg_get_proxy_host_rate_limit` | 속도 제한 구성 GET |
-| `npg_update_proxy_host_rate_limit` | 속도 제한 구성 UPDATE |
-| `npg_get_proxy_host_bot_filter` | 봇 필터 구성 GET |
-| `npg_update_proxy_host_bot_filter` | 봇 필터 구성 UPDATE |
-| `npg_delete_proxy_host_bot_filter` | 봇 필터 구성 삭제(글로벌로 폴백) |
-| `npg_get_proxy_host_security_headers` | 보안 헤더 구성 GET |
-| `npg_update_proxy_host_security_headers` | 보안 헤더 구성 UPDATE |
-| `npg_delete_proxy_host_security_headers` | 보안 헤더 구성 삭제(글로벌로 폴백) |
-| `npg_get_proxy_host_upstream` | 업스트림/로드 밸런싱 구성 GET |
-| `npg_update_proxy_host_upstream` | 업스트림/로드 밸런싱 구성 UPDATE |
-| `npg_delete_proxy_host_upstream` | 업스트림 구성 삭제(기본값으로 폴백) |
-| `npg_get_proxy_host_uri_block` | URI 차단 구성 GET |
-| `npg_update_proxy_host_uri_block` | URI 차단 구성 UPDATE |
-| `npg_delete_proxy_host_uri_block` | URI 차단 구성 삭제(글로벌로 폴백) |
-| `npg_add_proxy_host_uri_block_rule` | 단일 URI 차단 규칙 추가 |
-| `npg_delete_proxy_host_uri_block_rule` | 단일 URI 차단 규칙 제거 |
-| `npg_get_proxy_host_geo` | 지역 제한 구성 GET |
-| `npg_create_proxy_host_geo` | 지역 제한 CREATE |
-| `npg_update_proxy_host_geo` | 지역 제한 UPDATE |
-| `npg_delete_proxy_host_geo` | 지역 제한 DELETE |
-| `npg_get_proxy_host_fail2ban` | fail2ban 구성 GET |
-| `npg_update_proxy_host_fail2ban` | fail2ban 구성 UPDATE |
-| `npg_delete_proxy_host_fail2ban` | fail2ban 구성 삭제(글로벌로 폴백) |
-| `npg_get_proxy_host_challenge` | CAPTCHA/챌린지 구성 GET |
-| `npg_update_proxy_host_challenge` | CAPTCHA/챌린지 구성 UPDATE |
-| `npg_delete_proxy_host_challenge` | CAPTCHA/챌린지 구성 DELETE |
-| `npg_set_proxy_host_favorite` | 프록시 호스트를 즐겨찾기로 토글 |
-| `npg_get_proxy_host_cloud_blocking` | 호스트별 클라우드 제공자 차단 GET |
-| `npg_update_proxy_host_cloud_blocking` | 호스트별 클라우드 제공자 차단 UPDATE |
-| `npg_regenerate_config` | 특정 프록시 호스트용 nginx 구성 재생성 |
-
-### 로그(Logs) (37)
+### 프록시 호스트(Proxy Hosts) (34)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_get_logs` | 액세스 로그 조회 |
-| `npg_get_log_settings` | 로그 설정 조회 |
-| `npg_update_log_settings` | 로그 설정 업데이트 |
-| `npg_get_log_stats` | 로그 통계 조회 |
-| `npg_list_audit_logs` | 감사 로그 항목 목록 |
-| `npg_list_system_logs` | 시스템 로그 목록 |
-| `npg_list_log_files` | 모든 로그 파일 목록 |
-| `npg_download_log_file` | 파일명으로 로그 파일 다운로드 |
-| `npg_view_log_file` | 로그 파일 내용 조회 |
-| `npg_rotate_log_file` | 파일명으로 로그 파일 회전 |
-| `npg_delete_log_file` | 파일명으로 로그 파일 삭제 |
-| `npg_get_catalog` | 악성 규칙 카탈로그 조회 |
-| `npg_subscribe_catalog` | 카탈로그 항목 구독 |
-| `npg_get_filter_subscription_catalog` | 커리커드 필터 카탈로그 조회 |
-| `npg_subscribe_filter_catalog` | 하나 이상의 필터 목록 구독 |
-| `npg_get_certificate_logs` | 인증서의 발급 로그 스트림 조회 |
-| `npg_post_log` | 로그 항목 수동 삽입 |
-| `npg_cleanup_logs` | 보존 기간 초과 nginx 액세스 로그 삭제 |
-| `npg_get_log_autocomplete_hosts` | 액세스 로그에서 고유 호스트 목록 |
-| `npg_get_log_autocomplete_ips` | 액세스 로그에서 고유 클라이언트 IP 목록 |
-| `npg_get_log_autocomplete_user_agents` | 액세스 로그에서 고유 User-Agent 목록 |
-| `npg_get_log_autocomplete_uris` | 액세스 로그에서 고유 요청 URI 목록 |
-| `npg_get_log_autocomplete_countries` | 액세스 로그에서 고유 국가 목록 |
-| `npg_get_log_autocomplete_methods` | 액세스 로그에서 고유 HTTP 메서드 목록 |
-| `npg_get_log_filter_presets` | 저장된 로그 필터 프리셋 목록 |
-| `npg_create_log_filter_preset` | 로그 필터 프리셋 저장 |
-| `npg_update_log_filter_preset` | 로그 필터 프리셋 업데이트 |
-| `npg_delete_log_filter_preset` | 로그 필터 프리셋 삭제 |
-| `npg_cleanup_system_logs` | 보존 기간 초과 시스템 로그 삭제 |
-| `npg_get_system_log_sources` | 선택 가능한 시스템 로그 소스 조회 |
-| `npg_get_system_log_levels` | 선택 가능한 시스템 로그 레벨 조회 |
-| `npg_get_system_log_stats` | 시스템 로그 통계 조회 |
-| `npg_get_system_settings_logs` | 컨테이너 로그 수집기 구성 조회 |
-| `npg_update_system_settings_logs` | 컨테이너 로그 수집기 구성 업데이트 |
-| `npg_get_audit_log_actions` | 감사 로그의 액션 값 목록 |
-| `npg_get_audit_log_resource_types` | 감사 로그의 리소스 유형 목록 |
-| `npg_get_audit_log_api_tokens` | 모든 토큰의 최근 API 토큰 사용량 목록 |
+| `npg_list_proxy_hosts` | List all proxy hosts. Returns a list of proxy host objects. |
+| `npg_get_proxy_host` | Get a single proxy host by its ID. |
+| `npg_get_proxy_host_by_domain` | Get a proxy host by its domain name. |
+| `npg_create_proxy_host` | Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: pass only the fields you want to change; omitted fields inherit global defaults or sensible built-in defaults. Fields: proxy_type (default 'http'), forward_scheme (default 'http'), enabled (default True), ssl_enabled, ssl_forced (default True), ssl_http2 (default True), ssl_http3, ssl_cert_id, waf_enabled, waf_use_global (default True), waf_paranoia_level, waf_anomaly_threshold, waf_mode, cache_enabled, cache_static_only, cache_ttl, cache_template, block_normal, block_http, block_exploits (default True), block_exploits_exceptions, allow_websocket_upgrade (default True), enable_proxy_headers, host_header, extra_domains, advanced_config, proxy_buffering (str), proxy_request_buffering (str), client_max_body_size (str), proxy_max_temp_file_size (str), proxy_connect/send/read_timeout, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, stream_* fields. |
+| `npg_update_proxy_host` | Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool \| None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears. |
+| `npg_delete_proxy_host` | Delete a proxy host by its ID. |
+| `npg_test_proxy_host` | Test upstream connectivity for a proxy host. |
+| `npg_regenerate_config` | Regenerate nginx config for a specific proxy host without touching others. |
+| `npg_sync_proxy_hosts` | Sync all proxy host configs and reload nginx. |
+| `npg_clone_proxy_host` | Clone a proxy host with new domain names. Returns the new proxy host. |
+| `npg_get_proxy_host_rate_limit` | GET rate limit configuration for a proxy host. |
+| `npg_update_proxy_host_rate_limit` | UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool \| None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) |
+| `npg_get_proxy_host_bot_filter` | GET bot filter configuration for a proxy host. |
+| `npg_update_proxy_host_bot_filter` | UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str\|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool \| None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list). |
+| `npg_get_proxy_host_security_headers` | GET security headers configuration for a proxy host. |
+| `npg_update_proxy_host_security_headers` | UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool \| None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) |
+| `npg_apply_security_header_preset` | APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. |
+| `npg_get_proxy_host_upstream` | GET upstream/load balancing configuration for a proxy host. |
+| `npg_update_proxy_host_upstream` | UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval. |
+| `npg_get_proxy_host_uri_block` | GET URI block configuration for a proxy host. |
+| `npg_update_proxy_host_uri_block` | UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. |
+| `npg_get_proxy_host_fail2ban` | GET fail2ban configuration for a proxy host. |
+| `npg_update_proxy_host_fail2ban` | UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). |
+| `npg_get_proxy_host_challenge` | GET CAPTCHA/challenge configuration for a proxy host. |
+| `npg_update_proxy_host_challenge` | UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) |
+| `npg_delete_proxy_host_challenge` | DELETE CAPTCHA/challenge configuration for a proxy host. |
+| `npg_verify_challenge` | Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution. |
+| `npg_set_proxy_host_favorite` | Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool). |
+| `npg_delete_proxy_host_rate_limit` | Delete the rate limit config for a proxy host — host falls back to global default. REQUIRED: host_id. |
+| `npg_delete_proxy_host_bot_filter` | Delete the bot filter config for a proxy host — host falls back to global default. REQUIRED: host_id. |
+| `npg_delete_proxy_host_security_headers` | Delete the security headers config for a proxy host — host falls back to global default. REQUIRED: host_id. |
+| `npg_delete_proxy_host_upstream` | Delete the upstream/load balancing config for a proxy host — host falls back to defaults. REQUIRED: host_id. |
+| `npg_delete_proxy_host_uri_block` | Delete the URI block config for a proxy host — host falls back to global default. REQUIRED: host_id. |
+| `npg_delete_proxy_host_fail2ban` | Delete the fail2ban config for a proxy host — host falls back to global default. REQUIRED: host_id. |
 
-### 보안 & WAF(Security & WAF) (32)
+### 로그(Logs) (32)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_apply_security_header_preset` | 보안 헤더 프리셋 적용(엄격/균형/완화) |
-| `npg_get_security_headers_presets` | 사용 가능한 보안 헤더 프리셋 조회 |
-| `npg_list_exploit_rules` | 악성 규칙 목록 |
-| `npg_get_exploit_rule` | ID로 악성 규칙 조회 |
-| `npg_create_exploit_rule` | 악성 규칙 생성 |
-| `npg_update_exploit_rule` | 악성 규칙 업데이트 |
-| `npg_delete_exploit_rule` | 악성 규칙 삭제 |
-| `npg_toggle_exploit_rule` | 악성 규칙 상태 토글 |
-| `npg_list_waf_rules` | 모든 WAF 규칙 목록 |
-| `npg_get_waf_hosts` | 모든 프록시 호스트의 WAF 구성 조회 |
-| `npg_get_waf_host_config` | 특정 프록시 호스트의 WAF 구성 조회 |
-| `npg_disable_waf_rule` | 특정 프록시 호스트의 WAF 규칙 비활성화 |
-| `npg_get_global_security_headers` | 글로벌 보안 헤더 구성 GET |
-| `npg_update_global_security_headers` | 글로벌 보안 헤더 구성 UPDATE |
-| `npg_get_global_waf` | 글로벌 WAF 구성 GET |
-| `npg_update_global_waf` | 글로벌 WAF 구성 UPDATE |
-| `npg_get_exploit_rules_hosts` | 악성 차단을 활성화한 프록시 호스트 목록 |
-| `npg_get_exploit_rules_for_host` | 호스트의 제외 상태로 악성 규칙 목록 |
-| `npg_exclude_exploit_rule_from_host` | 단일 프록시 호스트에서 악성 규칙 제외 |
-| `npg_remove_exploit_rule_exclusion_from_host` | 호스트 제외 제거(해당 호스트에서 규칙 재활성화) |
-| `npg_global_exclude_exploit_rule` | 모든 호스트에서 악성 규칙 제외 |
-| `npg_remove_exploit_rule_global_exclusion` | 글로벌 제외 제거(모든 곳에서 규칙 재활성화) |
-| `npg_get_waf_global_rules` | 글로벌 제외 상태로 모든 OWASP CRS 규칙 목록 |
-| `npg_get_waf_global_exclusions` | 글로벌 비활성화된 CRS 규칙 목록 |
-| `npg_get_waf_global_history` | 글로벌 WAF 정책 변경 이력 조회 |
-| `npg_disable_waf_global_rule` | CRS 규칙을 글로벌로 비활성화 |
-| `npg_enable_waf_global_rule` | CRS 규칙을 글로벌로 재활성화 |
-| `npg_get_waf_host_history` | 프록시 호스트의 WAF 정책 변경 이력 조회 |
-| `npg_disable_waf_rule_by_host` | 도메인을 소유한 호스트의 CRS 규칙 비활성화 |
-| `npg_get_waf_test_patterns` | 내장 WAF 공격 테스트 패턴 목록 |
-| `npg_test_waf_pattern` | 대상 URL에 공격 페이로드 하나 발송 |
-| `npg_test_waf_all_patterns` | 대상 URL에 모든 공격 페이로드 발송 |
+| `npg_get_logs` | Get access logs. |
+| `npg_get_log_settings` | Get log settings. |
+| `npg_update_log_settings` | Update log settings. Pass only fields to change (dict). |
+| `npg_get_log_stats` | Get log statistics. |
+| `npg_list_audit_logs` | List audit log entries. |
+| `npg_list_system_logs` | List system logs. |
+| `npg_list_log_files` | List all log files. |
+| `npg_download_log_file` | Download a log file by its filename. |
+| `npg_view_log_file` | View the contents of a log file. |
+| `npg_rotate_log_file` | Rotate a log file by its filename. |
+| `npg_delete_log_file` | Delete a log file by its filename. |
+| `npg_post_log` | Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags. |
+| `npg_cleanup_logs` | Delete nginx access logs older than the configured retention period. |
+| `npg_get_log_autocomplete_hosts` | Get distinct hosts seen in nginx access logs (for autocomplete). |
+| `npg_get_log_autocomplete_ips` | Get distinct client IPs seen in nginx access logs (for autocomplete). |
+| `npg_get_log_autocomplete_user_agents` | Get distinct User-Agents seen in nginx access logs (for autocomplete). |
+| `npg_get_log_autocomplete_uris` | Get distinct request URIs seen in nginx access logs (for autocomplete). |
+| `npg_get_log_autocomplete_countries` | Get distinct countries seen in nginx access logs (for autocomplete). |
+| `npg_get_log_autocomplete_methods` | Get distinct HTTP methods seen in nginx access logs (for autocomplete). |
+| `npg_get_log_filter_presets` | List saved log filter presets. |
+| `npg_create_log_filter_preset` | Save a log filter preset. REQUIRED: name, filter (dict). Optional: description. |
+| `npg_update_log_filter_preset` | Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter, description. |
+| `npg_delete_log_filter_preset` | Delete a log filter preset by its ID. |
+| `npg_cleanup_system_logs` | Delete old system logs beyond the configured retention period. |
+| `npg_get_system_log_sources` | Get selectable system log sources (docker_api, docker_nginx, health_check, etc.). |
+| `npg_get_system_log_levels` | Get selectable system log levels (debug, info, warn, error, fatal). |
+| `npg_get_system_log_stats` | Get system log statistics (counts by source/level). |
+| `npg_get_system_settings_logs` | Get the container log collector configuration. |
+| `npg_update_system_settings_logs` | Update the container log collector configuration (partial update). Pass only fields to change. |
+| `npg_get_audit_log_actions` | List the action values present in the audit log (for filtering). |
+| `npg_get_audit_log_resource_types` | List the resource types present in the audit log (for filtering). |
+| `npg_get_audit_log_api_tokens` | List recent API token usage across all tokens. |
+
+### 보안 및 WAF(Security & WAF) (27)
+
+| 도구 | 설명 |
+|------|------|
+| `npg_list_exploit_rules` | List exploit block rules. |
+| `npg_get_exploit_rule` | Get an exploit rule by its ID. |
+| `npg_create_exploit_rule` | Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description. |
+| `npg_update_exploit_rule` | Update an exploit rule. Pass only fields to change (dict). |
+| `npg_delete_exploit_rule` | Delete an exploit rule by its ID. |
+| `npg_toggle_exploit_rule` | Toggle an exploit rule's enabled status. |
+| `npg_list_waf_rules` | List all WAF (Web Application Firewall) rules. |
+| `npg_get_waf_hosts` | Get WAF config for all proxy hosts. |
+| `npg_get_waf_host_config` | Get WAF config for a specific proxy host. |
+| `npg_disable_waf_rule` | Disable a WAF rule for a specific proxy host. |
+| `npg_get_global_security_headers` | GET global security headers configuration. |
+| `npg_update_global_security_headers` | UPDATE global security headers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy. |
+| `npg_get_global_bot_filter` | GET global bot filter configuration. |
+| `npg_update_global_bot_filter` | UPDATE global bot filter configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked_agents, custom_allowed_agents. |
+| `npg_get_global_rate_limit` | GET global rate limit configuration. |
+| `npg_update_global_rate_limit` | UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response. |
+| `npg_get_global_waf` | GET global WAF configuration. |
+| `npg_update_global_waf` | UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled}). |
+| `npg_get_exploit_rules_hosts` | List proxy hosts that have exploit blocking enabled. |
+| `npg_get_exploit_rules_for_host` | List exploit rules with this host's exclusion status. REQUIRED: host_id. |
+| `npg_exclude_exploit_rule_from_host` | Exclude an exploit rule on ONE proxy host (stop it blocking there). REQUIRED: host_id, rule_id. |
+| `npg_remove_exploit_rule_exclusion_from_host` | Remove a host exclusion for an exploit rule (re-enable the rule for that host). REQUIRED: host_id, rule_id. |
+| `npg_global_exclude_exploit_rule` | Exclude an exploit rule on EVERY host (stop it blocking anywhere). REQUIRED: rule_id. |
+| `npg_remove_exploit_rule_global_exclusion` | Remove a global exclusion for an exploit rule (re-enable the rule everywhere). REQUIRED: rule_id. |
+| `npg_get_waf_test_patterns` | List the built-in WAF attack test patterns. |
+| `npg_test_waf_pattern` | Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, pattern (pattern name or index). |
+| `npg_test_waf_all_patterns` | Fire every attack payload at a target URL for comprehensive WAF testing. REQUIRED: target_url. |
 
 ### DNS 제공자(DNS Providers) (15)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_dns_providers` | DNS-01 챌린지용 DNS 제공자 목록 |
-| `npg_get_dns_provider` | ID로 DNS 제공자 조회 |
-| `npg_create_dns_provider` | DNS-01 챌린지용 DNS 제공자 생성 |
-| `npg_update_dns_provider` | DNS 제공자 업데이트 |
-| `npg_delete_dns_provider` | DNS 제공자 삭제 |
-| `npg_test_dns_provider` | DNS 제공자 자격 증명 테스트 |
-| `npg_list_ddns_records` | 모든 DDNS 기록 목록 |
-| `npg_create_ddns_record` | DDNS 기록 생성 |
-| `npg_get_ddns_record` | ID로 DDNS 기록 조회 |
-| `npg_update_ddns_record` | DDNS 기록 업데이트 |
-| `npg_delete_ddns_record` | DDNS 기록 삭제 |
-| `npg_sync_ddns_records` | 모든 활성화된 DDNS 기록 동기화 |
-| `npg_sync_ddns_record` | 단일 DDNS 기록 동기화 |
-| `npg_import_ddns_from_hosts` | DDNS 활성화 프록시 호스트에서 DDNS 기록 가져오기 |
-| `npg_get_dns_provider_default` | 인증서 발급용 기본 DNS 제공자 조회 |
+| `npg_list_dns_providers` | List all DNS providers configured for DNS-01 challenges. |
+| `npg_get_dns_provider` | Get a DNS provider by its ID. |
+| `npg_create_dns_provider` | Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}). |
+| `npg_update_dns_provider` | Update a DNS provider. Pass only fields to change (dict). |
+| `npg_delete_dns_provider` | Delete a DNS provider by its ID. |
+| `npg_test_dns_provider` | Test DNS provider credentials. |
+| `npg_list_ddns_records` | List all DDNS records. |
+| `npg_create_ddns_record` | Create a DDNS record. REQUIRED: proxy_host_id, domain, provider_id. Optional: proxied (bool). |
+| `npg_get_ddns_record` | Get a DDNS record by its ID. |
+| `npg_update_ddns_record` | Update a DDNS record (partial update). Pass only fields to change. |
+| `npg_delete_ddns_record` | Delete a DDNS record by its ID. |
+| `npg_sync_ddns_records` | Sync all enabled DDNS records now (force immediate DNS update for all records). |
+| `npg_sync_ddns_record` | Sync one DDNS record now (force DNS update for a specific record). REQUIRED: record_id. |
+| `npg_import_ddns_from_hosts` | Import DDNS records from existing proxy hosts that have DDNS enabled. |
+| `npg_get_dns_provider_default` | Get the default DNS provider for certificate issuance. |
 
-### 인증(Authentication) (15)
-
-| 도구 | 설명 |
-|------|------|
-| `npg_get_auth_status` | 인증 상태 GET |
-| `npg_get_auth_account` | 내 계정 정보 GET |
-| `npg_auth_change_credentials` | 내 사용자명과 비밀번호 변경(초기 설정) |
-| `npg_auth_2fa_setup` | 2FA 등록 시작(QR 코드 반환) |
-| `npg_auth_2fa_enable` | 2FA 활성화 |
-| `npg_auth_2fa_disable` | 2FA 비활성화 |
-| `npg_get_auth_language` | 인증된 사용자의 UI 언어 선호도 GET |
-| `npg_update_auth_language` | 인증된 사용자의 UI 언어 SET |
-| `npg_get_auth_font` | 인증된 사용자의 UI 폰트 패밀리 선호도 GET |
-| `npg_update_auth_font` | 인증된 사용자의 UI 폰트 패밀리 SET |
-| `npg_list_auth_providers` | ForwardAuth 제공자(Authelia, Authentik, 커스텀) 목록 |
-| `npg_create_auth_provider` | ForwardAuth 제공자 생성 |
-| `npg_get_auth_provider` | ID로 ForwardAuth 제공자 조회 |
-| `npg_update_auth_provider` | ForwardAuth 제공자 업데이트 |
-| `npg_delete_auth_provider` | ForwardAuth 제공자 삭제 |
-
-### 인증서(Certificates) (12)
+### 인증(Authentication) (18)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_certificates` | 모든 SSL/TLS 인증서 목록 |
-| `npg_get_certificate` | ID로 인증서 조회 |
-| `npg_create_certificate` | 새 Let's Encrypt 인증서 요청 |
-| `npg_delete_certificate` | ID로 인증서 삭제 |
-| `npg_renew_certificate` | ID로 인증서 갱신 |
-| `npg_get_expiring_certificates` | 만료 임박 인증서 조회 |
-| `npg_get_certificate_history` | 인증서 이력 조회 |
-| `npg_upload_certificate` | 인증서 파일 업로드 |
-| `npg_delete_certificate_errors` | 오류 상태의 모든 인증서 일괄 삭제 |
-| `npg_clear_certificate_error` | 인증서의 오류 상태 지우기 |
-| `npg_upload_certificate_pem` | 커스텀 인증서의 PEM 자료 교체 |
-| `npg_get_certificate_download` | 인증서 자료(PEM) 다운로드 |
+| `npg_get_auth_status` | GET authentication status — returns whether the current session is authenticated and basic user info. |
+| `npg_get_auth_account` | GET own account info — returns the authenticated user's account details. |
+| `npg_auth_change_credentials` | Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup. |
+| `npg_auth_change_username` | Change own username. REQUIRED: current_password, new_username. |
+| `npg_auth_2fa_setup` | Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app. |
+| `npg_auth_2fa_enable` | Enable 2FA. REQUIRED: password, totp_code (6-digit code from authenticator). |
+| `npg_auth_2fa_disable` | Disable 2FA. REQUIRED: password, totp_code. |
+| `npg_get_auth_language` | GET the authenticated user's UI language preference. |
+| `npg_update_auth_language` | SET the authenticated user's UI language. REQUIRED: language (e.g. 'en', 'ko'). |
+| `npg_get_auth_font` | GET the authenticated user's UI font family preference. |
+| `npg_update_auth_font` | SET the authenticated user's UI font family. REQUIRED: font (e.g. 'Inter', 'Roboto'). |
+| `npg_get_auth_sso_providers` | List SSO providers available for the login screen (public-facing). |
+| `npg_auth_sso_start` | Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns a redirect URL. |
+| `npg_list_auth_providers` | List ForwardAuth (Authelia, Authentik, custom) providers. |
+| `npg_create_auth_provider` | Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific). |
+| `npg_get_auth_provider` | Get a ForwardAuth provider by its ID. |
+| `npg_update_auth_provider` | Update a ForwardAuth provider (partial update). Pass only fields to change. |
+| `npg_delete_auth_provider` | Delete a ForwardAuth provider by its ID. |
 
-### 필터 구독(Filter Subscriptions) (12)
-
-| 도구 | 설명 |
-|------|------|
-| `npg_list_filter_subscriptions` | 모든 필터 구독 목록 |
-| `npg_create_filter_subscription` | 필터 목록 URL 구독 |
-| `npg_get_filter_subscription` | 항목과 제외가 포함된 필터 구독 조회 |
-| `npg_update_filter_subscription` | 필터 구독 업데이트 |
-| `npg_delete_filter_subscription` | 필터 구독 삭제 |
-| `npg_refresh_filter_subscription` | 필터 구독 항목 새로 고침 |
-| `npg_get_filter_subscription_exclusions` | 필터 구독의 호스트 제외 목록 |
-| `npg_add_filter_subscription_exclusion` | 호스트를 필터 구독에서 제외 |
-| `npg_remove_filter_subscription_exclusion` | 호스트 제외 제거 |
-| `npg_get_filter_subscription_entry_exclusions` | 필터 구독의 항목 제외 목록 |
-| `npg_add_filter_subscription_entry_exclusion` | 단일 항목 값을 필터 구독에서 제외 |
-| `npg_remove_filter_subscription_entry_exclusion` | 항목 제외 제거 |
-
-### 클라우드 제공자(Cloud Providers) (11)
+### 인증서(Certificates) (15)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_cloud_providers` | 클라우드 제공자 목록(인증서 DNS 챌린지) |
-| `npg_get_cloud_provider` | 슬러그로 클라우드 제공자 조회 |
-| `npg_create_cloud_provider` | 클라우드 제공자 생성(IP 범위 데이터베이스 항목) |
-| `npg_update_cloud_provider` | 슬러그로 클라우드 제공자 업데이트 |
-| `npg_delete_cloud_provider` | 슬러그로 클라우드 제공자 삭제 |
-| `npg_list_cloud_providers_by_region` | 지역별 클라우드 제공자 목록 |
-| `npg_get_cloudflare_tunnel` | Cloudflare Tunnel 구성 조회 |
-| `npg_update_cloudflare_tunnel` | Cloudflare Tunnel 구성 업데이트 |
-| `npg_get_cloudflare_tunnel_status` | Cloudflare Tunnel 상태 조회 |
-| `npg_get_global_cloud_providers` | 글로벌 클라우드 제공자 구성 GET |
-| `npg_update_global_cloud_providers` | 글로벌 클라우드 제공자 구성 UPDATE |
+| `npg_list_certificates` | List all SSL/TLS certificates. |
+| `npg_get_certificate` | Get a certificate by its ID. |
+| `npg_create_certificate` | Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc. |
+| `npg_delete_certificate` | Delete a certificate by its ID. |
+| `npg_renew_certificate` | Renew a certificate by its ID. |
+| `npg_get_expiring_certificates` | Get certificates that are expiring soon. |
+| `npg_get_certificate_history` | Get certificate history. |
+| `npg_upload_certificate` | Upload a certificate file. Required: domain_names, cert_content, key_content. |
+| `npg_import_from_hosts` | Import certificates from existing hosts. |
+| `npg_test_acme` | Test ACME configuration for DNS provider. |
+| `npg_delete_certificate_errors` | Bulk-delete all certificates in error status. |
+| `npg_clear_certificate_error` | Clear a certificate's error state (mark as resolved). REQUIRED: cert_id. |
+| `npg_upload_certificate_pem` | Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM string). |
+| `npg_get_certificate_logs` | Get the issuance log stream for a certificate. REQUIRED: cert_id. |
+| `npg_get_certificate_download` | Download certificate material (PEM). REQUIRED: cert_id. |
+
+### 필터 구독(Filter Subscriptions) (15)
+
+| 도구 | 설명 |
+|------|------|
+| `npg_get_catalog` | Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows. |
+| `npg_list_filter_subscriptions` | List all filter subscriptions (remote IP/UA blocklists). |
+| `npg_get_filter_subscription_catalog` | Get the curated filter catalog — list of available filter lists to subscribe to. |
+| `npg_subscribe_filter_catalog` | Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json'). |
+| `npg_create_filter_subscription` | Subscribe to a filter list URL. REQUIRED: url. Optional: name. |
+| `npg_get_filter_subscription` | Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id. |
+| `npg_update_filter_subscription` | Update a filter subscription (partial update). Pass only fields to change. |
+| `npg_delete_filter_subscription` | Delete a filter subscription by its ID. |
+| `npg_refresh_filter_subscription` | Re-fetch entries for a filter subscription now. REQUIRED: subscription_id. |
+| `npg_get_filter_subscription_exclusions` | List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id. |
+| `npg_add_filter_subscription_exclusion` | Exclude a proxy host from a filter subscription. REQUIRED: subscription_id, host_id. |
+| `npg_remove_filter_subscription_exclusion` | Remove a host exclusion from a filter subscription. REQUIRED: subscription_id, host_id. |
+| `npg_get_filter_subscription_entry_exclusions` | List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id. |
+| `npg_add_filter_subscription_entry_exclusion` | Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value. |
+| `npg_remove_filter_subscription_entry_exclusion` | Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value. |
+
+### 클라우드 제공자(Cloud Providers) (13)
+
+| 도구 | 설명 |
+|------|------|
+| `npg_list_cloud_providers` | List all cloud providers (for certificate DNS challenges). |
+| `npg_get_cloud_provider` | Get a cloud provider by its slug. |
+| `npg_create_cloud_provider` | Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description. |
+| `npg_update_cloud_provider` | Update a cloud provider by its slug. Pass only fields to change (dict). |
+| `npg_delete_cloud_provider` | Delete a cloud provider by its slug. |
+| `npg_get_proxy_host_cloud_blocking` | GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. |
+| `npg_update_proxy_host_cloud_blocking` | UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool \| None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global). |
+| `npg_list_cloud_providers_by_region` | List cloud providers filtered by region. |
+| `npg_get_cloudflare_tunnel` | Get Cloudflare Tunnel configuration. |
+| `npg_update_cloudflare_tunnel` | Update Cloudflare Tunnel configuration. Pass only fields to change. |
+| `npg_get_cloudflare_tunnel_status` | Get Cloudflare Tunnel status. |
+| `npg_get_global_cloud_providers` | GET global cloud providers configuration. |
+| `npg_update_global_cloud_providers` | UPDATE global cloud providers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool). |
 
 ### URI 차단(URI Block) (10)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_uri_blocks` | 모든 URI 블록(글로벌 및 호스트별) 목록 |
-| `npg_create_uri_block` | 프록시 호스트용 URI 블록 생성 |
-| `npg_get_uri_block` | ID로 URI 블록 조회 |
-| `npg_update_uri_block` | URI 블록 업데이트 |
-| `npg_delete_uri_block` | ID로 URI 블록 삭제 |
-| `npg_bulk_add_uri_block_rule` | URI 규칙 일괄 추가 |
-| `npg_get_global_uri_block` | 글로벌 URI 블록 구성 GET |
-| `npg_update_global_uri_block` | 글로벌 URI 블록 구성 UPDATE |
-| `npg_add_global_uri_block_rule` | 글로벌 URI 블록에 규칙 추가 |
-| `npg_delete_global_uri_block_rule` | 글로벌 URI 블록에서 규칙 삭제 |
+| `npg_list_uri_blocks` | List all URI blocks (global and per-host). |
+| `npg_create_uri_block` | Create a URI block for a proxy host. Required: host_id, pattern, action (block/allow). Optional: is_regex. |
+| `npg_get_uri_block` | Get a URI block by its ID. |
+| `npg_update_uri_block` | Update a URI block. Pass only fields to change. |
+| `npg_delete_uri_block` | Delete a URI block by its ID. |
+| `npg_bulk_add_uri_block_rule` | Bulk add URI block rules. Required: rules (list of {pattern, action, is_regex}). |
+| `npg_get_global_uri_block` | GET global URI block configuration. |
+| `npg_update_global_uri_block` | UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. |
+| `npg_add_global_uri_block_rule` | Add a rule to the global URI block. Required: pattern, action. Optional: is_regex. |
+| `npg_delete_global_uri_block_rule` | Delete a rule from the global URI block by its ID. |
 
-### 설정(Settings) (8)
+### 설정(Settings) (11)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_get_settings` | 글로벌 NPG 설정 조회 |
-| `npg_update_settings` | 글로벌 NPG 설정 업데이트 |
-| `npg_get_system_settings` | 시스템 설정(서버명, 시간대, 로케일) 조회 |
-| `npg_update_system_settings` | 시스템 설정 업데이트 |
-| `npg_get_public_ui_settings` | 공개 UI 설정(인증 불필요) 조회 |
-| `npg_reset_settings` | 글로벌 nginx 설정을 기본값으로 초기화 |
-| `npg_get_settings_presets` | 사용 가능한 글로벌 설정 프리셋 목록 |
-| `npg_apply_settings_preset` | 글로벌 설정 프리셋 적용 |
+| `npg_get_settings` | Get global NPG settings. |
+| `npg_update_settings` | Update global NPG settings. Pass only fields to change (dict). |
+| `npg_get_system_settings` | Get system settings (server name, timezone, locale). |
+| `npg_update_system_settings` | Update system settings. Pass only fields to change (dict). |
+| `npg_get_dashboard` | Get dashboard data (summary of proxy hosts, certificates, etc.). |
+| `npg_get_dashboard_health` | Get system health status. |
+| `npg_get_dashboard_geoip_stats` | GET GeoIP statistics by country for the dashboard. |
+| `npg_get_public_ui_settings` | Get public UI settings (accessible without auth). |
+| `npg_reset_settings` | Reset global nginx settings to defaults. DESTRUCTIVE — this clears all custom settings. |
+| `npg_get_settings_presets` | List available global settings presets that can be applied. |
+| `npg_apply_settings_preset` | Apply a global settings preset. REQUIRED: preset (preset name/identifier). |
 
 ### 백업(Backups) (8)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_backups` | 모든 백업 목록 |
-| `npg_get_backup` | ID로 백업 조회 |
-| `npg_create_backup` | 새 백업 생성 |
-| `npg_delete_backup` | ID로 백업 삭제 |
-| `npg_restore_backup` | 백업에서 복원 |
-| `npg_download_backup` | ID로 백업 다운로드 |
-| `npg_upload_restore_backup` | 백업 파일 업로드 및 복원 |
-| `npg_get_backup_stats` | 백업 통계 조회 |
+| `npg_list_backups` | List all backups. |
+| `npg_get_backup` | Get a backup by its ID. |
+| `npg_create_backup` | Create a new backup. |
+| `npg_delete_backup` | Delete a backup by its ID. |
+| `npg_restore_backup` | Restore from a backup. Required: backup_id. |
+| `npg_download_backup` | Download a backup by its ID. |
+| `npg_upload_restore_backup` | Upload and restore from a backup file. |
+| `npg_get_backup_stats` | Get backup statistics. |
 
 ### API 토큰(API Tokens) (8)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_api_tokens` | 모든 API 토큰 목록 |
-| `npg_get_api_token` | ID로 API 토큰 조회 |
-| `npg_create_api_token` | 새 API 토큰 생성 |
-| `npg_update_api_token` | API 토큰 업데이트 |
-| `npg_revoke_api_token` | ID로 API 토큰 무효화 |
-| `npg_delete_api_token` | ID로 API 토큰 삭제 |
-| `npg_get_api_token_permissions` | API 토큰이 가질 수 있는 권한 문자열 목록 |
-| `npg_get_api_token_usage` | API 토큰의 최근 사용량 조회 |
+| `npg_list_api_tokens` | List all API tokens. |
+| `npg_get_api_token` | Get an API token by its ID. |
+| `npg_create_api_token` | Create a new API token. Required: name, permissions (array). Optional: expires_at. |
+| `npg_update_api_token` | Update an API token. Pass only fields to change (dict). |
+| `npg_revoke_api_token` | Revoke an API token by its ID. |
+| `npg_delete_api_token` | Delete an API token by its ID. |
+| `npg_get_api_token_permissions` | List the permission strings an API token may carry (reference list). |
+| `npg_get_api_token_usage` | Get recent usage for an API token. REQUIRED: token_id. |
 
-### 사용자(Users) (8)
+### 사용자(Users) (9)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_users` | 모든 사용자 목록 |
-| `npg_get_user` | ID로 사용자 조회 |
-| `npg_create_user` | 새 사용자 생성 |
-| `npg_set_user_password` | 사용자 비밀번호 설정/재설정 |
-| `npg_assign_user_role` | 사용자에게 역할 할당 |
-| `npg_end_user_sessions` | 사용자의 모든 세션 종료(강제 로그아웃) |
-| `npg_delete_user` | ID로 사용자 삭제 |
-| `npg_auth_change_username` | 내 사용자명 변경 |
+| `npg_list_users` | List all users. |
+| `npg_get_user` | Get a user by their ID. |
+| `npg_create_user` | Create a new user. Required: username, email, password. Optional: role_id, is_active. |
+| `npg_set_user_password` | Set/reset a user's password. Required: user_id, new_password. |
+| `npg_assign_user_role` | Assign a role to a user. Required: user_id, role_id. |
+| `npg_end_user_sessions` | End all sessions for a user (force logout). Required: user_id. |
+| `npg_delete_user` | Delete a user by their ID. |
+| `npg_get_permission_areas` | Get the permission area/verb matrix — all available permission scopes. |
+| `npg_set_user_role` | Assign a role to a user account. REQUIRED: user_id, role_id. |
 
 ### SSO 제공자(SSO Providers) (7)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_sso_providers` | 모든 SSO 제공자 목록 |
-| `npg_create_sso_provider` | 새 SSO 제공자 생성 |
-| `npg_update_sso_provider` | SSO 제공자 업데이트 |
-| `npg_delete_sso_provider` | SSO 제공자 삭제 |
-| `npg_test_sso_provider` | SSO 제공자 구성 테스트(테스트 로그인 흐름) |
-| `npg_get_auth_sso_providers` | 로그인 화면에 표시된 SSO 제공자 목록 |
-| `npg_auth_sso_start` | SSO 로그인 흐름 시작 |
+| `npg_list_sso_providers` | List all SSO providers. |
+| `npg_create_sso_provider` | Create a new SSO provider. Required: slug, name, issuer_url, client_id. Optional: client_secret (defaults to placeholder), scopes. |
+| `npg_update_sso_provider` | Update an SSO provider. Pass only fields to change. Required: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes. |
+| `npg_delete_sso_provider` | Delete an SSO provider by its ID. |
+| `npg_test_sso_provider` | Test SSO provider configuration by initiating a test login flow. |
+| `npg_add_proxy_host_uri_block_rule` | Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex), action (block/allow). Optional: case_sensitive (bool). |
+| `npg_delete_proxy_host_uri_block_rule` | Remove a single URI block rule from a proxy host. REQUIRED: host_id, rule_id. |
 
-### 기타(Other) (6)
-
-| 도구 | 설명 |
-|------|------|
-| `npg_list_countries` | GeoIP 차단을 위한 사용 가능한 국가 코드 목록 |
-| `npg_detect_telegram_chats` | 알림용 사용 가능한 Telegram 채팅 감지 |
-| `npg_import_from_hosts` | 기존 호스트에서 인증서 가져오기 |
-| `npg_test_acme` | DNS 제공자용 ACME 구성 테스트 |
-| `npg_get_global_rate_limit` | 글로벌 속도 제한 구성 GET |
-| `npg_update_global_rate_limit` | 글로벌 속도 제한 구성 UPDATE |
-
-### 대시보드(Dashboard) (6)
+### 대시보드(Dashboard) (3)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_get_dashboard` | 대시보드 데이터 조회(프록시 호스트, 인증서 요약 등) |
-| `npg_get_dashboard_health` | 시스템 상태 조회 |
-| `npg_get_dashboard_geoip_stats` | 국가별 GeoIP 통계 GET |
-| `npg_get_dashboard_containers` | Docker 컨테이너 통계 조회 |
-| `npg_get_dashboard_stats` | 시간별 통계 조회 |
-| `npg_get_dashboard_health_history` | 시스템 상태 이력 조회 |
+| `npg_get_dashboard_containers` | Get Docker container statistics for the dashboard. |
+| `npg_get_dashboard_stats` | Get hourly statistics for the dashboard. |
+| `npg_get_dashboard_health_history` | Get system health history for the dashboard. |
 
-### IP 관리(IP Management) (6)
+### IP 관리(IP Management) (4)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_ban_ip` | IP 주소 차단 |
-| `npg_unban_ip` | ID로 IP 차단 해제 |
-| `npg_bulk_unban_ips` | 여러 차단 IP 기록 일괄 차단 해제 |
-| `npg_get_ban_history` | 차단/차단 해제 이벤트 이력 조회 |
-| `npg_get_ban_history_stats` | 차단/차단 해제 이력 통계 조회 |
-| `npg_get_ban_history_for_ip` | 특정 IP의 차단 이력 조회 |
+| `npg_bulk_unban_ips` | Unban multiple banned-IP records at once. REQUIRED: ids (list of record IDs). |
+| `npg_get_ban_history` | Get ban/unban event history. |
+| `npg_get_ban_history_stats` | Get ban/unban history statistics. |
+| `npg_get_ban_history_for_ip` | Get ban history for a specific IP address. REQUIRED: ip. |
 
-### 알림 채널(Notification Channels) (6)
+### 알림 채널(Notification Channels) (8)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_notification_channels` | 모든 알림 채널 목록 |
-| `npg_create_notification_channel` | 알림 채널 생성 |
-| `npg_update_notification_channel` | 알림 채널 업데이트 |
-| `npg_delete_notification_channel` | 알림 채널 삭제 |
-| `npg_test_notification_channel` | 알림 채널 테스트(테스트 메시지 발송) |
-| `npg_get_notification_deliveries` | 알림 채널의 배달 이력 조회 |
+| `npg_list_notification_channels` | List all notification channels. |
+| `npg_create_notification_channel` | Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict). |
+| `npg_update_notification_channel` | Update a notification channel. Pass only fields to change. |
+| `npg_delete_notification_channel` | Delete a notification channel by its ID. |
+| `npg_test_notification_channel` | Test a notification channel by sending a test message. |
+| `npg_get_notification_deliveries` | Get delivery history for a notification channel. |
+| `npg_detect_telegram_chats` | Detect available Telegram chats for notification delivery. |
+| `npg_get_notification_channel_deliveries` | List recent deliveries for a notification channel. REQUIRED: channel_id. |
 
-### 리다이렉트 호스트(Redirect Hosts) (5)
+### 리다이렉트 호스트(Redirect Hosts) (6)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_redirect_hosts` | 모든 리다이렉트 호스트 목록 |
-| `npg_get_redirect_host` | ID로 리다이렉트 호스트 조회 |
-| `npg_create_redirect_host` | 새 리다이렉트 호스트 생성 |
-| `npg_update_redirect_host` | 리다이렉트 호스트 업데이트 |
-| `npg_delete_redirect_host` | ID로 리다이렉트 호스트 삭제 |
+| `npg_list_redirect_hosts` | List all redirect hosts. |
+| `npg_get_redirect_host` | Get a redirect host by its ID. |
+| `npg_create_redirect_host` | Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, default 301). |
+| `npg_update_redirect_host` | Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code. |
+| `npg_delete_redirect_host` | Delete a redirect host by its ID. |
+| `npg_sync_redirect_hosts` | Regenerate every redirect host config and reload nginx. |
 
 ### 액세스 목록(Access Lists) (5)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_access_lists` | 모든 액세스 목록(인증/제한 목록) |
-| `npg_get_access_list` | ID로 액세스 목록 조회 |
-| `npg_create_access_list` | 새 액세스 목록 생성 |
-| `npg_update_access_list` | 액세스 목록 업데이트 |
-| `npg_delete_access_list` | ID로 액세스 목록 삭제 |
+| `npg_list_access_lists` | List all access lists (authentication/restriction lists). |
+| `npg_get_access_list` | Get an access list by its ID. |
+| `npg_create_access_list` | Create a new access list. Required: name, advanced_config (block/allow rules). |
+| `npg_update_access_list` | Update an access list. Pass only fields to change. |
+| `npg_delete_access_list` | Delete an access list by its ID. |
 
-### 지역 제한(Geo) (5)
-
-| 도구 | 설명 |
-|------|------|
-| `npg_get_geoip_status` | GeoIP 데이터베이스 업데이트 상태 조회 |
-| `npg_update_geoip` | GeoIP 데이터베이스 업데이트 |
-| `npg_get_global_geo` | 글로벌 GeoIP 제한 구성 GET |
-| `npg_update_global_geo` | 글로벌 GeoIP 제한 구성 UPDATE |
-| `npg_get_geoip_history` | GeoIP 데이터베이스 업데이트 실행 이력 조회 |
-
-### Fail2ban & 챌린지(Fail2ban & Challenge) (4)
+### 지역(Geo) (10)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_verify_challenge` | CAPTCHA 솔루션 검증(공개 엔드포인트) |
-| `npg_get_challenge_config` | 글로벌 CAPTCHA 챌린지 구성 GET |
-| `npg_update_challenge_config` | 글로벌 CAPTCHA 챌린지 구성 UPDATE |
-| `npg_get_challenge_stats` | CAPTCHA 챌린지 통계 GET |
+| `npg_get_geoip_status` | Get GeoIP database update status. |
+| `npg_update_geoip` | Update GeoIP databases. |
+| `npg_list_countries` | List available country codes for GeoIP blocking. |
+| `npg_get_proxy_host_geo` | GET geo restriction configuration for a proxy host. |
+| `npg_create_proxy_host_geo` | CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots |
+| `npg_update_proxy_host_geo` | UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool \| None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots |
+| `npg_delete_proxy_host_geo` | DELETE geo restriction for a proxy host. |
+| `npg_get_global_geo` | GET global GeoIP restriction configuration. |
+| `npg_update_global_geo` | UPDATE global GeoIP restriction configuration (partial update — only provided fields are changed; omitted fields are left as-is. The global default is inherited by hosts without their own override). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode |
+| `npg_get_geoip_history` | List GeoIP database update runs and their status. |
 
-### 차단 IP & 봇(Banned IPs & Bots) (4)
+### Fail2ban 및 챌린지(Fail2ban & Challenge) (3)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_banned_ips` | 차단된 IP 주소 목록 |
-| `npg_get_bots_known` | 알려진 봇 User-Agent 시그니처 목록 |
-| `npg_get_global_bot_filter` | 글로벌 봇 필터 구성 GET |
-| `npg_update_global_bot_filter` | 글로벌 봇 필터 구성 UPDATE |
+| `npg_get_challenge_config` | GET the global CAPTCHA challenge configuration. |
+| `npg_update_challenge_config` | UPDATE the global CAPTCHA challenge configuration (partial update). Pass only fields to change. |
+| `npg_get_challenge_stats` | GET CAPTCHA challenge statistics. |
+
+### 차단 IP 및 봇(Banned IPs & Bots) (5)
+
+| 도구 | 설명 |
+|------|------|
+| `npg_list_banned_ips` | List banned IP addresses. |
+| `npg_ban_ip` | Ban an IP address. Required: ip. Optional: ban_time (seconds). |
+| `npg_unban_ip` | Unban an IP by its ID. |
+| `npg_get_bots_known` | Get list of known bot user-agent signatures. |
+| `npg_get_security_headers_presets` | Get available security header presets. |
 
 ### 역할(Roles) (4)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_list_roles` | 모든 역할 목록 |
-| `npg_create_role` | 새 역할 생성 |
-| `npg_update_role` | 역할 업데이트 |
-| `npg_delete_role` | ID로 역할 삭제 |
+| `npg_list_roles` | List all roles. |
+| `npg_create_role` | Create a new role. Required: name, permissions (array of permission strings). |
+| `npg_update_role` | Update a role. Pass only fields to change. |
+| `npg_delete_role` | Delete a role by its ID. |
 
-### 시스템(System) (4)
+### 시스템(System) (11)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_check_update` | 사용 가능한 NPG 업데이트 확인 |
-| `npg_get_status` | 구성 요소 상태 — 모든 NPG 서브시스템의 상태 |
-| `npg_check_npg_update` | 최신 NPG 릴리스 버전 확인 |
-| `npg_get_global_rate_limit` | 글로벌 속도 제한 구성 GET |
+| `npg_check_update` | Check for available NPG updates. |
+| `npg_get_health_detailed` | Get a detailed health snapshot (detailed version of health check). |
+| `npg_get_status` | Get component status — health of all NPG subsystems. |
+| `npg_check_npg_update` | Check for a newer NPG release version. |
+| `npg_get_waf_global_rules` | List all OWASP CRS rules with their GLOBAL exclusion status. |
+| `npg_get_waf_global_exclusions` | List the globally disabled CRS rules. |
+| `npg_get_waf_global_history` | Get the global WAF policy change history. |
+| `npg_disable_waf_global_rule` | Disable a CRS rule for EVERY host (globally). REQUIRED: rule_id. |
+| `npg_enable_waf_global_rule` | Re-enable a CRS rule globally (remove global disable). REQUIRED: rule_id. |
+| `npg_get_waf_host_history` | Get the WAF policy change history for a proxy host. REQUIRED: host_id. |
+| `npg_disable_waf_rule_by_host` | Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name, rule_id. |
 
 ### SSL / Nginx (3)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_reload_nginx` | 전체 재시작 없이 nginx 구성 재로드 |
-| `npg_sync_nginx` | 모든 구성 동기화 및 nginx 재로드 |
-| `npg_test_nginx` | nginx 구성 유효성 테스트 |
+| `npg_reload_nginx` | Reload nginx configuration without full restart. |
+| `npg_sync_nginx` | Sync all configs and reload nginx. |
+| `npg_test_nginx` | Test nginx configuration for validity. |
 
-### 시스템 & 상태(System & Health) (2)
+### 시스템 및 상태(System & Health) (1)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_get_upstream_health` | 업스트림 풀의 상태 GET |
-| `npg_get_health_detailed` | 상세 상태 스냅샷 조회 |
+| `npg_get_upstream_health` | GET health status of an upstream pool. REQUIRED: upstream_id (UUID string). |
 
 ### Docker (1)
 
 | 도구 | 설명 |
 |------|------|
-| `npg_get_docker_containers` | Docker 컨테이너 통계 조회 |
-
+| `npg_get_docker_containers` | Get status of all Docker containers managed by NPG. |
 ## 인증
 
 서버는 `NPG_USERNAME`과 `NPG_PASSWORD`를 사용해 **첫 사용 시 자동 인증**합니다. 수동 토큰 관리가 필요 없습니다 — 모든 도구 호출이 인증을 자동으로 갱신합니다.

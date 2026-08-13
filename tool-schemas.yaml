@@ -1,1469 +1,2349 @@
-npg_add_filter_subscription_entry_exclusion:
-- name: subscription_id
-  type: str | int
-  required: true
-- name: entry_value
-  type: str
-  required: true
-npg_add_filter_subscription_exclusion:
-- name: subscription_id
-  type: str | int
-  required: true
-- name: host_id
-  type: str | int
-  required: true
-npg_add_global_uri_block_rule:
-- name: pattern
-  type: str
-  required: true
-- name: action
-  type: str = "block"
-  required: true
-- name: is_regex
-  type: bool = False
-  required: true
-npg_add_proxy_host_uri_block_rule:
-- name: host_id
-  type: str | int
-  required: true
-- name: pattern
-  type: str
-  required: true
-- name: action
-  type: str
-  required: true
-- name: case_sensitive
-  type: bool = False
-  required: true
-npg_apply_security_header_preset:
-- name: host_id
-  type: str | int
-  required: true
-- name: preset
-  type: Literal["strict"
-  required: true
-npg_apply_settings_preset:
-- name: preset
-  type: str
-  required: true
-npg_assign_user_role:
-- name: user_id
-  type: str | int
-  required: true
-- name: role_id
-  type: str | int
-  required: true
-npg_auth_2fa_disable:
-- name: password
-  type: str
-  required: true
-- name: totp_code
-  type: str
-  required: true
-npg_auth_2fa_enable:
-- name: password
-  type: str
-  required: true
-- name: totp_code
-  type: str
-  required: true
-npg_auth_2fa_setup:
-- name: password
-  type: str
-  required: true
-npg_auth_change_credentials:
-- name: current_password
-  type: str
-  required: true
-- name: new_username
-  type: str
-  required: true
-- name: new_password
-  type: str
-  required: true
-npg_auth_change_username:
-- name: current_password
-  type: str
-  required: true
-- name: new_username
-  type: str
-  required: true
-npg_auth_sso_start:
-- name: slug
-  type: str
-  required: true
-npg_ban_ip:
-- name: ip_address
-  type: str
-  required: true
-- name: reason
-  type: str = "Manual ban via API"
-  required: true
-- name: duration
-  type: int = 3600
-  required: true
-npg_bulk_add_uri_block_rule:
-- name: rules
-  type: list[dict]
-  required: true
-npg_bulk_unban_ips:
-- name: ids
-  type: list[str | int]
-  required: true
-npg_check_npg_update: []
-npg_check_update: []
-npg_cleanup_logs: []
-npg_cleanup_system_logs: []
-npg_clear_certificate_error:
-- name: cert_id
-  type: str | int
-  required: true
-npg_clone_proxy_host:
-- name: host_id
-  type: str | int
-  required: true
-- name: domain_names
-  type: list[str]
-  required: true
-npg_create_access_list:
-- name: name
-  type: str
-  required: true
-- name: advanced_config
-  type: str = ""
-  required: true
-- name: clients
-  type: list | None = None
-  required: false
-npg_create_api_token:
-- name: name
-  type: str
-  required: true
-- name: permissions
-  type: list[str]
-  required: true
-- name: expires_at
-  type: str | None = None
-  required: false
-npg_create_auth_provider:
-- name: name
-  type: str
-  required: true
-- name: provider_type
-  type: str
-  required: true
-- name: config
-  type: dict | None = None
-  required: false
-- name: provider_url
-  type: str | None = None
-  required: false
-npg_create_backup: []
-npg_create_cloud_provider:
-- name: name
-  type: str
-  required: true
-- name: slug
-  type: str
-  required: true
-- name: ip_ranges
-  type: list[str]
-  required: true
-- name: region
-  type: str | None = None
-  required: false
-- name: description
-  type: str | None = None
-  required: false
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_create_ddns_record:
-- name: proxy_host_id
-  type: str | int
-  required: true
-- name: domain
-  type: str
-  required: true
-- name: provider_id
-  type: str | int
-  required: true
-- name: proxied
-  type: bool = False
-  required: true
-npg_create_dns_provider:
-- name: name
-  type: str
-  required: true
-- name: provider_type
-  type: str
-  required: true
-- name: credentials
-  type: dict | None = None
-  required: false
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_create_exploit_rule:
-- name: category
-  type: str
-  required: true
-- name: name
-  type: str
-  required: true
-- name: pattern
-  type: str
-  required: true
-- name: pattern_type
-  type: str
-  required: true
-- name: severity
-  type: str | None = None
-  required: false
-- name: description
-  type: str | None = None
-  required: false
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_create_filter_subscription:
-- name: url
-  type: str
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-npg_create_log_filter_preset:
-- name: name
-  type: str
-  required: true
-- name: filter
-  type: dict
-  required: true
-- name: description
-  type: str | None = None
-  required: false
-npg_create_notification_channel:
-- name: name
-  type: str
-  required: true
-- name: channel_type
-  type: str
-  required: true
-- name: config
-  type: dict | None = None
-  required: false
-npg_create_proxy_host_geo:
-- name: host_id
-  type: str | int
-  required: true
-- name: countries
-  type: list[str]
-  required: true
-- name: mode
-  type: Literal["whitelist"
-  required: true
-- name: enabled
-  type: bool = True
-  required: true
-- name: allowed_ips
-  type: list[str] | None = None
-  required: false
-- name: challenge_mode
-  type: bool = False
-  required: true
-- name: disable_global
-  type: bool = False
-  required: true
-- name: allow_private_ips
-  type: bool = True
-  required: true
-- name: allow_search_bots
-  type: bool = True
-  required: true
-npg_create_role:
-- name: name
-  type: str
-  required: true
-- name: permissions
-  type: list[str]
-  required: true
-npg_create_sso_provider:
-- name: slug
-  type: str
-  required: true
-- name: name
-  type: str
-  required: true
-- name: issuer_url
-  type: str
-  required: true
-- name: client_id
-  type: str
-  required: true
-- name: client_secret
-  type: str | None = None
-  required: false
-- name: scopes
-  type: str | None = None
-  required: false
-npg_create_uri_block:
-- name: host_id
-  type: str | int
-  required: true
-- name: pattern
-  type: str
-  required: true
-- name: action
-  type: str = "block"
-  required: true
-- name: is_regex
-  type: bool = False
-  required: true
-npg_create_user:
-- name: username
-  type: str
-  required: true
-- name: email
-  type: str
-  required: true
-- name: password
-  type: str
-  required: true
-- name: role_id
-  type: str | int | None = None
-  required: false
-- name: is_active
-  type: bool = True
-  required: true
-npg_delete_access_list:
-- name: list_id
-  type: str | int
-  required: true
-npg_delete_api_token:
-- name: token_id
-  type: str | int
-  required: true
-npg_delete_auth_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_delete_backup:
-- name: backup_id
-  type: str | int
-  required: true
-npg_delete_certificate:
-- name: cert_id
-  type: str | int
-  required: true
-npg_delete_certificate_errors: []
-npg_delete_cloud_provider:
-- name: slug
-  type: str
-  required: true
-npg_delete_ddns_record:
-- name: record_id
-  type: str | int
-  required: true
-npg_delete_dns_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_delete_exploit_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_delete_filter_subscription:
-- name: subscription_id
-  type: str | int
-  required: true
-npg_delete_global_uri_block_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_delete_log_file:
-- name: filename
-  type: str
-  required: true
-npg_delete_log_filter_preset:
-- name: preset_id
-  type: str | int
-  required: true
-npg_delete_notification_channel:
-- name: channel_id
-  type: str | int
-  required: true
-npg_delete_proxy_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_bot_filter:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_challenge:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_fail2ban:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_geo:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_rate_limit:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_security_headers:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_upstream:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_uri_block:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_proxy_host_uri_block_rule:
-- name: host_id
-  type: str | int
-  required: true
-- name: rule_id
-  type: str | int
-  required: true
-npg_delete_redirect_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_delete_role:
-- name: role_id
-  type: str | int
-  required: true
-npg_delete_sso_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_delete_uri_block:
-- name: block_id
-  type: str | int
-  required: true
-npg_delete_user:
-- name: user_id
-  type: str | int
-  required: true
-npg_detect_telegram_chats: []
-npg_disable_waf_global_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_disable_waf_rule:
-- name: host_id
-  type: str | int
-  required: true
-- name: rule_id
-  type: str | int
-  required: true
-npg_disable_waf_rule_by_host:
-- name: domain_name
-  type: str
-  required: true
-- name: rule_id
-  type: str | int
-  required: true
-npg_download_backup:
-- name: backup_id
-  type: str | int
-  required: true
-npg_download_log_file:
-- name: filename
-  type: str
-  required: true
-npg_enable_waf_global_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_end_user_sessions:
-- name: user_id
-  type: str | int
-  required: true
-npg_exclude_exploit_rule_from_host:
-- name: host_id
-  type: str | int
-  required: true
-- name: rule_id
-  type: str | int
-  required: true
-npg_get_access_list:
-- name: list_id
-  type: str | int
-  required: true
-npg_get_api_token:
-- name: token_id
-  type: str | int
-  required: true
-npg_get_api_token_permissions: []
-npg_get_api_token_usage:
-- name: token_id
-  type: str | int
-  required: true
-npg_get_audit_log_actions: []
-npg_get_audit_log_api_tokens: []
-npg_get_audit_log_resource_types: []
-npg_get_auth_account: []
-npg_get_auth_font: []
-npg_get_auth_language: []
-npg_get_auth_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_get_auth_sso_providers: []
-npg_get_auth_status: []
-npg_get_backup:
-- name: backup_id
-  type: str | int
-  required: true
-npg_get_backup_stats: []
-npg_get_ban_history: []
-npg_get_ban_history_for_ip:
-- name: ip
-  type: str
-  required: true
-npg_get_ban_history_stats: []
-npg_get_bots_known: []
-npg_get_catalog: []
-npg_get_certificate:
-- name: cert_id
-  type: str | int
-  required: true
-npg_get_certificate_download:
-- name: cert_id
-  type: str | int
-  required: true
-npg_get_certificate_history: []
-npg_get_certificate_logs:
-- name: cert_id
-  type: str | int
-  required: true
-npg_get_challenge_config: []
-npg_get_challenge_stats: []
-npg_get_cloud_provider:
-- name: slug
-  type: str
-  required: true
-npg_get_cloudflare_tunnel: []
-npg_get_cloudflare_tunnel_status: []
-npg_get_dashboard: []
-npg_get_dashboard_containers: []
-npg_get_dashboard_geoip_stats: []
-npg_get_dashboard_health: []
-npg_get_dashboard_health_history: []
-npg_get_dashboard_stats: []
-npg_get_ddns_record:
-- name: record_id
-  type: str | int
-  required: true
-npg_get_dns_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_get_dns_provider_default: []
-npg_get_docker_containers: []
-npg_get_expiring_certificates: []
-npg_get_exploit_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_get_exploit_rules_for_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_exploit_rules_hosts: []
-npg_get_filter_subscription:
-- name: subscription_id
-  type: str | int
-  required: true
-npg_get_filter_subscription_catalog: []
-npg_get_filter_subscription_entry_exclusions:
-- name: subscription_id
-  type: str | int
-  required: true
-npg_get_filter_subscription_exclusions:
-- name: subscription_id
-  type: str | int
-  required: true
-npg_get_geoip_history: []
-npg_get_geoip_status: []
-npg_get_global_bot_filter: []
-npg_get_global_cloud_providers: []
-npg_get_global_geo: []
-npg_get_global_rate_limit: []
-npg_get_global_security_headers: []
-npg_get_global_uri_block: []
-npg_get_global_waf: []
-npg_get_health_detailed: []
-npg_get_log_autocomplete_countries: []
-npg_get_log_autocomplete_hosts: []
-npg_get_log_autocomplete_ips: []
-npg_get_log_autocomplete_methods: []
-npg_get_log_autocomplete_uris: []
-npg_get_log_autocomplete_user_agents: []
-npg_get_log_filter_presets: []
-npg_get_log_settings: []
-npg_get_log_stats: []
-npg_get_logs: []
-npg_get_notification_channel_deliveries:
-- name: channel_id
-  type: str | int
-  required: true
-npg_get_notification_deliveries:
-- name: channel_id
-  type: str | int
-  required: true
-npg_get_permission_areas: []
+npg_list_proxy_hosts:
+  description: "List all proxy hosts. Returns a list of proxy host objects."
+  parameters: []
+
 npg_get_proxy_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_bot_filter:
-- name: host_id
-  type: str | int
-  required: true
+  description: "Get a single proxy host by its ID."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_get_proxy_host_by_domain:
-- name: domain
-  type: str
-  required: true
-npg_get_proxy_host_challenge:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_cloud_blocking:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_fail2ban:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_geo:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_rate_limit:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_security_headers:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_upstream:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_proxy_host_uri_block:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_public_ui_settings: []
-npg_get_redirect_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_security_headers_presets: []
-npg_get_settings: []
-npg_get_settings_presets: []
-npg_get_status: []
-npg_get_system_log_levels: []
-npg_get_system_log_sources: []
-npg_get_system_log_stats: []
-npg_get_system_settings: []
-npg_get_system_settings_logs: []
-npg_get_upstream_health:
-- name: upstream_id
-  type: str
-  required: true
-npg_get_uri_block:
-- name: block_id
-  type: str | int
-  required: true
-npg_get_user:
-- name: user_id
-  type: str | int
-  required: true
-npg_get_waf_global_exclusions: []
-npg_get_waf_global_history: []
-npg_get_waf_global_rules: []
-npg_get_waf_host_config:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_waf_host_history:
-- name: host_id
-  type: str | int
-  required: true
-npg_get_waf_hosts: []
-npg_get_waf_test_patterns: []
-npg_global_exclude_exploit_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_import_ddns_from_hosts: []
-npg_import_from_hosts: []
-npg_list_access_lists: []
-npg_list_api_tokens: []
-npg_list_audit_logs: []
-npg_list_auth_providers: []
-npg_list_backups: []
-npg_list_banned_ips: []
-npg_list_certificates: []
-npg_list_cloud_providers: []
-npg_list_cloud_providers_by_region:
-- name: region
-  type: str | None = None
-  required: false
-npg_list_countries: []
-npg_list_ddns_records: []
-npg_list_dns_providers: []
-npg_list_exploit_rules: []
-npg_list_filter_subscriptions: []
-npg_list_log_files: []
-npg_list_notification_channels: []
-npg_list_proxy_hosts: []
-npg_list_redirect_hosts: []
-npg_list_roles: []
-npg_list_sso_providers: []
-npg_list_system_logs: []
-npg_list_uri_blocks: []
-npg_list_users: []
-npg_list_waf_rules: []
-npg_post_log:
-- name: level
-  type: str
-  required: true
-- name: message
-  type: str
-  required: true
-- name: source
-  type: str | None = None
-  required: false
-- name: component
-  type: str | None = None
-  required: false
-- name: log_type
-  type: str = "access"
-  required: true
-npg_refresh_filter_subscription:
-- name: subscription_id
-  type: str | int
-  required: true
-npg_regenerate_config:
-- name: host_id
-  type: str | int
-  required: true
-npg_reload_nginx: []
-npg_remove_exploit_rule_exclusion_from_host:
-- name: host_id
-  type: str | int
-  required: true
-- name: rule_id
-  type: str | int
-  required: true
-npg_remove_exploit_rule_global_exclusion:
-- name: rule_id
-  type: str | int
-  required: true
-npg_remove_filter_subscription_entry_exclusion:
-- name: subscription_id
-  type: str | int
-  required: true
-- name: entry_value
-  type: str
-  required: true
-npg_remove_filter_subscription_exclusion:
-- name: subscription_id
-  type: str | int
-  required: true
-- name: host_id
-  type: str | int
-  required: true
-npg_renew_certificate:
-- name: cert_id
-  type: str | int
-  required: true
-npg_reset_settings: []
-npg_restore_backup:
-- name: backup_id
-  type: str | int
-  required: true
-npg_revoke_api_token:
-- name: token_id
-  type: str | int
-  required: true
-npg_rotate_log_file: []
-npg_set_proxy_host_favorite:
-- name: host_id
-  type: str | int
-  required: true
-- name: favorite
-  type: bool
-  required: true
-npg_set_user_password:
-- name: user_id
-  type: str | int
-  required: true
-- name: new_password
-  type: str
-  required: true
-npg_set_user_role:
-- name: user_id
-  type: str | int
-  required: true
-- name: role_id
-  type: str | int
-  required: true
-npg_subscribe_filter_catalog:
-- name: paths
-  type: list[str]
-  required: true
-npg_sync_ddns_record:
-- name: record_id
-  type: str | int
-  required: true
-npg_sync_ddns_records: []
-npg_sync_nginx: []
-npg_sync_proxy_hosts: []
-npg_sync_redirect_hosts: []
-npg_test_acme:
-- name: dns_provider_id
-  type: str | int | None = None
-  required: false
-npg_test_dns_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_test_nginx: []
-npg_test_notification_channel:
-- name: channel_id
-  type: str | int
-  required: true
+  description: "Get a proxy host by its domain name."
+  parameters:
+    - name: domain
+      type: string
+      required: true
+
+npg_create_proxy_host:
+  description: "Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: pass only the fields you want to change; omitted fields inherit global defaults or sensible built-in defaults. Fields: proxy_type (default 'http'), forward_scheme (default 'http'), enabled (default True), ssl_enabled, ssl_forced (default True), ssl_http2 (default True), ssl_http3, ssl_cert_id, waf_enabled, waf_use_global (default True), waf_paranoia_level, waf_anomaly_threshold, waf_mode, cache_enabled, cache_static_only, cache_ttl, cache_template, block_normal, block_http, block_exploits (default True), block_exploits_exceptions, allow_websocket_upgrade (default True), enable_proxy_headers, host_header, extra_domains, advanced_config, proxy_buffering (str), proxy_request_buffering (str), client_max_body_size (str), proxy_max_temp_file_size (str), proxy_connect/send/read_timeout, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, stream_* fields."
+  parameters: []
+
+npg_update_proxy_host:
+  description: "Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears."
+  parameters: []
+
+npg_delete_proxy_host:
+  description: "Delete a proxy host by its ID."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_test_proxy_host:
-- name: host_id
-  type: str | int
-  required: true
-npg_test_sso_provider:
-- name: provider_id
-  type: str | int
-  required: true
-npg_test_waf_all_patterns:
-- name: target_url
-  type: str
-  required: true
-npg_test_waf_pattern:
-- name: target_url
-  type: str
-  required: true
-- name: attack_type
-  type: str
-  required: true
-npg_toggle_exploit_rule:
-- name: rule_id
-  type: str | int
-  required: true
-npg_unban_ip:
-- name: ip_id
-  type: str | int
-  required: true
-npg_update_access_list:
-- name: list_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: advanced_config
-  type: str | None = None
-  required: false
-- name: clients
-  type: list | None = None
-  required: false
-npg_update_api_token:
-- name: token_id
-  type: str | int
-  required: true
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_auth_font:
-- name: font
-  type: str
-  required: true
-npg_update_auth_language:
-- name: language
-  type: str
-  required: true
-npg_update_auth_provider:
-- name: provider_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: config
-  type: dict | None = None
-  required: false
-npg_update_challenge_config:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: provider
-  type: str | None = None
-  required: false
-- name: secret_key
-  type: str | None = None
-  required: false
-- name: site_key
-  type: str | None = None
-  required: false
-- name: challenge_type
-  type: str | None = None
-  required: false
-npg_update_cloud_provider:
-- name: slug
-  type: str
-  required: true
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_cloudflare_tunnel:
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_ddns_record:
-- name: record_id
-  type: str | int
-  required: true
-- name: domain
-  type: str | None = None
-  required: false
-- name: provider_id
-  type: str | int | None = None
-  required: false
-- name: proxied
-  type: bool | None = None
-  required: false
-npg_update_dns_provider:
-- name: provider_id
-  type: str | int
-  required: true
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_exploit_rule:
-- name: rule_id
-  type: str | int
-  required: true
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_filter_subscription:
-- name: subscription_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: url
-  type: str | None = None
-  required: false
-- name: enabled
-  type: bool | None = None
-  required: false
-npg_update_geoip: []
-npg_update_global_bot_filter:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: block_bad_bots
-  type: bool | None = None
-  required: false
-- name: block_ai_bots
-  type: bool | None = None
-  required: false
-- name: allow_search_engines
-  type: bool | None = None
-  required: false
-- name: block_suspicious_clients
-  type: bool | None = None
-  required: false
-- name: challenge_suspicious
-  type: bool | None = None
-  required: false
-- name: custom_blocked_agents
-  type: str | None = None
-  required: false
-- name: custom_allowed_agents
-  type: str | None = None
-  required: false
-npg_update_global_cloud_providers:
-- name: blocked_providers
-  type: list[str] | None = None
-  required: false
-- name: challenge_mode
-  type: bool | None = None
-  required: false
-- name: allow_search_bots
-  type: bool | None = None
-  required: false
-npg_update_global_geo:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: mode
-  type: Literal["whitelist"
-  required: true
-- name: countries
-  type: list[str] | None = None
-  required: false
-- name: allowed_ips
-  type: list[str] | None = None
-  required: false
-- name: allow_private_ips
-  type: bool | None = None
-  required: false
-- name: allow_search_bots
-  type: bool | None = None
-  required: false
-- name: challenge_mode
-  type: bool | None = None
-  required: false
-npg_update_global_rate_limit:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: requests_per_second
-  type: int | None = None
-  required: false
-- name: burst_size
-  type: int | None = None
-  required: false
-- name: zone_size
-  type: str | None = None
-  required: false
-- name: limit_by
-  type: str | None = None
-  required: false
-- name: limit_response
-  type: int | None = None
-  required: false
-npg_update_global_security_headers:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: hsts_enabled
-  type: bool | None = None
-  required: false
-- name: hsts_max_age
-  type: int | None = None
-  required: false
-- name: hsts_include_subdomains
-  type: bool | None = None
-  required: false
-- name: hsts_preload
-  type: bool | None = None
-  required: false
-- name: x_frame_options
-  type: str | None = None
-  required: false
-- name: x_content_type_options
-  type: bool | None = None
-  required: false
-- name: x_xss_protection
-  type: bool | None = None
-  required: false
-- name: referrer_policy
-  type: str | None = None
-  required: false
-- name: content_security_policy
-  type: str | None = None
-  required: false
-npg_update_global_uri_block:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: rules
-  type: list[dict] | None = None
-  required: false
-- name: exception_ips
-  type: list[str] | None = None
-  required: false
-- name: allow_private_ips
-  type: bool | None = None
-  required: false
-npg_update_global_waf:
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: paranoia_level
-  type: int | None = None
-  required: false
-- name: anomaly_threshold
-  type: int | None = None
-  required: false
-- name: rules
-  type: list[dict] | None = None
-  required: false
-npg_update_log_filter_preset:
-- name: preset_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: filter
-  type: dict | None = None
-  required: false
-- name: description
-  type: str | None = None
-  required: false
-npg_update_log_settings:
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_notification_channel:
-- name: channel_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: channel_type
-  type: str | None = None
-  required: false
-- name: config
-  type: dict | None = None
-  required: false
-npg_update_proxy_host_bot_filter:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: block_bad_bots
-  type: bool | None = None
-  required: false
-- name: block_ai_bots
-  type: bool | None = None
-  required: false
-- name: allow_search_engines
-  type: bool | None = None
-  required: false
-- name: block_suspicious_clients
-  type: bool | None = None
-  required: false
-- name: challenge_suspicious
-  type: bool | None = None
-  required: false
-- name: disable_global
-  type: bool | None = None
-  required: false
-- name: custom_blocked_agents
-  type: str | None = None
-  required: false
-- name: custom_allowed_agents
-  type: str | None = None
-  required: false
-npg_update_proxy_host_challenge:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: challenge_type
-  type: str | None = None
-  required: false
-- name: site_key
-  type: str | None = None
-  required: false
-- name: token_validity
-  type: int | None = None
-  required: false
-- name: min_score
-  type: float | None = None
-  required: false
-- name: apply_to
-  type: str | None = None
-  required: false
-- name: page_title
-  type: str | None = None
-  required: false
-npg_update_proxy_host_cloud_blocking:
-- name: host_id
-  type: str | int
-  required: true
-- name: blocked_providers
-  type: list[str] | None = None
-  required: false
-- name: challenge_mode
-  type: bool | None = None
-  required: false
-- name: allow_search_bots
-  type: bool | None = None
-  required: false
-- name: cloud_disable_global
-  type: bool | None = None
-  required: false
-npg_update_proxy_host_fail2ban:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: max_retries
-  type: int | None = None
-  required: false
-- name: find_time
-  type: int | None = None
-  required: false
-- name: ban_time
-  type: int | None = None
-  required: false
-- name: fail_codes
-  type: str | None = None
-  required: false
-- name: action
-  type: Literal["block"
-  required: true
-npg_update_proxy_host_geo:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: mode
-  type: Literal["whitelist"
-  required: true
-- name: countries
-  type: list[str] | None = None
-  required: false
-- name: allowed_ips
-  type: list[str] | None = None
-  required: false
-- name: challenge_mode
-  type: bool | None = None
-  required: false
-- name: disable_global
-  type: bool | None = None
-  required: false
-- name: allow_private_ips
-  type: bool | None = None
-  required: false
-- name: allow_search_bots
-  type: bool | None = None
-  required: false
+  description: "Test upstream connectivity for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_regenerate_config:
+  description: "Regenerate nginx config for a specific proxy host without touching others."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_sync_proxy_hosts:
+  description: "Sync all proxy host configs and reload nginx."
+  parameters: []
+
+npg_clone_proxy_host:
+  description: "Clone a proxy host with new domain names. Returns the new proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: domain_names
+      type: array<string>
+      required: true
+
+npg_list_certificates:
+  description: "List all SSL/TLS certificates."
+  parameters: []
+
+npg_get_certificate:
+  description: "Get a certificate by its ID."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_create_certificate:
+  description: "Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc."
+  parameters: []
+
+npg_delete_certificate:
+  description: "Delete a certificate by its ID."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_renew_certificate:
+  description: "Renew a certificate by its ID."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_reload_nginx:
+  description: "Reload nginx configuration without full restart."
+  parameters: []
+
+npg_sync_nginx:
+  description: "Sync all configs and reload nginx."
+  parameters: []
+
+npg_test_nginx:
+  description: "Test nginx configuration for validity."
+  parameters: []
+
+npg_list_redirect_hosts:
+  description: "List all redirect hosts."
+  parameters: []
+
+npg_get_redirect_host:
+  description: "Get a redirect host by its ID."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_create_redirect_host:
+  description: "Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, default 301)."
+  parameters: []
+
+npg_update_redirect_host:
+  description: "Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code."
+  parameters: []
+
+npg_delete_redirect_host:
+  description: "Delete a redirect host by its ID."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_get_proxy_host_rate_limit:
+  description: "GET rate limit configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_update_proxy_host_rate_limit:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: requests_per_second
-  type: int | None = None
-  required: false
-- name: burst_size
-  type: int | None = None
-  required: false
-- name: zone_size
-  type: str | None = None
-  required: false
-- name: limit_by
-  type: str | None = None
-  required: false
-- name: limit_response
-  type: int | None = None
-  required: false
-- name: disable_global
-  type: bool | None = None
-  required: false
+  description: "UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)"
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: requests_per_second
+      type: integer
+      required: false
+    - name: burst_size
+      type: integer
+      required: false
+    - name: zone_size
+      type: string
+      required: false
+    - name: limit_by
+      type: string
+      required: false
+    - name: limit_response
+      type: integer
+      required: false
+    - name: disable_global
+      type: boolean
+      required: false
+
+npg_get_proxy_host_bot_filter:
+  description: "GET bot filter configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_update_proxy_host_bot_filter:
+  description: "UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: block_bad_bots
+      type: boolean
+      required: false
+    - name: block_ai_bots
+      type: boolean
+      required: false
+    - name: allow_search_engines
+      type: boolean
+      required: false
+    - name: block_suspicious_clients
+      type: boolean
+      required: false
+    - name: challenge_suspicious
+      type: boolean
+      required: false
+    - name: disable_global
+      type: boolean
+      required: false
+    - name: custom_blocked_agents
+      type: string
+      required: false
+    - name: custom_allowed_agents
+      type: string
+      required: false
+
+npg_get_proxy_host_security_headers:
+  description: "GET security headers configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_update_proxy_host_security_headers:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: hsts_enabled
-  type: bool | None = None
-  required: false
-- name: hsts_max_age
-  type: int | None = None
-  required: false
-- name: hsts_include_subdomains
-  type: bool | None = None
-  required: false
-- name: hsts_preload
-  type: bool | None = None
-  required: false
-- name: x_frame_options
-  type: str | None = None
-  required: false
-- name: x_content_type_options
-  type: bool | None = None
-  required: false
-- name: x_xss_protection
-  type: bool | None = None
-  required: false
-- name: referrer_policy
-  type: str | None = None
-  required: false
-- name: content_security_policy
-  type: str | None = None
-  required: false
-- name: disable_global
-  type: bool | None = None
-  required: false
+  description: "UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)"
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: hsts_enabled
+      type: boolean
+      required: false
+    - name: hsts_max_age
+      type: integer
+      required: false
+    - name: hsts_include_subdomains
+      type: boolean
+      required: false
+    - name: hsts_preload
+      type: boolean
+      required: false
+    - name: x_frame_options
+      type: string
+      required: false
+    - name: x_content_type_options
+      type: boolean
+      required: false
+    - name: x_xss_protection
+      type: boolean
+      required: false
+    - name: referrer_policy
+      type: string
+      required: false
+    - name: content_security_policy
+      type: string
+      required: false
+    - name: disable_global
+      type: boolean
+      required: false
+
+npg_apply_security_header_preset:
+  description: "APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: preset
+      type: string
+      required: true
+
+npg_get_proxy_host_upstream:
+  description: "GET upstream/load balancing configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_update_proxy_host_upstream:
-- name: host_id
-  type: str | int
-  required: true
-- name: scheme
-  type: str | None = None
-  required: false
-- name: servers
-  type: list[dict] | None = None
-  required: false
-- name: load_balance
-  type: str | None = None
-  required: false
-- name: health_check_enabled
-  type: bool | None = None
-  required: false
-- name: health_check_path
-  type: str | None = None
-  required: false
-- name: health_check_interval
-  type: int | None = None
-  required: false
+  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: scheme
+      type: string
+      required: false
+    - name: servers
+      type: array<object>
+      required: false
+    - name: load_balance
+      type: string
+      required: false
+    - name: health_check_enabled
+      type: boolean
+      required: false
+    - name: health_check_path
+      type: string
+      required: false
+    - name: health_check_interval
+      type: integer
+      required: false
+
+npg_get_proxy_host_uri_block:
+  description: "GET URI block configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_update_proxy_host_uri_block:
-- name: host_id
-  type: str | int
-  required: true
-- name: enabled
-  type: bool | None = None
-  required: false
-- name: rules
-  type: list[dict] | None = None
-  required: false
-- name: exception_ips
-  type: list[str] | None = None
-  required: false
-- name: allow_private_ips
-  type: bool | None = None
-  required: false
-npg_update_role:
-- name: role_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: permissions
-  type: list[str] | None = None
-  required: false
+  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: rules
+      type: array<object>
+      required: false
+    - name: exception_ips
+      type: array<string>
+      required: false
+    - name: allow_private_ips
+      type: boolean
+      required: false
+
+npg_get_settings:
+  description: "Get global NPG settings."
+  parameters: []
+
 npg_update_settings:
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_sso_provider:
-- name: provider_id
-  type: str | int
-  required: true
-- name: name
-  type: str | None = None
-  required: false
-- name: slug
-  type: str | None = None
-  required: false
-- name: issuer_url
-  type: str | None = None
-  required: false
-- name: client_id
-  type: str | None = None
-  required: false
-- name: client_secret
-  type: str | None = None
-  required: false
-- name: scopes
-  type: str | None = None
-  required: false
+  description: "Update global NPG settings. Pass only fields to change (dict)."
+  parameters:
+    - name: kwargs
+      type: object
+      required: false
+
+npg_get_system_settings:
+  description: "Get system settings (server name, timezone, locale)."
+  parameters: []
+
 npg_update_system_settings:
-- name: kwargs
-  type: dict | None = None
-  required: false
-npg_update_system_settings_logs:
-- name: max_age
-  type: str | None = None
-  required: false
-- name: max_size
-  type: str | None = None
-  required: false
-- name: max_files
-  type: int | None = None
-  required: false
-npg_update_uri_block:
-- name: block_id
-  type: str | int
-  required: true
-- name: pattern
-  type: str | None = None
-  required: false
-- name: action
-  type: str | None = None
-  required: false
-- name: is_regex
-  type: bool | None = None
-  required: false
-npg_upload_certificate:
-- name: domain_names
-  type: list[str]
-  required: true
-- name: cert_content
-  type: str
-  required: true
-- name: key_content
-  type: str
-  required: true
-npg_upload_certificate_pem:
-- name: cert_id
-  type: str | int
-  required: true
-- name: pem_content
-  type: str
-  required: true
-npg_upload_restore_backup:
-- name: file_content
-  type: str
-  required: true
+  description: "Update system settings. Pass only fields to change (dict)."
+  parameters:
+    - name: kwargs
+      type: object
+      required: false
+
+npg_get_dashboard:
+  description: "Get dashboard data (summary of proxy hosts, certificates, etc.)."
+  parameters: []
+
+npg_get_dashboard_health:
+  description: "Get system health status."
+  parameters: []
+
+npg_get_dashboard_geoip_stats:
+  description: "GET GeoIP statistics by country for the dashboard."
+  parameters: []
+
+npg_list_access_lists:
+  description: "List all access lists (authentication/restriction lists)."
+  parameters: []
+
+npg_get_access_list:
+  description: "Get an access list by its ID."
+  parameters:
+    - name: list_id
+      type: integer | string
+      required: true
+
+npg_create_access_list:
+  description: "Create a new access list. Required: name, advanced_config (block/allow rules)."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: advanced_config
+      type: string
+      required: false
+      default: ""
+    - name: clients
+      type: list
+      required: false
+
+npg_update_access_list:
+  description: "Update an access list. Pass only fields to change."
+  parameters:
+    - name: list_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: advanced_config
+      type: string
+      required: false
+    - name: clients
+      type: list
+      required: false
+
+npg_delete_access_list:
+  description: "Delete an access list by its ID."
+  parameters:
+    - name: list_id
+      type: integer | string
+      required: true
+
+npg_list_dns_providers:
+  description: "List all DNS providers configured for DNS-01 challenges."
+  parameters: []
+
+npg_get_dns_provider:
+  description: "Get a DNS provider by its ID."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_create_dns_provider:
+  description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'})."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: provider_type
+      type: string
+      required: true
+    - name: credentials
+      type: object
+      required: false
+    - name: kwargs
+      type: object
+      required: false
+
+npg_update_dns_provider:
+  description: "Update a DNS provider. Pass only fields to change (dict)."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+    - name: kwargs
+      type: object
+      required: false
+
+npg_delete_dns_provider:
+  description: "Delete a DNS provider by its ID."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_test_dns_provider:
+  description: "Test DNS provider credentials."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_list_cloud_providers:
+  description: "List all cloud providers (for certificate DNS challenges)."
+  parameters: []
+
+npg_get_cloud_provider:
+  description: "Get a cloud provider by its slug."
+  parameters:
+    - name: slug
+      type: string
+      required: true
+
+npg_create_cloud_provider:
+  description: "Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: slug
+      type: string
+      required: true
+    - name: ip_ranges
+      type: array<string>
+      required: true
+    - name: region
+      type: string
+      required: false
+    - name: description
+      type: string
+      required: false
+    - name: kwargs
+      type: object
+      required: false
+
+npg_update_cloud_provider:
+  description: "Update a cloud provider by its slug. Pass only fields to change (dict)."
+  parameters:
+    - name: slug
+      type: string
+      required: true
+    - name: kwargs
+      type: object
+      required: false
+
+npg_delete_cloud_provider:
+  description: "Delete a cloud provider by its slug."
+  parameters:
+    - name: slug
+      type: string
+      required: true
+
+npg_get_proxy_host_cloud_blocking:
+  description: "GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_update_proxy_host_cloud_blocking:
+  description: "UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: blocked_providers
+      type: array<string>
+      required: false
+    - name: challenge_mode
+      type: boolean
+      required: false
+    - name: allow_search_bots
+      type: boolean
+      required: false
+    - name: cloud_disable_global
+      type: boolean
+      required: false
+
+npg_get_geoip_status:
+  description: "Get GeoIP database update status."
+  parameters: []
+
+npg_update_geoip:
+  description: "Update GeoIP databases."
+  parameters: []
+
+npg_list_countries:
+  description: "List available country codes for GeoIP blocking."
+  parameters: []
+
+npg_get_proxy_host_geo:
+  description: "GET geo restriction configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_create_proxy_host_geo:
+  description: "CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots"
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: countries
+      type: array<string>
+      required: true
+    - name: mode
+      type: string
+      required: false
+      default: "blacklist"
+    - name: enabled
+      type: boolean
+      required: false
+      default: true
+    - name: allowed_ips
+      type: array<string>
+      required: false
+    - name: challenge_mode
+      type: boolean
+      required: false
+      default: false
+    - name: disable_global
+      type: boolean
+      required: false
+      default: false
+    - name: allow_private_ips
+      type: boolean
+      required: false
+      default: true
+    - name: allow_search_bots
+      type: boolean
+      required: false
+      default: true
+
+npg_update_proxy_host_geo:
+  description: "UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots"
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: mode
+      type: string
+      required: false
+    - name: countries
+      type: array<string>
+      required: false
+    - name: allowed_ips
+      type: array<string>
+      required: false
+    - name: challenge_mode
+      type: boolean
+      required: false
+    - name: disable_global
+      type: boolean
+      required: false
+    - name: allow_private_ips
+      type: boolean
+      required: false
+    - name: allow_search_bots
+      type: boolean
+      required: false
+
+npg_delete_proxy_host_geo:
+  description: "DELETE geo restriction for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_get_proxy_host_fail2ban:
+  description: "GET fail2ban configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_update_proxy_host_fail2ban:
+  description: "UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: max_retries
+      type: integer
+      required: false
+    - name: find_time
+      type: integer
+      required: false
+    - name: ban_time
+      type: integer
+      required: false
+    - name: fail_codes
+      type: string
+      required: false
+    - name: action
+      type: string
+      required: false
+
+npg_get_proxy_host_challenge:
+  description: "GET CAPTCHA/challenge configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_update_proxy_host_challenge:
+  description: "UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str)"
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: enabled
+      type: boolean
+      required: false
+    - name: challenge_type
+      type: string
+      required: false
+    - name: site_key
+      type: string
+      required: false
+    - name: token_validity
+      type: integer
+      required: false
+    - name: min_score
+      type: number
+      required: false
+    - name: apply_to
+      type: string
+      required: false
+    - name: page_title
+      type: string
+      required: false
+
+npg_delete_proxy_host_challenge:
+  description: "DELETE CAPTCHA/challenge configuration for a proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_verify_challenge:
-- name: token
-  type: str
-  required: true
-- name: solution
-  type: str
-  required: true
+  description: "Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution."
+  parameters:
+    - name: token
+      type: string
+      required: true
+    - name: solution
+      type: string
+      required: true
+
+npg_list_banned_ips:
+  description: "List banned IP addresses."
+  parameters: []
+
+npg_ban_ip:
+  description: "Ban an IP address. Required: ip. Optional: ban_time (seconds)."
+  parameters:
+    - name: ip_address
+      type: string
+      required: true
+    - name: reason
+      type: string
+      required: false
+      default: "Manual ban via API"
+    - name: duration
+      type: integer
+      required: false
+      default: 3600
+
+npg_unban_ip:
+  description: "Unban an IP by its ID."
+  parameters:
+    - name: ip_id
+      type: integer | string
+      required: true
+
+npg_get_bots_known:
+  description: "Get list of known bot user-agent signatures."
+  parameters: []
+
+npg_get_security_headers_presets:
+  description: "Get available security header presets."
+  parameters: []
+
+npg_list_exploit_rules:
+  description: "List exploit block rules."
+  parameters: []
+
+npg_get_exploit_rule:
+  description: "Get an exploit rule by its ID."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_create_exploit_rule:
+  description: "Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description."
+  parameters:
+    - name: category
+      type: string
+      required: true
+    - name: name
+      type: string
+      required: true
+    - name: pattern
+      type: string
+      required: true
+    - name: pattern_type
+      type: string
+      required: true
+    - name: severity
+      type: string
+      required: false
+    - name: description
+      type: string
+      required: false
+    - name: kwargs
+      type: object
+      required: false
+
+npg_update_exploit_rule:
+  description: "Update an exploit rule. Pass only fields to change (dict)."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+    - name: kwargs
+      type: object
+      required: false
+
+npg_delete_exploit_rule:
+  description: "Delete an exploit rule by its ID."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_toggle_exploit_rule:
+  description: "Toggle an exploit rule's enabled status."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_list_waf_rules:
+  description: "List all WAF (Web Application Firewall) rules."
+  parameters: []
+
+npg_get_waf_hosts:
+  description: "Get WAF config for all proxy hosts."
+  parameters: []
+
+npg_get_waf_host_config:
+  description: "Get WAF config for a specific proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_disable_waf_rule:
+  description: "Disable a WAF rule for a specific proxy host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_get_logs:
+  description: "Get access logs."
+  parameters: []
+
+npg_get_log_settings:
+  description: "Get log settings."
+  parameters: []
+
+npg_update_log_settings:
+  description: "Update log settings. Pass only fields to change (dict)."
+  parameters:
+    - name: kwargs
+      type: object
+      required: false
+
+npg_get_log_stats:
+  description: "Get log statistics."
+  parameters: []
+
+npg_list_audit_logs:
+  description: "List audit log entries."
+  parameters: []
+
+npg_list_system_logs:
+  description: "List system logs."
+  parameters: []
+
+npg_list_backups:
+  description: "List all backups."
+  parameters: []
+
+npg_get_backup:
+  description: "Get a backup by its ID."
+  parameters:
+    - name: backup_id
+      type: integer | string
+      required: true
+
+npg_create_backup:
+  description: "Create a new backup."
+  parameters: []
+
+npg_delete_backup:
+  description: "Delete a backup by its ID."
+  parameters:
+    - name: backup_id
+      type: integer | string
+      required: true
+
+npg_restore_backup:
+  description: "Restore from a backup. Required: backup_id."
+  parameters:
+    - name: backup_id
+      type: integer | string
+      required: true
+
+npg_list_api_tokens:
+  description: "List all API tokens."
+  parameters: []
+
+npg_get_api_token:
+  description: "Get an API token by its ID."
+  parameters:
+    - name: token_id
+      type: integer | string
+      required: true
+
+npg_create_api_token:
+  description: "Create a new API token. Required: name, permissions (array). Optional: expires_at."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: permissions
+      type: array<string>
+      required: true
+    - name: expires_at
+      type: string
+      required: false
+
+npg_update_api_token:
+  description: "Update an API token. Pass only fields to change (dict)."
+  parameters:
+    - name: token_id
+      type: integer | string
+      required: true
+    - name: kwargs
+      type: object
+      required: false
+
+npg_revoke_api_token:
+  description: "Revoke an API token by its ID."
+  parameters:
+    - name: token_id
+      type: integer | string
+      required: true
+
+npg_delete_api_token:
+  description: "Delete an API token by its ID."
+  parameters:
+    - name: token_id
+      type: integer | string
+      required: true
+
+npg_list_notification_channels:
+  description: "List all notification channels."
+  parameters: []
+
+npg_create_notification_channel:
+  description: "Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict)."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: channel_type
+      type: string
+      required: true
+    - name: config
+      type: object
+      required: false
+
+npg_update_notification_channel:
+  description: "Update a notification channel. Pass only fields to change."
+  parameters:
+    - name: channel_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: channel_type
+      type: string
+      required: false
+    - name: config
+      type: object
+      required: false
+
+npg_delete_notification_channel:
+  description: "Delete a notification channel by its ID."
+  parameters:
+    - name: channel_id
+      type: integer | string
+      required: true
+
+npg_test_notification_channel:
+  description: "Test a notification channel by sending a test message."
+  parameters:
+    - name: channel_id
+      type: integer | string
+      required: true
+
+npg_get_notification_deliveries:
+  description: "Get delivery history for a notification channel."
+  parameters:
+    - name: channel_id
+      type: integer | string
+      required: true
+
+npg_detect_telegram_chats:
+  description: "Detect available Telegram chats for notification delivery."
+  parameters: []
+
+npg_list_users:
+  description: "List all users."
+  parameters: []
+
+npg_get_user:
+  description: "Get a user by their ID."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+
+npg_create_user:
+  description: "Create a new user. Required: username, email, password. Optional: role_id, is_active."
+  parameters:
+    - name: username
+      type: string
+      required: true
+    - name: email
+      type: string
+      required: true
+    - name: password
+      type: string
+      required: true
+    - name: role_id
+      type: integer | string
+      required: false
+    - name: is_active
+      type: boolean
+      required: false
+      default: true
+
+npg_set_user_password:
+  description: "Set/reset a user's password. Required: user_id, new_password."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+    - name: new_password
+      type: string
+      required: true
+
+npg_assign_user_role:
+  description: "Assign a role to a user. Required: user_id, role_id."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+    - name: role_id
+      type: integer | string
+      required: true
+
+npg_end_user_sessions:
+  description: "End all sessions for a user (force logout). Required: user_id."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+
+npg_delete_user:
+  description: "Delete a user by their ID."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+
+npg_list_roles:
+  description: "List all roles."
+  parameters: []
+
+npg_create_role:
+  description: "Create a new role. Required: name, permissions (array of permission strings)."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: permissions
+      type: array<string>
+      required: true
+
+npg_update_role:
+  description: "Update a role. Pass only fields to change."
+  parameters:
+    - name: role_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: permissions
+      type: array<string>
+      required: false
+
+npg_delete_role:
+  description: "Delete a role by its ID."
+  parameters:
+    - name: role_id
+      type: integer | string
+      required: true
+
+npg_list_sso_providers:
+  description: "List all SSO providers."
+  parameters: []
+
+npg_create_sso_provider:
+  description: "Create a new SSO provider. Required: slug, name, issuer_url, client_id. Optional: client_secret (defaults to placeholder), scopes."
+  parameters:
+    - name: slug
+      type: string
+      required: true
+    - name: name
+      type: string
+      required: true
+    - name: issuer_url
+      type: string
+      required: true
+    - name: client_id
+      type: string
+      required: true
+    - name: client_secret
+      type: string
+      required: false
+    - name: scopes
+      type: string
+      required: false
+
+npg_update_sso_provider:
+  description: "Update an SSO provider. Pass only fields to change. Required: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: slug
+      type: string
+      required: false
+    - name: issuer_url
+      type: string
+      required: false
+    - name: client_id
+      type: string
+      required: false
+    - name: client_secret
+      type: string
+      required: false
+    - name: scopes
+      type: string
+      required: false
+
+npg_delete_sso_provider:
+  description: "Delete an SSO provider by its ID."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_test_sso_provider:
+  description: "Test SSO provider configuration by initiating a test login flow."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_list_log_files:
+  description: "List all log files."
+  parameters: []
+
+npg_download_log_file:
+  description: "Download a log file by its filename."
+  parameters:
+    - name: filename
+      type: string
+      required: true
+
 npg_view_log_file:
-- name: filename
-  type: str
-  required: true
-- name: lines
-  type: int = 100
-  required: true
+  description: "View the contents of a log file."
+  parameters:
+    - name: filename
+      type: string
+      required: true
+    - name: lines
+      type: integer
+      required: false
+      default: 100
+
+npg_rotate_log_file:
+  description: "Rotate a log file by its filename."
+  parameters: []
+
+npg_delete_log_file:
+  description: "Delete a log file by its filename."
+  parameters:
+    - name: filename
+      type: string
+      required: true
+
+npg_get_expiring_certificates:
+  description: "Get certificates that are expiring soon."
+  parameters: []
+
+npg_get_certificate_history:
+  description: "Get certificate history."
+  parameters: []
+
+npg_upload_certificate:
+  description: "Upload a certificate file. Required: domain_names, cert_content, key_content."
+  parameters:
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: cert_content
+      type: string
+      required: true
+    - name: key_content
+      type: string
+      required: true
+
+npg_import_from_hosts:
+  description: "Import certificates from existing hosts."
+  parameters: []
+
+npg_list_uri_blocks:
+  description: "List all URI blocks (global and per-host)."
+  parameters: []
+
+npg_create_uri_block:
+  description: "Create a URI block for a proxy host. Required: host_id, pattern, action (block/allow). Optional: is_regex."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: pattern
+      type: string
+      required: true
+    - name: action
+      type: string
+      required: false
+      default: "block"
+    - name: is_regex
+      type: boolean
+      required: false
+      default: false
+
+npg_get_uri_block:
+  description: "Get a URI block by its ID."
+  parameters:
+    - name: block_id
+      type: integer | string
+      required: true
+
+npg_update_uri_block:
+  description: "Update a URI block. Pass only fields to change."
+  parameters:
+    - name: block_id
+      type: integer | string
+      required: true
+    - name: pattern
+      type: string
+      required: false
+    - name: action
+      type: string
+      required: false
+    - name: is_regex
+      type: boolean
+      required: false
+
+npg_delete_uri_block:
+  description: "Delete a URI block by its ID."
+  parameters:
+    - name: block_id
+      type: integer | string
+      required: true
+
+npg_bulk_add_uri_block_rule:
+  description: "Bulk add URI block rules. Required: rules (list of {pattern, action, is_regex})."
+  parameters:
+    - name: rules
+      type: array<object>
+      required: true
+
+npg_get_global_uri_block:
+  description: "GET global URI block configuration."
+  parameters: []
+
+npg_update_global_uri_block:
+  description: "UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: rules
+      type: array<object>
+      required: false
+    - name: exception_ips
+      type: array<string>
+      required: false
+    - name: allow_private_ips
+      type: boolean
+      required: false
+
+npg_add_global_uri_block_rule:
+  description: "Add a rule to the global URI block. Required: pattern, action. Optional: is_regex."
+  parameters:
+    - name: pattern
+      type: string
+      required: true
+    - name: action
+      type: string
+      required: false
+      default: "block"
+    - name: is_regex
+      type: boolean
+      required: false
+      default: false
+
+npg_delete_global_uri_block_rule:
+  description: "Delete a rule from the global URI block by its ID."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_get_upstream_health:
+  description: "GET health status of an upstream pool. REQUIRED: upstream_id (UUID string)."
+  parameters:
+    - name: upstream_id
+      type: string
+      required: true
+
+npg_list_cloud_providers_by_region:
+  description: "List cloud providers filtered by region."
+  parameters:
+    - name: region
+      type: string
+      required: false
+
+npg_get_catalog:
+  description: "Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows."
+  parameters: []
+
+npg_get_docker_containers:
+  description: "Get status of all Docker containers managed by NPG."
+  parameters: []
+
+npg_check_update:
+  description: "Check for available NPG updates."
+  parameters: []
+
+npg_test_acme:
+  description: "Test ACME configuration for DNS provider."
+  parameters:
+    - name: dns_provider_id
+      type: integer | string
+      required: false
+
+npg_get_public_ui_settings:
+  description: "Get public UI settings (accessible without auth)."
+  parameters: []
+
+npg_get_dashboard_containers:
+  description: "Get Docker container statistics for the dashboard."
+  parameters: []
+
+npg_get_dashboard_stats:
+  description: "Get hourly statistics for the dashboard."
+  parameters: []
+
+npg_get_dashboard_health_history:
+  description: "Get system health history for the dashboard."
+  parameters: []
+
+npg_get_cloudflare_tunnel:
+  description: "Get Cloudflare Tunnel configuration."
+  parameters: []
+
+npg_update_cloudflare_tunnel:
+  description: "Update Cloudflare Tunnel configuration. Pass only fields to change."
+  parameters:
+    - name: kwargs
+      type: object
+      required: false
+
+npg_get_cloudflare_tunnel_status:
+  description: "Get Cloudflare Tunnel status."
+  parameters: []
+
+npg_get_global_security_headers:
+  description: "GET global security headers configuration."
+  parameters: []
+
+npg_update_global_security_headers:
+  description: "UPDATE global security headers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: hsts_enabled
+      type: boolean
+      required: false
+    - name: hsts_max_age
+      type: integer
+      required: false
+    - name: hsts_include_subdomains
+      type: boolean
+      required: false
+    - name: hsts_preload
+      type: boolean
+      required: false
+    - name: x_frame_options
+      type: string
+      required: false
+    - name: x_content_type_options
+      type: boolean
+      required: false
+    - name: x_xss_protection
+      type: boolean
+      required: false
+    - name: referrer_policy
+      type: string
+      required: false
+    - name: content_security_policy
+      type: string
+      required: false
+
+npg_get_global_bot_filter:
+  description: "GET global bot filter configuration."
+  parameters: []
+
+npg_update_global_bot_filter:
+  description: "UPDATE global bot filter configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked_agents, custom_allowed_agents."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: block_bad_bots
+      type: boolean
+      required: false
+    - name: block_ai_bots
+      type: boolean
+      required: false
+    - name: allow_search_engines
+      type: boolean
+      required: false
+    - name: block_suspicious_clients
+      type: boolean
+      required: false
+    - name: challenge_suspicious
+      type: boolean
+      required: false
+    - name: custom_blocked_agents
+      type: string
+      required: false
+    - name: custom_allowed_agents
+      type: string
+      required: false
+
+npg_get_global_cloud_providers:
+  description: "GET global cloud providers configuration."
+  parameters: []
+
+npg_update_global_cloud_providers:
+  description: "UPDATE global cloud providers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool)."
+  parameters:
+    - name: blocked_providers
+      type: array<string>
+      required: false
+    - name: challenge_mode
+      type: boolean
+      required: false
+    - name: allow_search_bots
+      type: boolean
+      required: false
+
+npg_get_global_geo:
+  description: "GET global GeoIP restriction configuration."
+  parameters: []
+
+npg_update_global_geo:
+  description: "UPDATE global GeoIP restriction configuration (partial update — only provided fields are changed; omitted fields are left as-is. The global default is inherited by hosts without their own override). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode"
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: mode
+      type: string
+      required: false
+    - name: countries
+      type: array<string>
+      required: false
+    - name: allowed_ips
+      type: array<string>
+      required: false
+    - name: allow_private_ips
+      type: boolean
+      required: false
+    - name: allow_search_bots
+      type: boolean
+      required: false
+    - name: challenge_mode
+      type: boolean
+      required: false
+
+npg_get_global_rate_limit:
+  description: "GET global rate limit configuration."
+  parameters: []
+
+npg_update_global_rate_limit:
+  description: "UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: requests_per_second
+      type: integer
+      required: false
+    - name: burst_size
+      type: integer
+      required: false
+    - name: zone_size
+      type: string
+      required: false
+    - name: limit_by
+      type: string
+      required: false
+    - name: limit_response
+      type: integer
+      required: false
+
+npg_get_global_waf:
+  description: "GET global WAF configuration."
+  parameters: []
+
+npg_update_global_waf:
+  description: "UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled})."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: paranoia_level
+      type: integer
+      required: false
+    - name: anomaly_threshold
+      type: integer
+      required: false
+    - name: rules
+      type: array<object>
+      required: false
+
+npg_download_backup:
+  description: "Download a backup by its ID."
+  parameters:
+    - name: backup_id
+      type: integer | string
+      required: true
+
+npg_upload_restore_backup:
+  description: "Upload and restore from a backup file."
+  parameters:
+    - name: file_content
+      type: string
+      required: true
+
+npg_get_backup_stats:
+  description: "Get backup statistics."
+  parameters: []
+
+npg_get_auth_status:
+  description: "GET authentication status — returns whether the current session is authenticated and basic user info."
+  parameters: []
+
+npg_get_auth_account:
+  description: "GET own account info — returns the authenticated user's account details."
+  parameters: []
+
+npg_auth_change_credentials:
+  description: "Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup."
+  parameters:
+    - name: current_password
+      type: string
+      required: true
+    - name: new_username
+      type: string
+      required: true
+    - name: new_password
+      type: string
+      required: true
+
+npg_auth_change_username:
+  description: "Change own username. REQUIRED: current_password, new_username."
+  parameters:
+    - name: current_password
+      type: string
+      required: true
+    - name: new_username
+      type: string
+      required: true
+
+npg_auth_2fa_setup:
+  description: "Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app."
+  parameters:
+    - name: password
+      type: string
+      required: true
+
+npg_auth_2fa_enable:
+  description: "Enable 2FA. REQUIRED: password, totp_code (6-digit code from authenticator)."
+  parameters:
+    - name: password
+      type: string
+      required: true
+    - name: totp_code
+      type: string
+      required: true
+
+npg_auth_2fa_disable:
+  description: "Disable 2FA. REQUIRED: password, totp_code."
+  parameters:
+    - name: password
+      type: string
+      required: true
+    - name: totp_code
+      type: string
+      required: true
+
+npg_get_auth_language:
+  description: "GET the authenticated user's UI language preference."
+  parameters: []
+
+npg_update_auth_language:
+  description: "SET the authenticated user's UI language. REQUIRED: language (e.g. 'en', 'ko')."
+  parameters:
+    - name: language
+      type: string
+      required: true
+
+npg_get_auth_font:
+  description: "GET the authenticated user's UI font family preference."
+  parameters: []
+
+npg_update_auth_font:
+  description: "SET the authenticated user's UI font family. REQUIRED: font (e.g. 'Inter', 'Roboto')."
+  parameters:
+    - name: font
+      type: string
+      required: true
+
+npg_get_auth_sso_providers:
+  description: "List SSO providers available for the login screen (public-facing)."
+  parameters: []
+
+npg_auth_sso_start:
+  description: "Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns a redirect URL."
+  parameters:
+    - name: slug
+      type: string
+      required: true
+
+npg_list_auth_providers:
+  description: "List ForwardAuth (Authelia, Authentik, custom) providers."
+  parameters: []
+
+npg_create_auth_provider:
+  description: "Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific)."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: provider_type
+      type: string
+      required: true
+    - name: config
+      type: object
+      required: false
+    - name: provider_url
+      type: string
+      required: false
+
+npg_get_auth_provider:
+  description: "Get a ForwardAuth provider by its ID."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_update_auth_provider:
+  description: "Update a ForwardAuth provider (partial update). Pass only fields to change."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: config
+      type: object
+      required: false
+
+npg_delete_auth_provider:
+  description: "Delete a ForwardAuth provider by its ID."
+  parameters:
+    - name: provider_id
+      type: integer | string
+      required: true
+
+npg_list_ddns_records:
+  description: "List all DDNS records."
+  parameters: []
+
+npg_create_ddns_record:
+  description: "Create a DDNS record. REQUIRED: proxy_host_id, domain, provider_id. Optional: proxied (bool)."
+  parameters:
+    - name: proxy_host_id
+      type: integer | string
+      required: true
+    - name: domain
+      type: string
+      required: true
+    - name: provider_id
+      type: integer | string
+      required: true
+    - name: proxied
+      type: boolean
+      required: false
+      default: false
+
+npg_get_ddns_record:
+  description: "Get a DDNS record by its ID."
+  parameters:
+    - name: record_id
+      type: integer | string
+      required: true
+
+npg_update_ddns_record:
+  description: "Update a DDNS record (partial update). Pass only fields to change."
+  parameters:
+    - name: record_id
+      type: integer | string
+      required: true
+    - name: domain
+      type: string
+      required: false
+    - name: provider_id
+      type: integer | string
+      required: false
+    - name: proxied
+      type: boolean
+      required: false
+
+npg_delete_ddns_record:
+  description: "Delete a DDNS record by its ID."
+  parameters:
+    - name: record_id
+      type: integer | string
+      required: true
+
+npg_sync_ddns_records:
+  description: "Sync all enabled DDNS records now (force immediate DNS update for all records)."
+  parameters: []
+
+npg_sync_ddns_record:
+  description: "Sync one DDNS record now (force DNS update for a specific record). REQUIRED: record_id."
+  parameters:
+    - name: record_id
+      type: integer | string
+      required: true
+
+npg_import_ddns_from_hosts:
+  description: "Import DDNS records from existing proxy hosts that have DDNS enabled."
+  parameters: []
+
+npg_list_filter_subscriptions:
+  description: "List all filter subscriptions (remote IP/UA blocklists)."
+  parameters: []
+
+npg_get_filter_subscription_catalog:
+  description: "Get the curated filter catalog — list of available filter lists to subscribe to."
+  parameters: []
+
+npg_subscribe_filter_catalog:
+  description: "Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json')."
+  parameters:
+    - name: paths
+      type: array<string>
+      required: true
+
+npg_create_filter_subscription:
+  description: "Subscribe to a filter list URL. REQUIRED: url. Optional: name."
+  parameters:
+    - name: url
+      type: string
+      required: true
+    - name: name
+      type: string
+      required: false
+
+npg_get_filter_subscription:
+  description: "Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+
+npg_update_filter_subscription:
+  description: "Update a filter subscription (partial update). Pass only fields to change."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: url
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+
+npg_delete_filter_subscription:
+  description: "Delete a filter subscription by its ID."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+
+npg_refresh_filter_subscription:
+  description: "Re-fetch entries for a filter subscription now. REQUIRED: subscription_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+
+npg_get_filter_subscription_exclusions:
+  description: "List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+
+npg_add_filter_subscription_exclusion:
+  description: "Exclude a proxy host from a filter subscription. REQUIRED: subscription_id, host_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_remove_filter_subscription_exclusion:
+  description: "Remove a host exclusion from a filter subscription. REQUIRED: subscription_id, host_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_get_filter_subscription_entry_exclusions:
+  description: "List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+
+npg_add_filter_subscription_entry_exclusion:
+  description: "Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+    - name: entry_value
+      type: string
+      required: true
+
+npg_remove_filter_subscription_entry_exclusion:
+  description: "Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value."
+  parameters:
+    - name: subscription_id
+      type: integer | string
+      required: true
+    - name: entry_value
+      type: string
+      required: true
+
+npg_get_exploit_rules_hosts:
+  description: "List proxy hosts that have exploit blocking enabled."
+  parameters: []
+
+npg_get_exploit_rules_for_host:
+  description: "List exploit rules with this host's exclusion status. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_exclude_exploit_rule_from_host:
+  description: "Exclude an exploit rule on ONE proxy host (stop it blocking there). REQUIRED: host_id, rule_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_remove_exploit_rule_exclusion_from_host:
+  description: "Remove a host exclusion for an exploit rule (re-enable the rule for that host). REQUIRED: host_id, rule_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_global_exclude_exploit_rule:
+  description: "Exclude an exploit rule on EVERY host (stop it blocking anywhere). REQUIRED: rule_id."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_remove_exploit_rule_global_exclusion:
+  description: "Remove a global exclusion for an exploit rule (re-enable the rule everywhere). REQUIRED: rule_id."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_delete_certificate_errors:
+  description: "Bulk-delete all certificates in error status."
+  parameters: []
+
+npg_clear_certificate_error:
+  description: "Clear a certificate's error state (mark as resolved). REQUIRED: cert_id."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_upload_certificate_pem:
+  description: "Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM string)."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+    - name: pem_content
+      type: string
+      required: true
+
+npg_get_certificate_logs:
+  description: "Get the issuance log stream for a certificate. REQUIRED: cert_id."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_get_certificate_download:
+  description: "Download certificate material (PEM). REQUIRED: cert_id."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+
+npg_get_challenge_config:
+  description: "GET the global CAPTCHA challenge configuration."
+  parameters: []
+
+npg_update_challenge_config:
+  description: "UPDATE the global CAPTCHA challenge configuration (partial update). Pass only fields to change."
+  parameters:
+    - name: enabled
+      type: boolean
+      required: false
+    - name: provider
+      type: string
+      required: false
+    - name: secret_key
+      type: string
+      required: false
+    - name: site_key
+      type: string
+      required: false
+    - name: challenge_type
+      type: string
+      required: false
+
+npg_get_challenge_stats:
+  description: "GET CAPTCHA challenge statistics."
+  parameters: []
+
+npg_get_dns_provider_default:
+  description: "Get the default DNS provider for certificate issuance."
+  parameters: []
+
+npg_post_log:
+  description: "Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags."
+  parameters:
+    - name: level
+      type: string
+      required: true
+    - name: message
+      type: string
+      required: true
+    - name: source
+      type: string
+      required: false
+    - name: component
+      type: string
+      required: false
+    - name: log_type
+      type: string
+      required: false
+      default: "access"
+
+npg_cleanup_logs:
+  description: "Delete nginx access logs older than the configured retention period."
+  parameters: []
+
+npg_get_log_autocomplete_hosts:
+  description: "Get distinct hosts seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_autocomplete_ips:
+  description: "Get distinct client IPs seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_autocomplete_user_agents:
+  description: "Get distinct User-Agents seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_autocomplete_uris:
+  description: "Get distinct request URIs seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_autocomplete_countries:
+  description: "Get distinct countries seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_autocomplete_methods:
+  description: "Get distinct HTTP methods seen in nginx access logs (for autocomplete)."
+  parameters: []
+
+npg_get_log_filter_presets:
+  description: "List saved log filter presets."
+  parameters: []
+
+npg_create_log_filter_preset:
+  description: "Save a log filter preset. REQUIRED: name, filter (dict). Optional: description."
+  parameters:
+    - name: name
+      type: string
+      required: true
+    - name: filter
+      type: object
+      required: true
+    - name: description
+      type: string
+      required: false
+
+npg_update_log_filter_preset:
+  description: "Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter, description."
+  parameters:
+    - name: preset_id
+      type: integer | string
+      required: true
+    - name: name
+      type: string
+      required: false
+    - name: filter
+      type: object
+      required: false
+    - name: description
+      type: string
+      required: false
+
+npg_delete_log_filter_preset:
+  description: "Delete a log filter preset by its ID."
+  parameters:
+    - name: preset_id
+      type: integer | string
+      required: true
+
+npg_cleanup_system_logs:
+  description: "Delete old system logs beyond the configured retention period."
+  parameters: []
+
+npg_get_system_log_sources:
+  description: "Get selectable system log sources (docker_api, docker_nginx, health_check, etc.)."
+  parameters: []
+
+npg_get_system_log_levels:
+  description: "Get selectable system log levels (debug, info, warn, error, fatal)."
+  parameters: []
+
+npg_get_system_log_stats:
+  description: "Get system log statistics (counts by source/level)."
+  parameters: []
+
+npg_get_system_settings_logs:
+  description: "Get the container log collector configuration."
+  parameters: []
+
+npg_update_system_settings_logs:
+  description: "Update the container log collector configuration (partial update). Pass only fields to change."
+  parameters:
+    - name: max_age
+      type: string
+      required: false
+    - name: max_size
+      type: string
+      required: false
+    - name: max_files
+      type: integer
+      required: false
+
+npg_get_audit_log_actions:
+  description: "List the action values present in the audit log (for filtering)."
+  parameters: []
+
+npg_get_audit_log_resource_types:
+  description: "List the resource types present in the audit log (for filtering)."
+  parameters: []
+
+npg_get_audit_log_api_tokens:
+  description: "List recent API token usage across all tokens."
+  parameters: []
+
+npg_get_notification_channel_deliveries:
+  description: "List recent deliveries for a notification channel. REQUIRED: channel_id."
+  parameters:
+    - name: channel_id
+      type: integer | string
+      required: true
+
+npg_set_proxy_host_favorite:
+  description: "Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: favorite
+      type: boolean
+      required: true
+
+npg_sync_redirect_hosts:
+  description: "Regenerate every redirect host config and reload nginx."
+  parameters: []
+
+npg_delete_proxy_host_rate_limit:
+  description: "Delete the rate limit config for a proxy host — host falls back to global default. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_delete_proxy_host_bot_filter:
+  description: "Delete the bot filter config for a proxy host — host falls back to global default. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_delete_proxy_host_security_headers:
+  description: "Delete the security headers config for a proxy host — host falls back to global default. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_delete_proxy_host_upstream:
+  description: "Delete the upstream/load balancing config for a proxy host — host falls back to defaults. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_delete_proxy_host_uri_block:
+  description: "Delete the URI block config for a proxy host — host falls back to global default. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_delete_proxy_host_fail2ban:
+  description: "Delete the fail2ban config for a proxy host — host falls back to global default. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_bulk_unban_ips:
+  description: "Unban multiple banned-IP records at once. REQUIRED: ids (list of record IDs)."
+  parameters:
+    - name: ids
+      type: array<st> | int]
+      required: true
+
+npg_get_ban_history:
+  description: "Get ban/unban event history."
+  parameters: []
+
+npg_get_ban_history_stats:
+  description: "Get ban/unban history statistics."
+  parameters: []
+
+npg_get_ban_history_for_ip:
+  description: "Get ban history for a specific IP address. REQUIRED: ip."
+  parameters:
+    - name: ip
+      type: string
+      required: true
+
+npg_add_proxy_host_uri_block_rule:
+  description: "Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex), action (block/allow). Optional: case_sensitive (bool)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: pattern
+      type: string
+      required: true
+    - name: action
+      type: string
+      required: true
+    - name: case_sensitive
+      type: boolean
+      required: false
+      default: false
+
+npg_delete_proxy_host_uri_block_rule:
+  description: "Remove a single URI block rule from a proxy host. REQUIRED: host_id, rule_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_reset_settings:
+  description: "Reset global nginx settings to defaults. DESTRUCTIVE — this clears all custom settings."
+  parameters: []
+
+npg_get_settings_presets:
+  description: "List available global settings presets that can be applied."
+  parameters: []
+
+npg_apply_settings_preset:
+  description: "Apply a global settings preset. REQUIRED: preset (preset name/identifier)."
+  parameters:
+    - name: preset
+      type: string
+      required: true
+
+npg_get_health_detailed:
+  description: "Get a detailed health snapshot (detailed version of health check)."
+  parameters: []
+
+npg_get_status:
+  description: "Get component status — health of all NPG subsystems."
+  parameters: []
+
+npg_check_npg_update:
+  description: "Check for a newer NPG release version."
+  parameters: []
+
+npg_get_permission_areas:
+  description: "Get the permission area/verb matrix — all available permission scopes."
+  parameters: []
+
+npg_get_waf_global_rules:
+  description: "List all OWASP CRS rules with their GLOBAL exclusion status."
+  parameters: []
+
+npg_get_waf_global_exclusions:
+  description: "List the globally disabled CRS rules."
+  parameters: []
+
+npg_get_waf_global_history:
+  description: "Get the global WAF policy change history."
+  parameters: []
+
+npg_disable_waf_global_rule:
+  description: "Disable a CRS rule for EVERY host (globally). REQUIRED: rule_id."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_enable_waf_global_rule:
+  description: "Re-enable a CRS rule globally (remove global disable). REQUIRED: rule_id."
+  parameters:
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_get_waf_host_history:
+  description: "Get the WAF policy change history for a proxy host. REQUIRED: host_id."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_disable_waf_rule_by_host:
+  description: "Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name, rule_id."
+  parameters:
+    - name: domain_name
+      type: string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
+npg_get_api_token_permissions:
+  description: "List the permission strings an API token may carry (reference list)."
+  parameters: []
+
+npg_get_api_token_usage:
+  description: "Get recent usage for an API token. REQUIRED: token_id."
+  parameters:
+    - name: token_id
+      type: integer | string
+      required: true
+
+npg_get_waf_test_patterns:
+  description: "List the built-in WAF attack test patterns."
+  parameters: []
+
+npg_test_waf_pattern:
+  description: "Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, pattern (pattern name or index)."
+  parameters:
+    - name: target_url
+      type: string
+      required: true
+    - name: attack_type
+      type: string
+      required: true
+
+npg_test_waf_all_patterns:
+  description: "Fire every attack payload at a target URL for comprehensive WAF testing. REQUIRED: target_url."
+  parameters:
+    - name: target_url
+      type: string
+      required: true
+
+npg_get_geoip_history:
+  description: "List GeoIP database update runs and their status."
+  parameters: []
+
+npg_set_user_role:
+  description: "Assign a role to a user account. REQUIRED: user_id, role_id."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+    - name: role_id
+      type: integer | string
+      required: true
