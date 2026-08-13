@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -57,6 +59,59 @@ jobs:
               print(f'\n{errors} file(s) out of sync. Run: regenerate_all_docs.py --write')
               sys.exit(1)
           print(f'All {len(main_tools)} tools in sync across all files')
+          PYEOF
+
+      - name: Check tool descriptions updated with signature changes
+        run: |
+          # If a tool's parameter signature changed in this push, its description
+          # must have changed too — otherwise the agent sees stale descriptions.
+          python3 << 'PYEOF'
+          import re, sys
+
+          SIG_RE = re.compile(
+              r'@mcp\.tool\(name="([^"]+)",\s*description="([^"]*)"\)\s*\n\s*async def\s+\w+\s*\(([^)]*)\)'
+          )
+
+          def extract(path):
+              with open(path) as f:
+                  src = f.read()
+              tools = {}
+              for m in SIG_RE.finditer(src):
+                  name, desc, sig = m.group(1), m.group(2), re.sub(r'\s+', ' ', m.group(3)).strip()
+                  tools[name] = (sig, desc)
+              return tools
+
+          try:
+              current = extract('npg_mcp/main.py')
+              # Compare against the previous commit (requires fetch-depth: 2)
+              import subprocess
+              prev_src = subprocess.run(
+                  ['git', 'show', 'HEAD^:npg_mcp/main.py'],
+                  capture_output=True, text=True, check=True
+              ).stdout
+              prev = {}
+              for m in SIG_RE.finditer(prev_src):
+                  name, desc, sig = m.group(1), m.group(2), re.sub(r'\s+', ' ', m.group(3)).strip()
+                  prev[name] = (sig, desc)
+          except subprocess.CalledProcessError:
+              print('No previous commit (initial push) — skipping description check')
+              sys.exit(0)
+
+          stale = []
+          for name, (sig, desc) in current.items():
+              if name not in prev:
+                  continue  # new tool — description is fresh by definition
+              prev_sig, prev_desc = prev[name]
+              if sig != prev_sig and desc == prev_desc:
+                  stale.append(name)
+
+          if stale:
+              print(f'ERROR: {len(stale)} tool(s) changed signature but description was NOT updated:')
+              for n in stale:
+                  print(f'  - {n}')
+              print('\nUpdate the description= in npg_mcp/main.py to reflect the new parameters/semantics.')
+              sys.exit(1)
+          print(f'All {len(current)} tool descriptions consistent with signatures')
           PYEOF
 
   publish:
