@@ -101,7 +101,7 @@ async def npg_list_proxy_hosts() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID.")
+@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id.")
 async def npg_get_proxy_host(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -236,7 +236,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host", description="Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears.")
+@mcp.tool(name="npg_update_proxy_host", description="Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears. REQUIRED: host_id.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -333,7 +333,7 @@ async def npg_update_proxy_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_proxy_host", description="Delete a proxy host by its ID.")
+@mcp.tool(name="npg_delete_proxy_host", description="Delete a proxy host by its ID. REQUIRED: host_id.")
 async def npg_delete_proxy_host(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -342,7 +342,7 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_proxy_host", description="Test upstream connectivity for a proxy host.")
+@mcp.tool(name="npg_test_proxy_host", description="Test upstream connectivity for a proxy host. REQUIRED: host_id.")
 async def npg_test_proxy_host(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -351,7 +351,7 @@ async def npg_test_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_regenerate_config", description="Regenerate nginx config for a specific proxy host without touching others.")
+@mcp.tool(name="npg_regenerate_config", description="Regenerate nginx config for a specific proxy host without touching others. REQUIRED: host_id.")
 async def npg_regenerate_config(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -369,7 +369,7 @@ async def npg_sync_proxy_hosts() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_clone_proxy_host", description="Clone a proxy host with new domain names. Returns the new proxy host.")
+@mcp.tool(name="npg_clone_proxy_host", description="Clone a proxy host with new domain names. Returns the new proxy host. REQUIRED: host_id, domain_names.")
 async def npg_clone_proxy_host(host_id: str | int, domain_names: list[str]) -> dict:
     c = _get_client()
     try:
@@ -390,7 +390,7 @@ async def npg_list_certificates() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_certificate", description="Get a certificate by its ID.")
+@mcp.tool(name="npg_get_certificate", description="Get a certificate by its ID. REQUIRED: cert_id.")
 async def npg_get_certificate(cert_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -419,7 +419,7 @@ async def npg_create_certificate(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_certificate", description="Delete a certificate by its ID.")
+@mcp.tool(name="npg_delete_certificate", description="Delete a certificate by its ID. REQUIRED: cert_id.")
 async def npg_delete_certificate(cert_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -428,7 +428,7 @@ async def npg_delete_certificate(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_renew_certificate", description="Renew a certificate by its ID.")
+@mcp.tool(name="npg_renew_certificate", description="Renew a certificate by its ID. REQUIRED: cert_id.")
 async def npg_renew_certificate(cert_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -482,7 +482,7 @@ async def npg_list_redirect_hosts() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_redirect_host", description="Get a redirect host by its ID.")
+@mcp.tool(name="npg_get_redirect_host", description="Get a redirect host by its ID. REQUIRED: host_id.")
 async def npg_get_redirect_host(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -513,7 +513,7 @@ async def npg_create_redirect_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_redirect_host", description="Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code.")
+@mcp.tool(name="npg_update_redirect_host", description="Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code. REQUIRED: host_id.")
 async def npg_update_redirect_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -535,7 +535,7 @@ async def npg_update_redirect_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_redirect_host", description="Delete a redirect host by its ID.")
+@mcp.tool(name="npg_delete_redirect_host", description="Delete a redirect host by its ID. REQUIRED: host_id.")
 async def npg_delete_redirect_host(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -547,7 +547,7 @@ async def npg_delete_redirect_host(host_id: str | int) -> dict:
 
 # ── Security Features (per proxy host) ────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_rate_limit", description="GET rate limit configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_rate_limit", description="GET rate limit configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -556,7 +556,7 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)")
+@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id.")
 async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -573,7 +573,7 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_bot_filter", description="GET bot filter configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_bot_filter", description="GET bot filter configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -603,7 +603,7 @@ async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | N
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_security_headers", description="GET security headers configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_security_headers", description="GET security headers configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -612,7 +612,7 @@ async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)")
+@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id.")
 async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -633,7 +633,7 @@ async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bo
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed.")
+@mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. REQUIRED: host_id.")
 async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["strict", "balanced", "relaxed"]) -> dict:
     c = _get_client()
     try:
@@ -642,7 +642,7 @@ async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_upstream", description="GET upstream/load balancing configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_upstream", description="GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -651,7 +651,7 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval.")
+@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
 async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -667,7 +667,7 @@ async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_uri_block", description="GET URI block configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_uri_block", description="GET URI block configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -676,7 +676,7 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips.")
+@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id.")
 async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -768,7 +768,7 @@ async def npg_list_access_lists() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID.")
+@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id.")
 async def npg_get_access_list(list_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -791,7 +791,7 @@ async def npg_create_access_list(name: str, advanced_config: str = "", clients: 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_access_list", description="Update an access list. Pass only fields to change.")
+@mcp.tool(name="npg_update_access_list", description="Update an access list. Pass only fields to change. REQUIRED: list_id.")
 async def npg_update_access_list(list_id: str | int, name: str | None = None, advanced_config: str | None = None, clients: list | None = None) -> dict:
     c = _get_client()
     try:
@@ -804,7 +804,7 @@ async def npg_update_access_list(list_id: str | int, name: str | None = None, ad
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_access_list", description="Delete an access list by its ID.")
+@mcp.tool(name="npg_delete_access_list", description="Delete an access list by its ID. REQUIRED: list_id.")
 async def npg_delete_access_list(list_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -825,7 +825,7 @@ async def npg_list_dns_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_dns_provider", description="Get a DNS provider by its ID.")
+@mcp.tool(name="npg_get_dns_provider", description="Get a DNS provider by its ID. REQUIRED: provider_id.")
 async def npg_get_dns_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -848,7 +848,7 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change (dict).")
+@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change (dict). REQUIRED: provider_id.")
 async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -857,7 +857,7 @@ async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_dns_provider", description="Delete a DNS provider by its ID.")
+@mcp.tool(name="npg_delete_dns_provider", description="Delete a DNS provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -866,7 +866,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials.")
+@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials. REQUIRED: provider_id.")
 async def npg_test_dns_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -930,7 +930,7 @@ async def npg_delete_cloud_provider(slug: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_cloud_blocking", description="GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global.")
+@mcp.tool(name="npg_get_proxy_host_cloud_blocking", description="GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id.")
 async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -939,7 +939,7 @@ async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global).")
+@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global). REQUIRED: host_id.")
 async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None, cloud_disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -986,7 +986,7 @@ async def npg_list_countries() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_geo", description="GET geo restriction configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_geo", description="GET geo restriction configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1006,7 +1006,7 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots")
+@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots REQUIRED: host_id.")
 async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -1024,7 +1024,7 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_proxy_host_geo", description="DELETE geo restriction for a proxy host.")
+@mcp.tool(name="npg_delete_proxy_host_geo", description="DELETE geo restriction for a proxy host. REQUIRED: host_id.")
 async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1036,7 +1036,7 @@ async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
 
 # ── Fail2ban (per proxy host) ─────────────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_fail2ban", description="GET fail2ban configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_fail2ban", description="GET fail2ban configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1045,7 +1045,7 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge).")
+@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). REQUIRED: host_id.")
 async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "challenge"] | None = None) -> dict:
     c = _get_client()
     try:
@@ -1064,7 +1064,7 @@ async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | Non
 
 # ── Challenge/CAPTCHA (per proxy host) ────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_challenge", description="GET CAPTCHA/challenge configuration for a proxy host.")
+@mcp.tool(name="npg_get_proxy_host_challenge", description="GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1073,7 +1073,7 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str)")
+@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) REQUIRED: host_id.")
 async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | None = None, challenge_type: str | None = None, site_key: str | None = None, token_validity: int | None = None, min_score: float | None = None, apply_to: str | None = None, page_title: str | None = None) -> dict:
     c = _get_client()
     try:
@@ -1090,7 +1090,7 @@ async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | No
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_proxy_host_challenge", description="DELETE CAPTCHA/challenge configuration for a proxy host.")
+@mcp.tool(name="npg_delete_proxy_host_challenge", description="DELETE CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id.")
 async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1120,7 +1120,7 @@ async def npg_list_banned_ips() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_ban_ip", description="Ban an IP address. Required: ip. Optional: ban_time (seconds).")
+@mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: ban_time (seconds).")
 async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", duration: int = 3600) -> dict:
     """Ban an IP address. Required: ip_address. Optional: reason, duration (seconds, 0=permanent)."""
     c = _get_client()
@@ -1130,7 +1130,7 @@ async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", durati
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_unban_ip", description="Unban an IP by its ID.")
+@mcp.tool(name="npg_unban_ip", description="Unban an IP by its ID. REQUIRED: ip_id.")
 async def npg_unban_ip(ip_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1169,7 +1169,7 @@ async def npg_list_exploit_rules() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_exploit_rule", description="Get an exploit rule by its ID.")
+@mcp.tool(name="npg_get_exploit_rule", description="Get an exploit rule by its ID. REQUIRED: rule_id.")
 async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1194,7 +1194,7 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change (dict).")
+@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change (dict). REQUIRED: rule_id.")
 async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -1203,7 +1203,7 @@ async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_exploit_rule", description="Delete an exploit rule by its ID.")
+@mcp.tool(name="npg_delete_exploit_rule", description="Delete an exploit rule by its ID. REQUIRED: rule_id.")
 async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1212,7 +1212,7 @@ async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_toggle_exploit_rule", description="Toggle an exploit rule's enabled status.")
+@mcp.tool(name="npg_toggle_exploit_rule", description="Toggle an exploit rule's enabled status. REQUIRED: rule_id.")
 async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1242,7 +1242,7 @@ async def npg_get_waf_hosts() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_waf_host_config", description="Get WAF config for a specific proxy host.")
+@mcp.tool(name="npg_get_waf_host_config", description="Get WAF config for a specific proxy host. REQUIRED: host_id.")
 async def npg_get_waf_host_config(host_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1251,7 +1251,7 @@ async def npg_get_waf_host_config(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_disable_waf_rule", description="Disable a WAF rule for a specific proxy host.")
+@mcp.tool(name="npg_disable_waf_rule", description="Disable a WAF rule for a specific proxy host. REQUIRED: host_id, rule_id.")
 async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1328,7 +1328,7 @@ async def npg_list_backups() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_backup", description="Get a backup by its ID.")
+@mcp.tool(name="npg_get_backup", description="Get a backup by its ID. REQUIRED: backup_id.")
 async def npg_get_backup(backup_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1346,7 +1346,7 @@ async def npg_create_backup() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_backup", description="Delete a backup by its ID.")
+@mcp.tool(name="npg_delete_backup", description="Delete a backup by its ID. REQUIRED: backup_id.")
 async def npg_delete_backup(backup_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1376,7 +1376,7 @@ async def npg_list_api_tokens() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_api_token", description="Get an API token by its ID.")
+@mcp.tool(name="npg_get_api_token", description="Get an API token by its ID. REQUIRED: token_id.")
 async def npg_get_api_token(token_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1395,7 +1395,7 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_at: st
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change (dict).")
+@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change (dict). REQUIRED: token_id.")
 async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -1404,7 +1404,7 @@ async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_revoke_api_token", description="Revoke an API token by its ID.")
+@mcp.tool(name="npg_revoke_api_token", description="Revoke an API token by its ID. REQUIRED: token_id.")
 async def npg_revoke_api_token(token_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1413,7 +1413,7 @@ async def npg_revoke_api_token(token_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_api_token", description="Delete an API token by its ID.")
+@mcp.tool(name="npg_delete_api_token", description="Delete an API token by its ID. REQUIRED: token_id.")
 async def npg_delete_api_token(token_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1433,7 +1433,7 @@ async def npg_list_notification_channels() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).")
+@mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. REQUIRED: name, channel_type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).")
 async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -1445,7 +1445,7 @@ async def npg_create_notification_channel(name: str, channel_type: str, config: 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_notification_channel", description="Update a notification channel. Pass only fields to change.")
+@mcp.tool(name="npg_update_notification_channel", description="Update a notification channel. Pass only fields to change. REQUIRED: channel_id.")
 async def npg_update_notification_channel(channel_id: str | int, name: str | None = None, channel_type: str | None = None, config: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -1458,7 +1458,7 @@ async def npg_update_notification_channel(channel_id: str | int, name: str | Non
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_notification_channel", description="Delete a notification channel by its ID.")
+@mcp.tool(name="npg_delete_notification_channel", description="Delete a notification channel by its ID. REQUIRED: channel_id.")
 async def npg_delete_notification_channel(channel_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1467,7 +1467,7 @@ async def npg_delete_notification_channel(channel_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_notification_channel", description="Test a notification channel by sending a test message.")
+@mcp.tool(name="npg_test_notification_channel", description="Test a notification channel by sending a test message. REQUIRED: channel_id.")
 async def npg_test_notification_channel(channel_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1476,7 +1476,7 @@ async def npg_test_notification_channel(channel_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel.")
+@mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel. REQUIRED: channel_id.")
 async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1506,7 +1506,7 @@ async def npg_list_users() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_user", description="Get a user by their ID.")
+@mcp.tool(name="npg_get_user", description="Get a user by their ID. REQUIRED: user_id.")
 async def npg_get_user(user_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1554,7 +1554,7 @@ async def npg_end_user_sessions(user_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_user", description="Delete a user by their ID.")
+@mcp.tool(name="npg_delete_user", description="Delete a user by their ID. REQUIRED: user_id.")
 async def npg_delete_user(user_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1585,7 +1585,7 @@ async def npg_create_role(name: str, permissions: list[str]) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_role", description="Update a role. Pass only fields to change.")
+@mcp.tool(name="npg_update_role", description="Update a role. Pass only fields to change. REQUIRED: role_id.")
 async def npg_update_role(role_id: str | int, name: str | None = None, permissions: list[str] | None = None) -> dict:
     c = _get_client()
     try:
@@ -1597,7 +1597,7 @@ async def npg_update_role(role_id: str | int, name: str | None = None, permissio
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_role", description="Delete a role by its ID.")
+@mcp.tool(name="npg_delete_role", description="Delete a role by its ID. REQUIRED: role_id.")
 async def npg_delete_role(role_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1648,7 +1648,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_sso_provider", description="Delete an SSO provider by its ID.")
+@mcp.tool(name="npg_delete_sso_provider", description="Delete an SSO provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_sso_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1657,7 +1657,7 @@ async def npg_delete_sso_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_sso_provider", description="Test SSO provider configuration by initiating a test login flow.")
+@mcp.tool(name="npg_test_sso_provider", description="Test SSO provider configuration by initiating a test login flow. REQUIRED: provider_id.")
 async def npg_test_sso_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1688,7 +1688,7 @@ async def npg_download_log_file(filename: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_view_log_file", description="View the contents of a log file.")
+@mcp.tool(name="npg_view_log_file", description="View the contents of a log file. REQUIRED: filename.")
 async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
     c = _get_client()
     try:
@@ -1779,7 +1779,7 @@ async def npg_create_uri_block(host_id: str | int, pattern: str, action: str = "
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_uri_block", description="Get a URI block by its ID.")
+@mcp.tool(name="npg_get_uri_block", description="Get a URI block by its ID. REQUIRED: block_id.")
 async def npg_get_uri_block(block_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1788,7 +1788,7 @@ async def npg_get_uri_block(block_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_uri_block", description="Update a URI block. Pass only fields to change.")
+@mcp.tool(name="npg_update_uri_block", description="Update a URI block. Pass only fields to change. REQUIRED: block_id.")
 async def npg_update_uri_block(block_id: str | int, pattern: str | None = None, action: str | None = None, is_regex: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -1801,7 +1801,7 @@ async def npg_update_uri_block(block_id: str | int, pattern: str | None = None, 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_uri_block", description="Delete a URI block by its ID.")
+@mcp.tool(name="npg_delete_uri_block", description="Delete a URI block by its ID. REQUIRED: block_id.")
 async def npg_delete_uri_block(block_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -1855,7 +1855,7 @@ async def npg_add_global_uri_block_rule(pattern: str, action: str = "block", is_
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_global_uri_block_rule", description="Delete a rule from the global URI block by its ID.")
+@mcp.tool(name="npg_delete_global_uri_block_rule", description="Delete a rule from the global URI block by its ID. REQUIRED: rule_id.")
 async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2183,7 +2183,7 @@ async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int
 
 # ── Backups ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_download_backup", description="Download a backup by its ID.")
+@mcp.tool(name="npg_download_backup", description="Download a backup by its ID. REQUIRED: backup_id.")
 async def npg_download_backup(backup_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2192,7 +2192,7 @@ async def npg_download_backup(backup_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_upload_restore_backup", description="Upload and restore from a backup file.")
+@mcp.tool(name="npg_upload_restore_backup", description="Upload and restore from a backup file. REQUIRED: file_content.")
 async def npg_upload_restore_backup(file_content: str) -> dict:
     c = _get_client()
     try:
@@ -2280,7 +2280,7 @@ async def npg_auth_change_username(current_password: str, new_username: str) -> 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_auth_2fa_setup", description="Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app.")
+@mcp.tool(name="npg_auth_2fa_setup", description="Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app. REQUIRED: password.")
 async def npg_auth_2fa_setup(password: str) -> dict:
     c = _get_client()
     try:
@@ -2373,7 +2373,7 @@ async def npg_list_auth_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_auth_provider", description="Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific).")
+@mcp.tool(name="npg_create_auth_provider", description="Create a ForwardAuth provider. REQUIRED: name, provider_type, config dict (provider-specific).")
 async def npg_create_auth_provider(name: str, provider_type: str, config: dict | None = None, provider_url: str | None = None) -> dict:
     c = _get_client()
     try:
@@ -2387,7 +2387,7 @@ async def npg_create_auth_provider(name: str, provider_type: str, config: dict |
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_auth_provider", description="Get a ForwardAuth provider by its ID.")
+@mcp.tool(name="npg_get_auth_provider", description="Get a ForwardAuth provider by its ID. REQUIRED: provider_id.")
 async def npg_get_auth_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2396,7 +2396,7 @@ async def npg_get_auth_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_auth_provider", description="Update a ForwardAuth provider (partial update). Pass only fields to change.")
+@mcp.tool(name="npg_update_auth_provider", description="Update a ForwardAuth provider (partial update). Pass only fields to change. REQUIRED: provider_id.")
 async def npg_update_auth_provider(provider_id: str | int, name: str | None = None, config: dict | None = None) -> dict:
     c = _get_client()
     try:
@@ -2408,7 +2408,7 @@ async def npg_update_auth_provider(provider_id: str | int, name: str | None = No
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_auth_provider", description="Delete a ForwardAuth provider by its ID.")
+@mcp.tool(name="npg_delete_auth_provider", description="Delete a ForwardAuth provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_auth_provider(provider_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2438,7 +2438,7 @@ async def npg_create_ddns_record(proxy_host_id: str | int, domain: str, provider
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_ddns_record", description="Get a DDNS record by its ID.")
+@mcp.tool(name="npg_get_ddns_record", description="Get a DDNS record by its ID. REQUIRED: record_id.")
 async def npg_get_ddns_record(record_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2447,7 +2447,7 @@ async def npg_get_ddns_record(record_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_ddns_record", description="Update a DDNS record (partial update). Pass only fields to change.")
+@mcp.tool(name="npg_update_ddns_record", description="Update a DDNS record (partial update). Pass only fields to change. REQUIRED: record_id.")
 async def npg_update_ddns_record(record_id: str | int, domain: str | None = None, provider_id: str | int | None = None, proxied: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -2460,7 +2460,7 @@ async def npg_update_ddns_record(record_id: str | int, domain: str | None = None
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_ddns_record", description="Delete a DDNS record by its ID.")
+@mcp.tool(name="npg_delete_ddns_record", description="Delete a DDNS record by its ID. REQUIRED: record_id.")
 async def npg_delete_ddns_record(record_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2547,7 +2547,7 @@ async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_filter_subscription", description="Update a filter subscription (partial update). Pass only fields to change.")
+@mcp.tool(name="npg_update_filter_subscription", description="Update a filter subscription (partial update). Pass only fields to change. REQUIRED: subscription_id.")
 async def npg_update_filter_subscription(subscription_id: str | int, name: str | None = None, url: str | None = None, enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -2560,7 +2560,7 @@ async def npg_update_filter_subscription(subscription_id: str | int, name: str |
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_filter_subscription", description="Delete a filter subscription by its ID.")
+@mcp.tool(name="npg_delete_filter_subscription", description="Delete a filter subscription by its ID. REQUIRED: subscription_id.")
 async def npg_delete_filter_subscription(subscription_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2897,7 +2897,7 @@ async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_delete_log_filter_preset", description="Delete a log filter preset by its ID.")
+@mcp.tool(name="npg_delete_log_filter_preset", description="Delete a log filter preset by its ID. REQUIRED: preset_id.")
 async def npg_delete_log_filter_preset(preset_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -3301,7 +3301,7 @@ async def npg_get_waf_test_patterns() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_waf_pattern", description="Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, pattern (pattern name or index).")
+@mcp.tool(name="npg_test_waf_pattern", description="Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, attack_type (attack type name or index).")
 async def npg_test_waf_pattern(target_url: str, attack_type: str) -> dict:
     c = _get_client()
     try:

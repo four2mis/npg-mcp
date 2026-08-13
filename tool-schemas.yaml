@@ -3,7 +3,7 @@ npg_list_proxy_hosts:
   parameters: []
 
 npg_get_proxy_host:
-  description: "Get a single proxy host by its ID."
+  description: "Get a single proxy host by its ID. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -21,25 +21,25 @@ npg_create_proxy_host:
   parameters: []
 
 npg_update_proxy_host:
-  description: "Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears."
+  description: "Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears. REQUIRED: host_id."
   parameters: []
 
 npg_delete_proxy_host:
-  description: "Delete a proxy host by its ID."
+  description: "Delete a proxy host by its ID. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_test_proxy_host:
-  description: "Test upstream connectivity for a proxy host."
+  description: "Test upstream connectivity for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_regenerate_config:
-  description: "Regenerate nginx config for a specific proxy host without touching others."
+  description: "Regenerate nginx config for a specific proxy host without touching others. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -50,7 +50,7 @@ npg_sync_proxy_hosts:
   parameters: []
 
 npg_clone_proxy_host:
-  description: "Clone a proxy host with new domain names. Returns the new proxy host."
+  description: "Clone a proxy host with new domain names. Returns the new proxy host. REQUIRED: host_id, domain_names."
   parameters:
     - name: host_id
       type: integer | string
@@ -64,7 +64,7 @@ npg_list_certificates:
   parameters: []
 
 npg_get_certificate:
-  description: "Get a certificate by its ID."
+  description: "Get a certificate by its ID. REQUIRED: cert_id."
   parameters:
     - name: cert_id
       type: integer | string
@@ -75,14 +75,14 @@ npg_create_certificate:
   parameters: []
 
 npg_delete_certificate:
-  description: "Delete a certificate by its ID."
+  description: "Delete a certificate by its ID. REQUIRED: cert_id."
   parameters:
     - name: cert_id
       type: integer | string
       required: true
 
 npg_renew_certificate:
-  description: "Renew a certificate by its ID."
+  description: "Renew a certificate by its ID. REQUIRED: cert_id."
   parameters:
     - name: cert_id
       type: integer | string
@@ -105,7 +105,7 @@ npg_list_redirect_hosts:
   parameters: []
 
 npg_get_redirect_host:
-  description: "Get a redirect host by its ID."
+  description: "Get a redirect host by its ID. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -116,25 +116,25 @@ npg_create_redirect_host:
   parameters: []
 
 npg_update_redirect_host:
-  description: "Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code."
+  description: "Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code. REQUIRED: host_id."
   parameters: []
 
 npg_delete_redirect_host:
-  description: "Delete a redirect host by its ID."
+  description: "Delete a redirect host by its ID. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_get_proxy_host_rate_limit:
-  description: "GET rate limit configuration for a proxy host."
+  description: "GET rate limit configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_rate_limit:
-  description: "UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)"
+  description: "UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -162,7 +162,7 @@ npg_update_proxy_host_rate_limit:
       required: false
 
 npg_get_proxy_host_bot_filter:
-  description: "GET bot filter configuration for a proxy host."
+  description: "GET bot filter configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -203,14 +203,14 @@ npg_update_proxy_host_bot_filter:
       required: false
 
 npg_get_proxy_host_security_headers:
-  description: "GET security headers configuration for a proxy host."
+  description: "GET security headers configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_security_headers:
-  description: "UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)"
+  description: "UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -250,7 +250,7 @@ npg_update_proxy_host_security_headers:
       required: false
 
 npg_apply_security_header_preset:
-  description: "APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed."
+  description: "APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -260,14 +260,14 @@ npg_apply_security_header_preset:
       required: true
 
 npg_get_proxy_host_upstream:
-  description: "GET upstream/load balancing configuration for a proxy host."
+  description: "GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_upstream:
-  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval."
+  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -292,14 +292,14 @@ npg_update_proxy_host_upstream:
       required: false
 
 npg_get_proxy_host_uri_block:
-  description: "GET URI block configuration for a proxy host."
+  description: "GET URI block configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_uri_block:
-  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips."
+  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -356,7 +356,7 @@ npg_list_access_lists:
   parameters: []
 
 npg_get_access_list:
-  description: "Get an access list by its ID."
+  description: "Get an access list by its ID. REQUIRED: list_id."
   parameters:
     - name: list_id
       type: integer | string
@@ -377,7 +377,7 @@ npg_create_access_list:
       required: false
 
 npg_update_access_list:
-  description: "Update an access list. Pass only fields to change."
+  description: "Update an access list. Pass only fields to change. REQUIRED: list_id."
   parameters:
     - name: list_id
       type: integer | string
@@ -393,7 +393,7 @@ npg_update_access_list:
       required: false
 
 npg_delete_access_list:
-  description: "Delete an access list by its ID."
+  description: "Delete an access list by its ID. REQUIRED: list_id."
   parameters:
     - name: list_id
       type: integer | string
@@ -404,7 +404,7 @@ npg_list_dns_providers:
   parameters: []
 
 npg_get_dns_provider:
-  description: "Get a DNS provider by its ID."
+  description: "Get a DNS provider by its ID. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -427,7 +427,7 @@ npg_create_dns_provider:
       required: false
 
 npg_update_dns_provider:
-  description: "Update a DNS provider. Pass only fields to change (dict)."
+  description: "Update a DNS provider. Pass only fields to change (dict). REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -437,14 +437,14 @@ npg_update_dns_provider:
       required: false
 
 npg_delete_dns_provider:
-  description: "Delete a DNS provider by its ID."
+  description: "Delete a DNS provider by its ID. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
       required: true
 
 npg_test_dns_provider:
-  description: "Test DNS provider credentials."
+  description: "Test DNS provider credentials. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -501,14 +501,14 @@ npg_delete_cloud_provider:
       required: true
 
 npg_get_proxy_host_cloud_blocking:
-  description: "GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global."
+  description: "GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_cloud_blocking:
-  description: "UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global)."
+  description: "UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global). REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -539,7 +539,7 @@ npg_list_countries:
   parameters: []
 
 npg_get_proxy_host_geo:
-  description: "GET geo restriction configuration for a proxy host."
+  description: "GET geo restriction configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -583,7 +583,7 @@ npg_create_proxy_host_geo:
       default: true
 
 npg_update_proxy_host_geo:
-  description: "UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots"
+  description: "UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -614,21 +614,21 @@ npg_update_proxy_host_geo:
       required: false
 
 npg_delete_proxy_host_geo:
-  description: "DELETE geo restriction for a proxy host."
+  description: "DELETE geo restriction for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_get_proxy_host_fail2ban:
-  description: "GET fail2ban configuration for a proxy host."
+  description: "GET fail2ban configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_fail2ban:
-  description: "UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge)."
+  description: "UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -653,14 +653,14 @@ npg_update_proxy_host_fail2ban:
       required: false
 
 npg_get_proxy_host_challenge:
-  description: "GET CAPTCHA/challenge configuration for a proxy host."
+  description: "GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_update_proxy_host_challenge:
-  description: "UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str)"
+  description: "UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -688,7 +688,7 @@ npg_update_proxy_host_challenge:
       required: false
 
 npg_delete_proxy_host_challenge:
-  description: "DELETE CAPTCHA/challenge configuration for a proxy host."
+  description: "DELETE CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -709,7 +709,7 @@ npg_list_banned_ips:
   parameters: []
 
 npg_ban_ip:
-  description: "Ban an IP address. Required: ip. Optional: ban_time (seconds)."
+  description: "Ban an IP address. REQUIRED: ip_address. Optional: ban_time (seconds)."
   parameters:
     - name: ip_address
       type: string
@@ -724,7 +724,7 @@ npg_ban_ip:
       default: 3600
 
 npg_unban_ip:
-  description: "Unban an IP by its ID."
+  description: "Unban an IP by its ID. REQUIRED: ip_id."
   parameters:
     - name: ip_id
       type: integer | string
@@ -743,7 +743,7 @@ npg_list_exploit_rules:
   parameters: []
 
 npg_get_exploit_rule:
-  description: "Get an exploit rule by its ID."
+  description: "Get an exploit rule by its ID. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -775,7 +775,7 @@ npg_create_exploit_rule:
       required: false
 
 npg_update_exploit_rule:
-  description: "Update an exploit rule. Pass only fields to change (dict)."
+  description: "Update an exploit rule. Pass only fields to change (dict). REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -785,14 +785,14 @@ npg_update_exploit_rule:
       required: false
 
 npg_delete_exploit_rule:
-  description: "Delete an exploit rule by its ID."
+  description: "Delete an exploit rule by its ID. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
       required: true
 
 npg_toggle_exploit_rule:
-  description: "Toggle an exploit rule's enabled status."
+  description: "Toggle an exploit rule's enabled status. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -807,14 +807,14 @@ npg_get_waf_hosts:
   parameters: []
 
 npg_get_waf_host_config:
-  description: "Get WAF config for a specific proxy host."
+  description: "Get WAF config for a specific proxy host. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
       required: true
 
 npg_disable_waf_rule:
-  description: "Disable a WAF rule for a specific proxy host."
+  description: "Disable a WAF rule for a specific proxy host. REQUIRED: host_id, rule_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -855,7 +855,7 @@ npg_list_backups:
   parameters: []
 
 npg_get_backup:
-  description: "Get a backup by its ID."
+  description: "Get a backup by its ID. REQUIRED: backup_id."
   parameters:
     - name: backup_id
       type: integer | string
@@ -866,7 +866,7 @@ npg_create_backup:
   parameters: []
 
 npg_delete_backup:
-  description: "Delete a backup by its ID."
+  description: "Delete a backup by its ID. REQUIRED: backup_id."
   parameters:
     - name: backup_id
       type: integer | string
@@ -884,7 +884,7 @@ npg_list_api_tokens:
   parameters: []
 
 npg_get_api_token:
-  description: "Get an API token by its ID."
+  description: "Get an API token by its ID. REQUIRED: token_id."
   parameters:
     - name: token_id
       type: integer | string
@@ -904,7 +904,7 @@ npg_create_api_token:
       required: false
 
 npg_update_api_token:
-  description: "Update an API token. Pass only fields to change (dict)."
+  description: "Update an API token. Pass only fields to change (dict). REQUIRED: token_id."
   parameters:
     - name: token_id
       type: integer | string
@@ -914,14 +914,14 @@ npg_update_api_token:
       required: false
 
 npg_revoke_api_token:
-  description: "Revoke an API token by its ID."
+  description: "Revoke an API token by its ID. REQUIRED: token_id."
   parameters:
     - name: token_id
       type: integer | string
       required: true
 
 npg_delete_api_token:
-  description: "Delete an API token by its ID."
+  description: "Delete an API token by its ID. REQUIRED: token_id."
   parameters:
     - name: token_id
       type: integer | string
@@ -932,7 +932,7 @@ npg_list_notification_channels:
   parameters: []
 
 npg_create_notification_channel:
-  description: "Create a notification channel. Required: name, type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict)."
+  description: "Create a notification channel. REQUIRED: name, channel_type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict)."
   parameters:
     - name: name
       type: string
@@ -945,7 +945,7 @@ npg_create_notification_channel:
       required: false
 
 npg_update_notification_channel:
-  description: "Update a notification channel. Pass only fields to change."
+  description: "Update a notification channel. Pass only fields to change. REQUIRED: channel_id."
   parameters:
     - name: channel_id
       type: integer | string
@@ -961,21 +961,21 @@ npg_update_notification_channel:
       required: false
 
 npg_delete_notification_channel:
-  description: "Delete a notification channel by its ID."
+  description: "Delete a notification channel by its ID. REQUIRED: channel_id."
   parameters:
     - name: channel_id
       type: integer | string
       required: true
 
 npg_test_notification_channel:
-  description: "Test a notification channel by sending a test message."
+  description: "Test a notification channel by sending a test message. REQUIRED: channel_id."
   parameters:
     - name: channel_id
       type: integer | string
       required: true
 
 npg_get_notification_deliveries:
-  description: "Get delivery history for a notification channel."
+  description: "Get delivery history for a notification channel. REQUIRED: channel_id."
   parameters:
     - name: channel_id
       type: integer | string
@@ -990,7 +990,7 @@ npg_list_users:
   parameters: []
 
 npg_get_user:
-  description: "Get a user by their ID."
+  description: "Get a user by their ID. REQUIRED: user_id."
   parameters:
     - name: user_id
       type: integer | string
@@ -1044,7 +1044,7 @@ npg_end_user_sessions:
       required: true
 
 npg_delete_user:
-  description: "Delete a user by their ID."
+  description: "Delete a user by their ID. REQUIRED: user_id."
   parameters:
     - name: user_id
       type: integer | string
@@ -1065,7 +1065,7 @@ npg_create_role:
       required: true
 
 npg_update_role:
-  description: "Update a role. Pass only fields to change."
+  description: "Update a role. Pass only fields to change. REQUIRED: role_id."
   parameters:
     - name: role_id
       type: integer | string
@@ -1078,7 +1078,7 @@ npg_update_role:
       required: false
 
 npg_delete_role:
-  description: "Delete a role by its ID."
+  description: "Delete a role by its ID. REQUIRED: role_id."
   parameters:
     - name: role_id
       type: integer | string
@@ -1136,14 +1136,14 @@ npg_update_sso_provider:
       required: false
 
 npg_delete_sso_provider:
-  description: "Delete an SSO provider by its ID."
+  description: "Delete an SSO provider by its ID. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
       required: true
 
 npg_test_sso_provider:
-  description: "Test SSO provider configuration by initiating a test login flow."
+  description: "Test SSO provider configuration by initiating a test login flow. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1161,7 +1161,7 @@ npg_download_log_file:
       required: true
 
 npg_view_log_file:
-  description: "View the contents of a log file."
+  description: "View the contents of a log file. REQUIRED: filename."
   parameters:
     - name: filename
       type: string
@@ -1230,14 +1230,14 @@ npg_create_uri_block:
       default: false
 
 npg_get_uri_block:
-  description: "Get a URI block by its ID."
+  description: "Get a URI block by its ID. REQUIRED: block_id."
   parameters:
     - name: block_id
       type: integer | string
       required: true
 
 npg_update_uri_block:
-  description: "Update a URI block. Pass only fields to change."
+  description: "Update a URI block. Pass only fields to change. REQUIRED: block_id."
   parameters:
     - name: block_id
       type: integer | string
@@ -1253,7 +1253,7 @@ npg_update_uri_block:
       required: false
 
 npg_delete_uri_block:
-  description: "Delete a URI block by its ID."
+  description: "Delete a URI block by its ID. REQUIRED: block_id."
   parameters:
     - name: block_id
       type: integer | string
@@ -1302,7 +1302,7 @@ npg_add_global_uri_block_rule:
       default: false
 
 npg_delete_global_uri_block_rule:
-  description: "Delete a rule from the global URI block by its ID."
+  description: "Delete a rule from the global URI block by its ID. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -1535,14 +1535,14 @@ npg_update_global_waf:
       required: false
 
 npg_download_backup:
-  description: "Download a backup by its ID."
+  description: "Download a backup by its ID. REQUIRED: backup_id."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
 
 npg_upload_restore_backup:
-  description: "Upload and restore from a backup file."
+  description: "Upload and restore from a backup file. REQUIRED: file_content."
   parameters:
     - name: file_content
       type: string
@@ -1584,7 +1584,7 @@ npg_auth_change_username:
       required: true
 
 npg_auth_2fa_setup:
-  description: "Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app."
+  description: "Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app. REQUIRED: password."
   parameters:
     - name: password
       type: string
@@ -1648,7 +1648,7 @@ npg_list_auth_providers:
   parameters: []
 
 npg_create_auth_provider:
-  description: "Create a ForwardAuth provider. REQUIRED: name, type, config dict (provider-specific)."
+  description: "Create a ForwardAuth provider. REQUIRED: name, provider_type, config dict (provider-specific)."
   parameters:
     - name: name
       type: string
@@ -1664,14 +1664,14 @@ npg_create_auth_provider:
       required: false
 
 npg_get_auth_provider:
-  description: "Get a ForwardAuth provider by its ID."
+  description: "Get a ForwardAuth provider by its ID. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
       required: true
 
 npg_update_auth_provider:
-  description: "Update a ForwardAuth provider (partial update). Pass only fields to change."
+  description: "Update a ForwardAuth provider (partial update). Pass only fields to change. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1684,7 +1684,7 @@ npg_update_auth_provider:
       required: false
 
 npg_delete_auth_provider:
-  description: "Delete a ForwardAuth provider by its ID."
+  description: "Delete a ForwardAuth provider by its ID. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1712,14 +1712,14 @@ npg_create_ddns_record:
       default: false
 
 npg_get_ddns_record:
-  description: "Get a DDNS record by its ID."
+  description: "Get a DDNS record by its ID. REQUIRED: record_id."
   parameters:
     - name: record_id
       type: integer | string
       required: true
 
 npg_update_ddns_record:
-  description: "Update a DDNS record (partial update). Pass only fields to change."
+  description: "Update a DDNS record (partial update). Pass only fields to change. REQUIRED: record_id."
   parameters:
     - name: record_id
       type: integer | string
@@ -1735,7 +1735,7 @@ npg_update_ddns_record:
       required: false
 
 npg_delete_ddns_record:
-  description: "Delete a DDNS record by its ID."
+  description: "Delete a DDNS record by its ID. REQUIRED: record_id."
   parameters:
     - name: record_id
       type: integer | string
@@ -1789,7 +1789,7 @@ npg_get_filter_subscription:
       required: true
 
 npg_update_filter_subscription:
-  description: "Update a filter subscription (partial update). Pass only fields to change."
+  description: "Update a filter subscription (partial update). Pass only fields to change. REQUIRED: subscription_id."
   parameters:
     - name: subscription_id
       type: integer | string
@@ -1805,7 +1805,7 @@ npg_update_filter_subscription:
       required: false
 
 npg_delete_filter_subscription:
-  description: "Delete a filter subscription by its ID."
+  description: "Delete a filter subscription by its ID. REQUIRED: subscription_id."
   parameters:
     - name: subscription_id
       type: integer | string
@@ -2065,7 +2065,7 @@ npg_update_log_filter_preset:
       required: false
 
 npg_delete_log_filter_preset:
-  description: "Delete a log filter preset by its ID."
+  description: "Delete a log filter preset by its ID. REQUIRED: preset_id."
   parameters:
     - name: preset_id
       type: integer | string
@@ -2318,7 +2318,7 @@ npg_get_waf_test_patterns:
   parameters: []
 
 npg_test_waf_pattern:
-  description: "Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, pattern (pattern name or index)."
+  description: "Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, attack_type (attack type name or index)."
   parameters:
     - name: target_url
       type: string
