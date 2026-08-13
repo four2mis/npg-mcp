@@ -68,13 +68,44 @@ mcp = FastMCP(
 
 
 def _get_client() -> client_mod.NPGClient:
-    """Get NPG client with auto-login from env credentials."""
-    # Check for stored token first
+    """Get NPG client with auto-login from env credentials.
+
+    Auth priority (highest first):
+    1. NPG_API_TOKEN env var — long-lived API token (ng_... format).
+       Immune to password changes; preferred for production.
+    2. Per-request ContextVar token (set by MCP middleware).
+    3. NPG_USERNAME/NPG_PASSWORD auto-login (JWT — invalidated on
+       password change or session end).
+
+    For JWT auth, a 401 on the first request triggers a single
+    re-login attempt to recover from stale tokens.
+    """
+    # 1. Long-lived API token (preferred — survives password changes)
+    api_token = os.environ.get("NPG_API_TOKEN", "").strip()
+    if api_token:
+        return client_mod.NPGClient(token=api_token)
+
+    # 2. Per-request token from ContextVar
     token = client_mod.get_token()
     if token:
-        return client_mod.NPGClient(token=token)
+        c = client_mod.NPGClient(token=token)
+        # If the JWT was invalidated (password change, session end),
+        # re-authenticate once from env credentials.
+        if os.environ.get("NPG_USERNAME") and os.environ.get("NPG_PASSWORD"):
+            try:
+                c.get("/api/v1/settings")
+            except Exception:
+                # Stale token — clear and re-login
+                client_mod.set_token("")
+                c.close()
+                c = client_mod.NPGClient()
+                c.login(
+                    os.environ["NPG_USERNAME"],
+                    os.environ["NPG_PASSWORD"],
+                )
+        return c
 
-    # Auto-login from env credentials
+    # 3. Auto-login from env credentials
     username = os.environ.get("NPG_USERNAME", "")
     password = os.environ.get("NPG_PASSWORD", "")
     if username and password:
@@ -82,7 +113,9 @@ def _get_client() -> client_mod.NPGClient:
         c.login(username, password)
         return c
 
-    raise RuntimeError("NPG_USERNAME/NPG_PASSWORD environment variables not set.")
+    raise RuntimeError(
+        "NPG_API_TOKEN or NPG_USERNAME/NPG_PASSWORD environment variables not set."
+    )
 
 
 def _id_path(id_val) -> str:
