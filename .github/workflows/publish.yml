@@ -30,30 +30,47 @@ jobs:
 
       - name: Check documentation drift
         run: |
-          # Verify tool-schemas.yaml, README.md, README.ko.md are in sync with main.py
+          # Verify tool-schemas.yaml (full name set) and README.md/README.ko.md
+          # (compact format: category counts only) are in sync with main.py
           python3 << 'PYEOF'
           import re, sys
+          from collections import Counter
 
           with open('npg_mcp/main.py') as f:
               main_tools = set(re.findall(r'@mcp\.tool\(name="([^"]+)"', f.read()))
 
           errors = 0
-          checks = [
-              ('tool-schemas.yaml', r'^(npg_\w+):'),
-              ('README.md', r'\|\s*`(npg_\w+)`\s*\|'),
-              ('README.ko.md', r'\|\s*`(npg_\w+)`\s*\|'),
-          ]
-          for fname, pattern in checks:
-              with open(fname) as f:
-                  doc_tools = set(re.findall(pattern, f.read(), re.MULTILINE))
-              missing = main_tools - doc_tools
-              extra = doc_tools - main_tools
-              if missing:
-                  print(f'ERROR: {fname} missing {len(missing)} tools: {sorted(missing)[:5]}...')
+
+          # 1. tool-schemas.yaml must contain every tool name
+          with open('tool-schemas.yaml') as f:
+              schema_tools = set(re.findall(r'^(npg_\w+):', f.read(), re.MULTILINE))
+          missing = main_tools - schema_tools
+          extra = schema_tools - main_tools
+          if missing:
+              print(f'ERROR: tool-schemas.yaml missing {len(missing)} tools: {sorted(missing)[:5]}...')
+              errors += 1
+          if extra:
+              print(f'ERROR: tool-schemas.yaml has {len(extra)} extra/stale tools: {sorted(extra)[:5]}...')
+              errors += 1
+          if not missing and not extra:
+              print(f'OK: tool-schemas.yaml has all {len(schema_tools)} tools')
+
+          # 2. README.md / README.ko.md: category counts must match main.py
+          #    (READMEs no longer list tool names — see regenerate_all_docs.py)
+          def readme_total(path):
+              with open(path) as f:
+                  content = f.read()
+              return sum(int(m) for m in re.findall(r'\|\s*\*\*[^*]+\*\*\s*\|\s*(\d+) tools?', content))
+
+          # Category counts from main.py are validated by regenerate_all_docs.py;
+          # here we only verify the READMEs' total tool count matches main.py.
+          for fname in ('README.md', 'README.ko.md'):
+              total = readme_total(fname)
+              if total != len(main_tools):
+                  print(f'ERROR: {fname} total tool count {total} != main.py {len(main_tools)}')
                   errors += 1
-              if extra:
-                  print(f'ERROR: {fname} has {len(extra)} extra/stale tools: {sorted(extra)[:5]}...')
-                  errors += 1
+              else:
+                  print(f'OK: {fname} total tool count {total} matches main.py')
 
           if errors:
               print(f'\n{errors} file(s) out of sync. Run: regenerate_all_docs.py --write')
