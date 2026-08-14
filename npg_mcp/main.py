@@ -2283,6 +2283,23 @@ async def npg_get_auth_account() -> dict:
                 return {"success": False, "error": str(e2)}
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_get_auth_me", description="GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Accepts both API token and session JWT on NPG v2.39.+. Use to check what the current credential can actually do.")
+async def npg_get_auth_me() -> dict:
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/auth/me")
+        return {"success": True, "data": data}
+    except Exception as e:
+        # JWT-only endpoint on older NPG — retry with JWT client if API token failed
+        if "401" in str(e) and os.environ.get("NPG_USERNAME") and os.environ.get("NPG_PASSWORD"):
+            try:
+                c2 = _get_jwt_client()
+                data = c2.get("/api/v1/auth/me")
+                return {"success": True, "data": data}
+            except Exception as e2:
+                return {"success": False, "error": str(e2)}
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_auth_change_credentials", description="Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup.")
 async def npg_auth_change_credentials(current_password: str, new_username: str, new_password: str) -> dict:
     c = _get_client()
@@ -3159,7 +3176,7 @@ async def npg_apply_settings_preset(preset: str) -> dict:
 
 # ── System Extras ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_health_detailed", description="Get a detailed health snapshot (detailed version of health check). NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed.")
+@mcp.tool(name="npg_get_health_detailed", description="GET a detailed health snapshot (detailed version of health check). Accepts both API token and session JWT on NPG v2.39.+.")
 async def npg_get_health_detailed() -> dict:
     c = _get_client()
     try:
@@ -3176,7 +3193,7 @@ async def npg_get_health_detailed() -> dict:
                 return {"success": False, "error": str(e2)}
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_status", description="Get component status — health of all NPG subsystems. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed.")
+@mcp.tool(name="npg_get_status", description="GET component status — health of all NPG subsystems (API, database, nginx). Accepts both API token and session JWT on NPG v2.39.+.")
 async def npg_get_status() -> dict:
     c = _get_client()
     try:

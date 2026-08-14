@@ -1533,6 +1533,10 @@ npg_get_auth_account:
   description: "GET own account info — returns the authenticated user's account details. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
   parameters: []
 
+npg_get_auth_me:
+  description: "GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Accepts both API token and session JWT on NPG v2.39.+. Use to check what the current credential can actually do."
+  parameters: []
+
 npg_auth_change_credentials:
   description: "Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup."
   parameters:
@@ -2207,11 +2211,11 @@ npg_apply_settings_preset:
       required: true
 
 npg_get_health_detailed:
-  description: "Get a detailed health snapshot (detailed version of health check). NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
+  description: "GET a detailed health snapshot (detailed version of health check). Accepts both API token and session JWT on NPG v2.39.+."
   parameters: []
 
 npg_get_status:
-  description: "Get component status — health of all NPG subsystems. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
+  description: "GET component status — health of all NPG subsystems (API, database, nginx). Accepts both API token and session JWT on NPG v2.39.+."
   parameters: []
 
 npg_check_npg_update:
