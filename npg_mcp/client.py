@@ -77,6 +77,18 @@ class NPGClient:
         except Exception as e:
             raise self._sanitize(e) from e
 
+    def get_text(self, path: str, params: dict | None = None) -> str:
+        """GET returning raw response text (for non-JSON endpoints like log downloads)."""
+        try:
+            url = urljoin(self.base_url + "/", path.lstrip("/"))
+            resp = self._client.get(url, params=params, headers=self._headers())
+            resp.raise_for_status()
+            return resp.text
+        except NPGError:
+            raise
+        except Exception as e:
+            raise self._sanitize(e) from e
+
     def post(self, path: str, body: dict | None = None, params: dict | None = None) -> dict:
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))

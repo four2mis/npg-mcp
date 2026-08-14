@@ -1159,7 +1159,7 @@ npg_list_log_files:
   parameters: []
 
 npg_download_log_file:
-  description: "Download a log file by its filename."
+  description: "Download a log file by its filename. Returns the raw log content."
   parameters:
     - name: filename
       type: string
@@ -1498,7 +1498,7 @@ npg_update_global_waf:
       required: false
 
 npg_download_backup:
-  description: "Download a backup by its ID. REQUIRED: backup_id."
+  description: "Download a backup by its ID. Returns the raw backup content."
   parameters:
     - name: backup_id
       type: integer | string
@@ -1889,7 +1889,7 @@ npg_get_certificate_logs:
       required: true
 
 npg_get_certificate_download:
-  description: "Download certificate material (PEM). REQUIRED: cert_id."
+  description: "Download certificate material (PEM/zip). REQUIRED: cert_id. Returns the raw content."
   parameters:
     - name: cert_id
       type: integer | string

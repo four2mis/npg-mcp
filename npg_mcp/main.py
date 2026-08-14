@@ -1724,12 +1724,12 @@ async def npg_list_log_files() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename.")
+@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename. Returns the raw log content.")
 async def npg_download_log_file(filename: str) -> dict:
     c = _get_client()
     try:
         encoded = quote(filename, safe="")
-        data = c.get(f"/api/v1/system-settings/log-files/{encoded}/download")
+        data = c.get_text(f"/api/v1/system-settings/log-files/{encoded}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2184,11 +2184,11 @@ async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int
 
 # ── Backups ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_download_backup", description="Download a backup by its ID. REQUIRED: backup_id.")
+@mcp.tool(name="npg_download_backup", description="Download a backup by its ID. Returns the raw backup content.")
 async def npg_download_backup(backup_id: str | int) -> dict:
     c = _get_client()
     try:
-        data = c.get(f"/api/v1/backups/{_id_path(backup_id)}/download")
+        data = c.get_text(f"/api/v1/backups/{_id_path(backup_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2693,11 +2693,11 @@ async def npg_get_certificate_logs(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM). REQUIRED: cert_id.")
+@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns the raw content.")
 async def npg_get_certificate_download(cert_id: str | int) -> dict:
     c = _get_client()
     try:
-        data = c.get(f"/api/v1/certificates/{_id_path(cert_id)}/download")
+        data = c.get_text(f"/api/v1/certificates/{_id_path(cert_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
