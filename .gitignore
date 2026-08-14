@@ -31,3 +31,7 @@ swagger.md
 *.txt
 
 swagger.yaml
+
+# Kanban pipeline working files (agent-managed, not source code)
+.kanban-goals.md
+.kanban-state.json
