@@ -11,7 +11,7 @@ import httpx
 # Per-request token store — scoped to the current request context var so
 # concurrent clients cannot overwrite each other's session token.
 _request_token: ContextVar[str] = ContextVar("npg_request_token", default="")
-_current_base_url: str = "http://npg-api:8080"
+_current_base_url: str = ""
 
 
 def set_token(token: str) -> None:
