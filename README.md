@@ -8,6 +8,8 @@ Built with [FastMCP](https://github.com/jlowin/fastmcp) and [httpx](https://www.
 
 > **⚠️ Vibe-coded with an AI agent.** This codebase was generated at speed by an AI agent, not hand-crafted by a human. Expect rough edges, unhandled edge cases, and bugs. Do **not** deploy it to an active/production NginxProxyGuard instance without first testing against a **sandboxed / disposable NPG environment** and reviewing the code. It can create, update, delete, and reconfigure live proxy hosts, so verify in isolation before pointing it at real infrastructure.
 
+> **🤖 Automatically managed.** This codebase is continuously maintained by an autonomous coding agent via an automated kanban pipeline. Issues and pull requests submitted to this repository will be reviewed and addressed automatically.
+
 ## Quick Start
 
 ### Prerequisites
