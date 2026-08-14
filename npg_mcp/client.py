@@ -89,26 +89,30 @@ class NPGClient:
         except Exception as e:
             raise self._sanitize(e) from e
 
-    def post(self, path: str, body: dict | None = None, params: dict | None = None) -> dict:
+    def post(self, path: str, body: dict | None = None, params: dict | None = None) -> dict | None:
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
             resp = self._client.post(
                 url, json=body, params=params, headers=self._headers()
             )
             resp.raise_for_status()
+            if resp.status_code == 204 or not resp.content:
+                return None
             return resp.json()
         except NPGError:
             raise
         except Exception as e:
             raise self._sanitize(e) from e
 
-    def put(self, path: str, body: dict | None = None, params: dict | None = None) -> dict:
+    def put(self, path: str, body: dict | None = None, params: dict | None = None) -> dict | None:
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
             resp = self._client.put(
                 url, json=body, params=params, headers=self._headers()
             )
             resp.raise_for_status()
+            if resp.status_code == 204 or not resp.content:
+                return None
             return resp.json()
         except NPGError:
             raise
@@ -149,7 +153,7 @@ class NPGClient:
         except Exception as e:
             raise self._sanitize(e) from e
 
-    def logout(self) -> dict:
+    def logout(self) -> dict | None:
         """Invalidate current session."""
         result = self.post("/api/v1/auth/logout")
         set_token("")

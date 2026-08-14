@@ -730,6 +730,13 @@ npg_unban_ip:
       type: integer | string
       required: true
 
+npg_unban_ip_by_address:
+  description: "Unban an IP address without needing its ban record ID. REQUIRED: ip (the IP address string, e.g. '1.2.3.4')."
+  parameters:
+    - name: ip
+      type: string
+      required: true
+
 npg_get_bots_known:
   description: "Get list of known bot user-agent signatures."
   parameters: []
@@ -1148,11 +1155,14 @@ npg_delete_sso_provider:
       required: true
 
 npg_test_sso_provider:
-  description: "Test SSO provider configuration by initiating a test login flow. REQUIRED: provider_id."
+  description: "Probe an OIDC issuer's discovery document without saving a provider. REQUIRED: issuer_url (e.g. 'https://accounts.google.com'). Optional: scopes (space-separated, defaults to 'openid profile email', must contain 'openid'). Returns issuer, authorization_endpoint, token_endpoint, scopes_supported, supports_pkce, missing_scopes."
   parameters:
-    - name: provider_id
-      type: integer | string
+    - name: issuer_url
+      type: string
       required: true
+    - name: scopes
+      type: string
+      required: false
 
 npg_list_log_files:
   description: "List all log files."
@@ -2144,6 +2154,16 @@ npg_get_ban_history_for_ip:
       type: string
       required: true
 
+npg_get_ip_traffic_stats:
+  description: "Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default)."
+  parameters:
+    - name: ip
+      type: string
+      required: true
+    - name: days
+      type: integer
+      required: false
+
 npg_add_proxy_host_uri_block_rule:
   description: "Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description."
   parameters:
@@ -2245,6 +2265,16 @@ npg_disable_waf_rule_by_host:
       type: integer | string
       required: true
 
+npg_enable_waf_rule_by_host:
+  description: "Re-enable a CRS rule for a specific proxy host (removes per-host exclusion). REQUIRED: host_id (proxy host UUID), rule_id (CRS rule ID)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: rule_id
+      type: integer | string
+      required: true
+
 npg_get_api_token_permissions:
   description: "List the permission strings an API token may carry (reference list)."
   parameters: []
@@ -2289,4 +2319,14 @@ npg_set_user_role:
       required: true
     - name: role_id
       type: integer | string
+      required: true
+
+npg_set_user_email:
+  description: "Set the SSO linking email for a user account. This is the address an identity provider's verified email is matched against when linking a sign-in to an existing account. REQUIRED: user_id, email (must be a plain email address, no display name)."
+  parameters:
+    - name: user_id
+      type: integer | string
+      required: true
+    - name: email
+      type: string
       required: true

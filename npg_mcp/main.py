@@ -1192,6 +1192,15 @@ async def npg_unban_ip(ip_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_unban_ip_by_address", description="Unban an IP address without needing its ban record ID. REQUIRED: ip (the IP address string, e.g. '1.2.3.4').")
+async def npg_unban_ip_by_address(ip: str) -> dict:
+    c = _get_client()
+    try:
+        c.delete("/api/v1/banned-ips", params={"ip": ip})
+        return {"success": True, "message": f"IP {ip} unbanned"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_get_bots_known", description="Get list of known bot user-agent signatures.")
 async def npg_get_bots_known() -> dict:
     c = _get_client()
@@ -1703,11 +1712,14 @@ async def npg_delete_sso_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_sso_provider", description="Test SSO provider configuration by initiating a test login flow. REQUIRED: provider_id.")
-async def npg_test_sso_provider(provider_id: str | int) -> dict:
+@mcp.tool(name="npg_test_sso_provider", description="Probe an OIDC issuer's discovery document without saving a provider. REQUIRED: issuer_url (e.g. 'https://accounts.google.com'). Optional: scopes (space-separated, defaults to 'openid profile email', must contain 'openid'). Returns issuer, authorization_endpoint, token_endpoint, scopes_supported, supports_pkce, missing_scopes.")
+async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.post(f"/api/v1/sso-providers/{_id_path(provider_id)}/test")
+        body: dict = {"issuer_url": issuer_url}
+        if scopes is not None:
+            body["scopes"] = scopes
+        data = c.post("/api/v1/sso-providers/test", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3081,6 +3093,18 @@ async def npg_get_ban_history_for_ip(ip: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_get_ip_traffic_stats", description="Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default).")
+async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if days is not None:
+            params["days"] = days
+        data = c.get(f"/api/v1/banned-ips/stats/ip/{quote(ip, safe='')}", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description.")
 async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None) -> dict:
     c = _get_client()
@@ -3252,6 +3276,15 @@ async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_enable_waf_rule_by_host", description="Re-enable a CRS rule for a specific proxy host (removes per-host exclusion). REQUIRED: host_id (proxy host UUID), rule_id (CRS rule ID).")
+async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) -> dict:
+    c = _get_client()
+    try:
+        c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        return {"success": True, "message": f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 # ── API Tokens Extras ──────────────────────────────────────────────────
 
@@ -3323,6 +3356,15 @@ async def npg_set_user_role(user_id: str | int, role_id: str | int) -> dict:
     try:
         data = c.put(f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
         return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_set_user_email", description="Set the SSO linking email for a user account. This is the address an identity provider's verified email is matched against when linking a sign-in to an existing account. REQUIRED: user_id, email (must be a plain email address, no display name).")
+async def npg_set_user_email(user_id: str | int, email: str) -> dict:
+    c = _get_client()
+    try:
+        c.put(f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
+        return {"success": True, "message": f"Email updated for user {_id_path(user_id)}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
