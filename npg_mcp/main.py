@@ -1486,13 +1486,15 @@ async def npg_list_notification_channels() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. REQUIRED: name, channel_type (e.g. 'email', 'telegram', 'slack'). Optional: config (dict).")
-async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None) -> dict:
+@mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. REQUIRED: name, channel_type ('webhook'/'discord'/'telegram'). Optional: config (dict, e.g. {'url': '...'} for webhook/discord, {'bot_token': '...', 'chat_id': '...'} for telegram), events (list of event keys, e.g. ['ip.banned', 'cert.renewal_failed'] — at least one event or digest_enabled required), allow_private_target (bool, allow private-network webhook URLs), digest_enabled (bool), digest_hour (int 0-23).")
+async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None, events: list[str] | None = None, allow_private_target: bool = False, digest_enabled: bool = False, digest_hour: int = 9) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "type": channel_type}
+        body = {"name": name, "type": channel_type, "allow_private_target": allow_private_target, "digest_enabled": digest_enabled, "digest_hour": digest_hour}
         if config:
             body["config"] = config
+        if events:
+            body["events"] = events
         data = c.post("/api/v1/notification-channels", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1786,17 +1788,8 @@ async def npg_get_certificate_history() -> dict:
 async def npg_upload_certificate(domain_names: list[str], cert_content: str, key_content: str) -> dict:
     c = _get_client()
     try:
-        body = {"domain_names": domain_names, "cert": cert_content, "key": key_content}
+        body = {"domain_names": domain_names, "certificate_pem": cert_content, "private_key_pem": key_content}
         data = c.post("/api/v1/certificates/upload", body)
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_import_from_hosts", description="Import certificates from existing hosts.")
-async def npg_import_from_hosts() -> dict:
-    c = _get_client()
-    try:
-        data = c.post("/api/v1/certificates/import-from-hosts")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1813,52 +1806,16 @@ async def npg_list_uri_blocks() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_uri_block", description="Create a URI block for a proxy host. Required: host_id, pattern, action (block/allow). Optional: is_regex.")
-async def npg_create_uri_block(host_id: str | int, pattern: str, action: str = "block", is_regex: bool = False) -> dict:
+@mcp.tool(name="npg_bulk_add_uri_block_rule", description="Bulk add a URI block rule to multiple or all proxy hosts. REQUIRED: pattern. Optional: match_type ('exact'/'prefix'/'regex', default 'exact'), description, host_ids (list of host UUIDs; empty = all enabled hosts).")
+async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", description: str | None = None, host_ids: list[str] | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"pattern": pattern, "action": action, "is_regex": is_regex}
-        data = c.post(f"/api/v1/uri-blocks", body)
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_uri_block", description="Get a URI block by its ID. REQUIRED: block_id.")
-async def npg_get_uri_block(block_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.get(f"/api/v1/uri-blocks/{_id_path(block_id)}")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_update_uri_block", description="Update a URI block. Pass only fields to change. REQUIRED: block_id.")
-async def npg_update_uri_block(block_id: str | int, pattern: str | None = None, action: str | None = None, is_regex: bool | None = None) -> dict:
-    c = _get_client()
-    try:
-        body: dict = {}
-        if pattern is not None: body["pattern"] = pattern
-        if action is not None: body["action"] = action
-        if is_regex is not None: body["is_regex"] = is_regex
-        data = c.put(f"/api/v1/uri-blocks/{_id_path(block_id)}", body)
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_delete_uri_block", description="Delete a URI block by its ID. REQUIRED: block_id.")
-async def npg_delete_uri_block(block_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        c.delete(f"/api/v1/uri-blocks/{_id_path(block_id)}")
-        return {"success": True, "message": f"URI block {_id_path(block_id)} deleted"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_bulk_add_uri_block_rule", description="Bulk add URI block rules. Required: rules (list of {pattern, action, is_regex}).")
-async def npg_bulk_add_uri_block_rule(rules: list[dict]) -> dict:
-    c = _get_client()
-    try:
-        data = c.post("/api/v1/uri-blocks/bulk-add-rule", {"rules": rules})
+        body: dict = {"pattern": pattern, "match_type": match_type}
+        if description is not None:
+            body["description"] = description
+        if host_ids is not None:
+            body["host_ids"] = host_ids
+        data = c.post("/api/v1/uri-blocks/bulk-add-rule", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1964,7 +1921,7 @@ async def npg_get_docker_containers() -> dict:
 async def npg_check_update() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/update/check")
+        data = c.get("/api/v1/system-settings/update/check")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1977,7 +1934,7 @@ async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
     c = _get_client()
     try:
         body = {"dns_provider_id": _id_path(dns_provider_id)} if dns_provider_id is not None else {}
-        data = c.post("/api/v1/acme/test", body)
+        data = c.post("/api/v1/system-settings/acme/test", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2503,11 +2460,12 @@ async def npg_sync_ddns_record(record_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_import_ddns_from_hosts", description="Import DDNS records from existing proxy hosts that have DDNS enabled.")
-async def npg_import_ddns_from_hosts() -> dict:
+@mcp.tool(name="npg_import_ddns_from_hosts", description="Import DDNS records from existing proxy hosts that have DDNS enabled. REQUIRED: proxy_host_ids (list of host UUIDs), dns_provider_id (UUID of the DNS provider to use).")
+async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id: str) -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/ddns-records/import-from-hosts")
+        body = {"proxy_host_ids": proxy_host_ids, "dns_provider_id": _id_path(dns_provider_id)}
+        data = c.post("/api/v1/ddns-records/import-from-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3123,11 +3081,14 @@ async def npg_get_ban_history_for_ip(ip: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex), action (block/allow). Optional: case_sensitive (bool).")
-async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, action: str, case_sensitive: bool = False) -> dict:
+@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description.")
+async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", {"pattern": pattern, "action": action, "case_sensitive": case_sensitive})
+        body: dict = {"pattern": pattern, "match_type": match_type}
+        if description is not None:
+            body["description"] = description
+        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}

@@ -156,7 +156,7 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 ## Tools Reference
 
-This server exposes **280 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **275 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
@@ -165,10 +165,10 @@ This server exposes **280 MCP tools** across 27 categories. Tool names, descript
 | **Security & WAF** | 27 tools |
 | **DNS Providers** | 15 tools |
 | **Authentication** | 14 tools |
-| **Certificates** | 15 tools |
+| **Certificates** | 14 tools |
 | **Filter Subscriptions** | 14 tools |
 | **Cloud Providers** | 13 tools |
-| **URI Block** | 10 tools |
+| **URI Block** | 6 tools |
 | **Settings** | 11 tools |
 | **Backups** | 8 tools |
 | **API Tokens** | 8 tools |
@@ -211,13 +211,13 @@ Alternatively, call `npg_auth_login` directly for explicit authentication. The r
 
 ```
 npg_mcp/
-  main.py       # All 280 MCP tools
+  main.py       # All 275 MCP tools
   client.py     # HTTP client wrapper with auto-auth
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
 pyproject.toml  # Dependencies: mcp>=1.0, httpx>=0.27
-tool-schemas.yaml  # Full input parameter schemas for all 280 tools
+tool-schemas.yaml  # Full input parameter schemas for all 275 tools
 ```
 
 ## License

@@ -64,11 +64,13 @@ class NPGClient:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
 
-    def get(self, path: str, params: dict | None = None) -> dict:
+    def get(self, path: str, params: dict | None = None) -> dict | None:
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
             resp = self._client.get(url, params=params, headers=self._headers())
             resp.raise_for_status()
+            if resp.status_code == 204 or not resp.content:
+                return None
             return resp.json()
         except NPGError:
             raise
@@ -141,7 +143,7 @@ class NPGClient:
         set_token("")
         return result
 
-    def me(self) -> dict:
+    def me(self) -> dict | None:
         """Get current user info."""
         return self.get("/api/v1/auth/me")
 
