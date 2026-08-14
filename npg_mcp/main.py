@@ -83,7 +83,12 @@ def _get_client() -> client_mod.NPGClient:
     # 1. Long-lived API token (preferred — survives password changes)
     api_token = os.environ.get("NPG_API_TOKEN", "").strip()
     if api_token:
-        return client_mod.NPGClient(token=api_token)
+        c = client_mod.NPGClient(token=api_token)
+        # Some NPG endpoints (e.g. /status, /health/detailed) are JWT-only
+        # and reject API tokens with 401. If username/password are also
+        # available, transparently fall back to JWT for those endpoints.
+        # The API token handles 95%+ of endpoints; JWT is a safety net.
+        return c
 
     # 2. Per-request token from ContextVar
     token = client_mod.get_token()
@@ -116,6 +121,21 @@ def _get_client() -> client_mod.NPGClient:
     raise RuntimeError(
         "NPG_API_TOKEN or NPG_USERNAME/NPG_PASSWORD environment variables not set."
     )
+
+
+def _get_jwt_client() -> client_mod.NPGClient:
+    """Get a JWT-authenticated client (for JWT-only endpoints like /status).
+
+    Some NPG endpoints reject API tokens and only accept session JWTs.
+    This helper always logs in with username/password to get a fresh JWT.
+    """
+    username = os.environ.get("NPG_USERNAME", "")
+    password = os.environ.get("NPG_PASSWORD", "")
+    if not username or not password:
+        raise RuntimeError("NPG_USERNAME/NPG_PASSWORD required for JWT-only endpoints.")
+    c = client_mod.NPGClient()
+    c.login(username, password)
+    return c
 
 
 def _id_path(id_val) -> str:
@@ -1569,15 +1589,6 @@ async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_assign_user_role", description="Assign a role to a user. Required: user_id, role_id.")
-async def npg_assign_user_role(user_id: str | int, role_id: str | int) -> dict:
-    c = _get_client()
-    try:
-        data = c.put(f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 @mcp.tool(name="npg_end_user_sessions", description="End all sessions for a user (force logout). Required: user_id.")
 async def npg_end_user_sessions(user_id: str | int) -> dict:
     c = _get_client()
@@ -2286,13 +2297,21 @@ async def npg_get_auth_status() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_auth_account", description="GET own account info — returns the authenticated user's account details.")
+@mcp.tool(name="npg_get_auth_account", description="GET own account info — returns the authenticated user's account details. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed.")
 async def npg_get_auth_account() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/auth/account")
         return {"success": True, "data": data}
     except Exception as e:
+        # JWT-only endpoint — retry with JWT client if API token failed
+        if "401" in str(e) and os.environ.get("NPG_USERNAME") and os.environ.get("NPG_PASSWORD"):
+            try:
+                c2 = _get_jwt_client()
+                data = c2.get("/api/v1/auth/account")
+                return {"success": True, "data": data}
+            except Exception as e2:
+                return {"success": False, "error": str(e2)}
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_auth_change_credentials", description="Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup.")
@@ -2336,42 +2355,6 @@ async def npg_auth_2fa_disable(password: str, totp_code: str) -> dict:
     c = _get_client()
     try:
         data = c.post("/api/v1/auth/2fa/disable", {"password": password, "totp_code": totp_code})
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_auth_language", description="GET the authenticated user's UI language preference.")
-async def npg_get_auth_language() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/auth/language")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_update_auth_language", description="SET the authenticated user's UI language. REQUIRED: language (e.g. 'en', 'ko').")
-async def npg_update_auth_language(language: str) -> dict:
-    c = _get_client()
-    try:
-        data = c.put("/api/v1/auth/language", {"language": language})
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_auth_font", description="GET the authenticated user's UI font family preference.")
-async def npg_get_auth_font() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/auth/font")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_update_auth_font", description="SET the authenticated user's UI font family. REQUIRED: font (e.g. 'Inter', 'Roboto').")
-async def npg_update_auth_font(font: str) -> dict:
-    c = _get_client()
-    try:
-        data = c.put("/api/v1/auth/font", {"font": font})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2537,15 +2520,6 @@ async def npg_list_filter_subscriptions() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/filter-subscriptions")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_get_filter_subscription_catalog", description="Get the curated filter catalog — list of available filter lists to subscribe to.")
-async def npg_get_filter_subscription_catalog() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/filter-subscriptions/catalog")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3200,22 +3174,38 @@ async def npg_apply_settings_preset(preset: str) -> dict:
 
 # ── System Extras ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_health_detailed", description="Get a detailed health snapshot (detailed version of health check).")
+@mcp.tool(name="npg_get_health_detailed", description="Get a detailed health snapshot (detailed version of health check). NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed.")
 async def npg_get_health_detailed() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/health/detailed")
         return {"success": True, "data": data}
     except Exception as e:
+        # JWT-only endpoint — retry with JWT client if API token failed
+        if "401" in str(e) and os.environ.get("NPG_USERNAME") and os.environ.get("NPG_PASSWORD"):
+            try:
+                c2 = _get_jwt_client()
+                data = c2.get("/api/v1/health/detailed")
+                return {"success": True, "data": data}
+            except Exception as e2:
+                return {"success": False, "error": str(e2)}
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_status", description="Get component status — health of all NPG subsystems.")
+@mcp.tool(name="npg_get_status", description="Get component status — health of all NPG subsystems. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed.")
 async def npg_get_status() -> dict:
     c = _get_client()
     try:
         data = c.get("/api/v1/status")
         return {"success": True, "data": data}
     except Exception as e:
+        # JWT-only endpoint — retry with JWT client if API token failed
+        if "401" in str(e) and os.environ.get("NPG_USERNAME") and os.environ.get("NPG_PASSWORD"):
+            try:
+                c2 = _get_jwt_client()
+                data = c2.get("/api/v1/status")
+                return {"success": True, "data": data}
+            except Exception as e2:
+                return {"success": False, "error": str(e2)}
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_check_npg_update", description="Check for a newer NPG release version.")

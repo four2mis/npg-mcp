@@ -156,7 +156,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **286개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **280개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
 | 카테고리 | 도구 |
 |----------|-------|
@@ -164,15 +164,15 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **로그(Logs)** | 32 tools |
 | **보안 및 WAF(Security & WAF)** | 27 tools |
 | **DNS 제공자(DNS Providers)** | 15 tools |
-| **인증(Authentication)** | 18 tools |
+| **인증(Authentication)** | 14 tools |
 | **인증서(Certificates)** | 15 tools |
-| **필터 구독(Filter Subscriptions)** | 15 tools |
+| **필터 구독(Filter Subscriptions)** | 14 tools |
 | **클라우드 제공자(Cloud Providers)** | 13 tools |
 | **URI 차단(URI Block)** | 10 tools |
 | **설정(Settings)** | 11 tools |
 | **백업(Backups)** | 8 tools |
 | **API 토큰(API Tokens)** | 8 tools |
-| **사용자(Users)** | 9 tools |
+| **사용자(Users)** | 8 tools |
 | **SSO 제공자(SSO Providers)** | 7 tools |
 | **대시보드(Dashboard)** | 3 tools |
 | **IP 관리(IP Management)** | 4 tools |

@@ -1026,16 +1026,6 @@ npg_set_user_password:
       type: string
       required: true
 
-npg_assign_user_role:
-  description: "Assign a role to a user. Required: user_id, role_id."
-  parameters:
-    - name: user_id
-      type: integer | string
-      required: true
-    - name: role_id
-      type: integer | string
-      required: true
-
 npg_end_user_sessions:
   description: "End all sessions for a user (force logout). Required: user_id."
   parameters:
@@ -1557,7 +1547,7 @@ npg_get_auth_status:
   parameters: []
 
 npg_get_auth_account:
-  description: "GET own account info — returns the authenticated user's account details."
+  description: "GET own account info — returns the authenticated user's account details. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
   parameters: []
 
 npg_auth_change_credentials:
@@ -1607,28 +1597,6 @@ npg_auth_2fa_disable:
       type: string
       required: true
     - name: totp_code
-      type: string
-      required: true
-
-npg_get_auth_language:
-  description: "GET the authenticated user's UI language preference."
-  parameters: []
-
-npg_update_auth_language:
-  description: "SET the authenticated user's UI language. REQUIRED: language (e.g. 'en', 'ko')."
-  parameters:
-    - name: language
-      type: string
-      required: true
-
-npg_get_auth_font:
-  description: "GET the authenticated user's UI font family preference."
-  parameters: []
-
-npg_update_auth_font:
-  description: "SET the authenticated user's UI font family. REQUIRED: font (e.g. 'Inter', 'Roboto')."
-  parameters:
-    - name: font
       type: string
       required: true
 
@@ -1758,10 +1726,6 @@ npg_import_ddns_from_hosts:
 
 npg_list_filter_subscriptions:
   description: "List all filter subscriptions (remote IP/UA blocklists)."
-  parameters: []
-
-npg_get_filter_subscription_catalog:
-  description: "Get the curated filter catalog — list of available filter lists to subscribe to."
   parameters: []
 
 npg_subscribe_filter_catalog:
@@ -2244,11 +2208,11 @@ npg_apply_settings_preset:
       required: true
 
 npg_get_health_detailed:
-  description: "Get a detailed health snapshot (detailed version of health check)."
+  description: "Get a detailed health snapshot (detailed version of health check). NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
   parameters: []
 
 npg_get_status:
-  description: "Get component status — health of all NPG subsystems."
+  description: "Get component status — health of all NPG subsystems. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
   parameters: []
 
 npg_check_npg_update:
