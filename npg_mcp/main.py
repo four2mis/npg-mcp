@@ -1662,11 +1662,11 @@ async def npg_list_sso_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_sso_provider", description="Create a new SSO provider. Required: slug, name, issuer_url, client_id. Optional: client_secret (defaults to placeholder), scopes.")
-async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None) -> dict:
+@mcp.tool(name="npg_create_sso_provider", description="CREATE a new SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. OPTIONAL: client_secret (defaults to placeholder), scopes, trust_provider_email (bool, default false — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; only enable if you control the provider AND its user enrollment). After creation, call npg_list_sso_providers to verify.")
+async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False) -> dict:
     c = _get_client()
     try:
-        body = {"slug": slug, "name": name, "issuer_url": issuer_url, "client_id": client_id}
+        body = {"slug": slug, "name": name, "issuer_url": issuer_url, "client_id": client_id, "trust_provider_email": trust_provider_email}
         if client_secret is not None:
             body["client_secret"] = client_secret
         if scopes is not None:
@@ -1676,8 +1676,8 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
-async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
+@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, trust_provider_email (bool — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; omit to leave unchanged), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
+async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, trust_provider_email: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     c = _get_client()
     try:
         cid = _id_path(provider_id)
@@ -1699,8 +1699,8 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
             return {"success": False, "error": f"SSO provider {cid} not found"}
         # Start with current values for full-replace fields
         body: dict = {"slug": current.get("slug", ""), "issuer_url": current.get("issuer_url", ""), "client_id": current.get("client_id", ""), "client_secret": current.get("client_secret", "********")}
-        # Merge all current non-replace fields
-        for k in ("name", "scopes", "callback_base_url", "enabled", "allow_jit", "allowed_email_domains", "allowed_emails", "group_claim", "required_group", "default_role_id"):
+        # Merge all current non-replace fields (incl. trust_provider_email to avoid data-loss)
+        for k in ("name", "scopes", "callback_base_url", "enabled", "allow_jit", "trust_provider_email", "allowed_email_domains", "allowed_emails", "group_claim", "required_group", "default_role_id"):
             if current.get(k) is not None:
                 body[k] = current[k]
         # Override with provided values
@@ -1713,6 +1713,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
         if callback_base_url is not None: body["callback_base_url"] = callback_base_url
         if enabled is not None: body["enabled"] = enabled
         if allow_jit is not None: body["allow_jit"] = allow_jit
+        if trust_provider_email is not None: body["trust_provider_email"] = trust_provider_email
         if allowed_email_domains is not None: body["allowed_email_domains"] = allowed_email_domains
         if allowed_emails is not None: body["allowed_emails"] = allowed_emails
         if group_claim is not None: body["group_claim"] = group_claim
