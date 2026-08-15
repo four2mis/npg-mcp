@@ -132,5 +132,20 @@ class NPGClient:
         except Exception as e:
             raise self._sanitize(e) from e
 
+    def post_file(self, path: str, file_field: str, file_content: bytes, filename: str, extra_fields: dict | None = None) -> dict | None:
+        """POST a multipart file upload (for backup restore, certificate upload, etc.)."""
+        try:
+            url = urljoin(self.base_url + "/", path.lstrip("/"))
+            files = {file_field: (filename, file_content, "application/octet-stream")}
+            resp = self._client.post(url, files=files, data=extra_fields, headers=self._headers())
+            resp.raise_for_status()
+            if resp.status_code == 204 or not resp.content:
+                return None
+            return resp.json()
+        except NPGError:
+            raise
+        except Exception as e:
+            raise self._sanitize(e) from e
+
     def close(self) -> None:
         self._client.close()

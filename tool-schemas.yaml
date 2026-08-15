@@ -250,7 +250,7 @@ npg_update_proxy_host_security_headers:
       required: false
 
 npg_apply_security_header_preset:
-  description: "APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. REQUIRED: host_id."
+  description: "APPLY a security header preset to a proxy host. preset: moderate, relaxed, or strict. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -363,21 +363,26 @@ npg_get_access_list:
       required: true
 
 npg_create_access_list:
-  description: "Create a new access list. Required: name, advanced_config (block/allow rules)."
+  description: "CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth (bool, allow authenticated users to bypass), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all, description, sort_order)."
   parameters:
     - name: name
       type: string
       required: true
-    - name: advanced_config
+    - name: satisfy_any
+      type: boolean
+      required: false
+    - name: pass_auth
+      type: boolean
+      required: false
+    - name: description
       type: string
       required: false
-      default: ""
-    - name: clients
+    - name: items
       type: list
       required: false
 
 npg_update_access_list:
-  description: "Update an access list. Pass only fields to change. REQUIRED: list_id."
+  description: "UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth (bool), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all)."
   parameters:
     - name: list_id
       type: integer | string
@@ -385,10 +390,16 @@ npg_update_access_list:
     - name: name
       type: string
       required: false
-    - name: advanced_config
+    - name: satisfy_any
+      type: boolean
+      required: false
+    - name: pass_auth
+      type: boolean
+      required: false
+    - name: description
       type: string
       required: false
-    - name: clients
+    - name: items
       type: list
       required: false
 
@@ -967,7 +978,7 @@ npg_create_notification_channel:
       default: 9
 
 npg_update_notification_channel:
-  description: "Update a notification channel. Pass only fields to change. REQUIRED: channel_id."
+  description: "UPDATE a notification channel (full-replace — read-modify-write: omitted fields are preserved by listing channels first and merging). REQUIRED: channel_id. Optional: name, channel_type (webhook/discord/telegram), config (dict with url/bot_token/chat_id), events, enabled, digest_enabled, digest_hour, allow_private_target, rich_format, language, dashboard_url, template. The API validates type+config together, so the current channel is fetched from the list endpoint first to merge existing values with provided ones."
   parameters:
     - name: channel_id
       type: integer | string
@@ -980,6 +991,33 @@ npg_update_notification_channel:
       required: false
     - name: config
       type: object
+      required: false
+    - name: events
+      type: array<string>
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: digest_enabled
+      type: boolean
+      required: false
+    - name: digest_hour
+      type: integer
+      required: false
+    - name: allow_private_target
+      type: boolean
+      required: false
+    - name: rich_format
+      type: boolean
+      required: false
+    - name: language
+      type: string
+      required: false
+    - name: dashboard_url
+      type: string
+      required: false
+    - name: template
+      type: string
       required: false
 
 npg_delete_notification_channel:
@@ -1004,8 +1042,14 @@ npg_get_notification_deliveries:
       required: true
 
 npg_detect_telegram_chats:
-  description: "Detect available Telegram chats for notification delivery."
-  parameters: []
+  description: "DETECT available Telegram chats for notification delivery. REQUIRED: bot_token (Telegram bot API token). Optional: channel_id (existing channel ID to look up stored token). Sends bot_token in the request body; Telegram must be reachable from the NPG server."
+  parameters:
+    - name: bot_token
+      type: string
+      required: false
+    - name: channel_id
+      type: string
+      required: false
 
 npg_list_users:
   description: "List all users."
@@ -1019,7 +1063,7 @@ npg_get_user:
       required: true
 
 npg_create_user:
-  description: "Create a new user. Required: username, email, password. Optional: role_id, is_active."
+  description: "CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Optional: is_active. The API rejects creation without a valid role_id (empty string causes 500)."
   parameters:
     - name: username
       type: string
@@ -1032,7 +1076,7 @@ npg_create_user:
       required: true
     - name: role_id
       type: integer | string
-      required: false
+      required: true
     - name: is_active
       type: boolean
       required: false
@@ -1067,22 +1111,29 @@ npg_list_roles:
   parameters: []
 
 npg_create_role:
-  description: "Create a new role. Required: name, permissions (array of permission strings)."
+  description: "CREATE a new role. REQUIRED: name. Optional: description, permissions (array of 'area:verb' strings, e.g. ['proxy:read','proxy:write']). Use npg_get_permission_areas to list valid areas and verbs."
   parameters:
     - name: name
       type: string
       required: true
     - name: permissions
       type: array<string>
-      required: true
+      required: false
+    - name: description
+      type: string
+      required: false
+      default: ""
 
 npg_update_role:
-  description: "Update a role. Pass only fields to change. REQUIRED: role_id."
+  description: "UPDATE a role (partial update — omitted fields left as-is). REQUIRED: role_id. Optional: name, description, permissions (array of 'area:verb' strings)."
   parameters:
     - name: role_id
       type: integer | string
       required: true
     - name: name
+      type: string
+      required: false
+    - name: description
       type: string
       required: false
     - name: permissions
@@ -1123,7 +1174,7 @@ npg_create_sso_provider:
       required: false
 
 npg_update_sso_provider:
-  description: "Update an SSO provider. Pass only fields to change. Required: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes."
+  description: "UPDATE an SSO provider (full-replace endpoint — omitted fields may reset, consider listing first to merge). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1144,6 +1195,30 @@ npg_update_sso_provider:
       type: string
       required: false
     - name: scopes
+      type: string
+      required: false
+    - name: callback_base_url
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: allow_jit
+      type: boolean
+      required: false
+    - name: allowed_email_domains
+      type: array<string>
+      required: false
+    - name: allowed_emails
+      type: array<string>
+      required: false
+    - name: group_claim
+      type: string
+      required: false
+    - name: required_group
+      type: string
+      required: false
+    - name: default_role_id
       type: string
       required: false
 
@@ -1260,19 +1335,22 @@ npg_update_global_uri_block:
       required: false
 
 npg_add_global_uri_block_rule:
-  description: "Add a rule to the global URI block. Required: pattern, action. Optional: is_regex."
+  description: "ADD a rule to the global URI block. REQUIRED: pattern. Optional: match_type (exact/prefix/regex, default prefix), description, enabled (default true)."
   parameters:
     - name: pattern
       type: string
       required: true
-    - name: action
+    - name: match_type
       type: string
       required: false
-      default: "block"
-    - name: is_regex
+      default: "prefix"
+    - name: description
+      type: string
+      required: false
+      default: ""
+    - name: enabled
       type: boolean
       required: false
-      default: false
 
 npg_delete_global_uri_block_rule:
   description: "Delete a rule from the global URI block by its ID. REQUIRED: rule_id."
@@ -1508,14 +1586,14 @@ npg_update_global_waf:
       required: false
 
 npg_download_backup:
-  description: "Download a backup by its ID. Returns the raw backup content."
+  description: "DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns the raw backup content (gzip binary). Use npg_list_backups to find the ID."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
 
 npg_upload_restore_backup:
-  description: "Upload and restore from a backup file. REQUIRED: file_content."
+  description: "UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (base64 or raw bytes of the .tar.gz backup file). The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first."
   parameters:
     - name: file_content
       type: string
@@ -1549,7 +1627,7 @@ npg_list_auth_providers:
   parameters: []
 
 npg_create_auth_provider:
-  description: "Create a ForwardAuth provider. REQUIRED: name, provider_type, config dict (provider-specific)."
+  description: "CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL, e.g. http://127.0.0.1:9091). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (for Docker-backed providers, provider_url is resolved from container)."
   parameters:
     - name: name
       type: string
@@ -1557,10 +1635,28 @@ npg_create_auth_provider:
     - name: provider_type
       type: string
       required: true
+    - name: provider_url
+      type: string
+      required: false
     - name: config
       type: object
       required: false
-    - name: provider_url
+    - name: enabled
+      type: boolean
+      required: false
+    - name: timeout_ms
+      type: integer
+      required: false
+    - name: container_name
+      type: string
+      required: false
+    - name: container_network
+      type: string
+      required: false
+    - name: container_port
+      type: integer
+      required: false
+    - name: container_scheme
       type: string
       required: false
 
@@ -1572,7 +1668,7 @@ npg_get_auth_provider:
       required: true
 
 npg_update_auth_provider:
-  description: "Update a ForwardAuth provider (partial update). Pass only fields to change. REQUIRED: provider_id."
+  description: "UPDATE a ForwardAuth provider (partial update — omitted fields left as-is). REQUIRED: provider_id. Optional: name, provider_url, config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1580,8 +1676,29 @@ npg_update_auth_provider:
     - name: name
       type: string
       required: false
+    - name: provider_url
+      type: string
+      required: false
     - name: config
       type: object
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: timeout_ms
+      type: integer
+      required: false
+    - name: container_name
+      type: string
+      required: false
+    - name: container_network
+      type: string
+      required: false
+    - name: container_port
+      type: integer
+      required: false
+    - name: container_scheme
+      type: string
       required: false
 
 npg_delete_auth_provider:
@@ -1596,21 +1713,26 @@ npg_list_ddns_records:
   parameters: []
 
 npg_create_ddns_record:
-  description: "Create a DDNS record. REQUIRED: proxy_host_id, domain, provider_id. Optional: proxied (bool)."
+  description: "CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool)."
   parameters:
-    - name: proxy_host_id
-      type: integer | string
-      required: true
-    - name: domain
+    - name: hostname
       type: string
       required: true
-    - name: provider_id
+    - name: dns_provider_id
       type: integer | string
       required: true
     - name: proxied
       type: boolean
       required: false
       default: false
+    - name: ttl
+      type: integer
+      required: false
+      default: 0
+    - name: enabled
+      type: boolean
+      required: false
+      default: true
 
 npg_get_ddns_record:
   description: "Get a DDNS record by its ID. REQUIRED: record_id."
@@ -1620,18 +1742,24 @@ npg_get_ddns_record:
       required: true
 
 npg_update_ddns_record:
-  description: "Update a DDNS record (partial update). Pass only fields to change. REQUIRED: record_id."
+  description: "UPDATE a DDNS record (partial update — omitted fields left as-is). REQUIRED: record_id. Optional: hostname, dns_provider_id, proxied (bool), ttl (int), enabled (bool)."
   parameters:
     - name: record_id
       type: integer | string
       required: true
-    - name: domain
+    - name: hostname
       type: string
       required: false
-    - name: provider_id
+    - name: dns_provider_id
       type: integer | string
       required: false
     - name: proxied
+      type: boolean
+      required: false
+    - name: ttl
+      type: integer
+      required: false
+    - name: enabled
       type: boolean
       required: false
 
@@ -2206,7 +2334,7 @@ npg_get_waf_host_history:
       required: true
 
 npg_disable_waf_rule_by_host:
-  description: "Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name, rule_id."
+  description: "Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API."
   parameters:
     - name: domain_name
       type: string

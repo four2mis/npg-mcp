@@ -638,8 +638,8 @@ async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bo
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: strict, balanced, or relaxed. REQUIRED: host_id.")
-async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["strict", "balanced", "relaxed"]) -> dict:
+@mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: moderate, relaxed, or strict. REQUIRED: host_id.")
+async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["moderate", "relaxed", "strict"]) -> dict:
     c = _get_client()
     try:
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers/preset/{preset}")
@@ -782,28 +782,30 @@ async def npg_get_access_list(list_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_access_list", description="Create a new access list. Required: name, advanced_config (block/allow rules).")
-async def npg_create_access_list(name: str, advanced_config: str = "", clients: list | None = None) -> dict:
+@mcp.tool(name="npg_create_access_list", description="CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth (bool, allow authenticated users to bypass), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all, description, sort_order).")
+async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     c = _get_client()
     try:
-        body = {
-            "name": name,
-            "advanced_config": advanced_config,
-            "clients": clients or [],
-        }
+        body: dict = {"name": name}
+        if satisfy_any is not None: body["satisfy_any"] = satisfy_any
+        if pass_auth is not None: body["pass_auth"] = pass_auth
+        if description is not None: body["description"] = description
+        if items is not None: body["items"] = items
         data = c.post("/api/v1/access-lists", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_access_list", description="Update an access list. Pass only fields to change. REQUIRED: list_id.")
-async def npg_update_access_list(list_id: str | int, name: str | None = None, advanced_config: str | None = None, clients: list | None = None) -> dict:
+@mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth (bool), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all).")
+async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
         if name is not None: body["name"] = name
-        if advanced_config is not None: body["advanced_config"] = advanced_config
-        if clients is not None: body["clients"] = clients
+        if satisfy_any is not None: body["satisfy_any"] = satisfy_any
+        if pass_auth is not None: body["pass_auth"] = pass_auth
+        if description is not None: body["description"] = description
+        if items is not None: body["items"] = items
         data = c.put(f"/api/v1/access-lists/{_id_path(list_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1461,15 +1463,48 @@ async def npg_create_notification_channel(name: str, channel_type: str, config: 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_notification_channel", description="Update a notification channel. Pass only fields to change. REQUIRED: channel_id.")
-async def npg_update_notification_channel(channel_id: str | int, name: str | None = None, channel_type: str | None = None, config: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_notification_channel", description="UPDATE a notification channel (full-replace — read-modify-write: omitted fields are preserved by listing channels first and merging). REQUIRED: channel_id. Optional: name, channel_type (webhook/discord/telegram), config (dict with url/bot_token/chat_id), events, enabled, digest_enabled, digest_hour, allow_private_target, rich_format, language, dashboard_url, template. The API validates type+config together, so the current channel is fetched from the list endpoint first to merge existing values with provided ones.")
+async def npg_update_notification_channel(channel_id: str | int, name: str | None = None, channel_type: str | None = None, config: dict | None = None, events: list[str] | None = None, enabled: bool | None = None, digest_enabled: bool | None = None, digest_hour: int | None = None, allow_private_target: bool | None = None, rich_format: bool | None = None, language: str | None = None, dashboard_url: str | None = None, template: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
+        cid = _id_path(channel_id)
+        # Read-modify-write: API is full-replace (UpdateNotificationChannelRequest = CreateNotificationChannelRequest)
+        # There is no GET /:id endpoint, so we use the list endpoint and find by ID
+        listing = c.get("/api/v1/notification-channels")
+        existing: dict = {}
+        if listing and isinstance(listing, dict):
+            for ch in listing.get("data", []):
+                if ch.get("id") == cid:
+                    existing = ch
+                    break
+        body: dict = {
+            "name": existing.get("name", ""),
+            "type": existing.get("type", "webhook"),
+            "config": existing.get("config", {}),
+            "events": existing.get("events", []),
+            "digest_events": existing.get("digest_events", []),
+            "rich_format": existing.get("rich_format", False),
+            "language": existing.get("language", "en"),
+            "dashboard_url": existing.get("dashboard_url", ""),
+            "digest_enabled": existing.get("digest_enabled", False),
+            "digest_hour": existing.get("digest_hour", 9),
+            "allow_private_target": existing.get("allow_private_target", False),
+            "template": existing.get("template", ""),
+        }
+        if enabled is not None: body["enabled"] = enabled
+        # Overlay provided fields
         if name is not None: body["name"] = name
         if channel_type is not None: body["type"] = channel_type
         if config is not None: body["config"] = config
-        data = c.put(f"/api/v1/notification-channels/{_id_path(channel_id)}", body)
+        if events is not None: body["events"] = events
+        if digest_enabled is not None: body["digest_enabled"] = digest_enabled
+        if digest_hour is not None: body["digest_hour"] = digest_hour
+        if allow_private_target is not None: body["allow_private_target"] = allow_private_target
+        if rich_format is not None: body["rich_format"] = rich_format
+        if language is not None: body["language"] = language
+        if dashboard_url is not None: body["dashboard_url"] = dashboard_url
+        if template is not None: body["template"] = template
+        data = c.put(f"/api/v1/notification-channels/{cid}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1501,11 +1536,14 @@ async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_detect_telegram_chats", description="Detect available Telegram chats for notification delivery.")
-async def npg_detect_telegram_chats() -> dict:
+@mcp.tool(name="npg_detect_telegram_chats", description="DETECT available Telegram chats for notification delivery. REQUIRED: bot_token (Telegram bot API token). Optional: channel_id (existing channel ID to look up stored token). Sends bot_token in the request body; Telegram must be reachable from the NPG server.")
+async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: str | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/notification-channels/detect-telegram-chats")
+        body: dict = {}
+        if bot_token is not None: body["bot_token"] = bot_token
+        if channel_id is not None: body["channel_id"] = channel_id
+        data = c.post("/api/v1/notification-channels/detect-telegram-chats", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1531,13 +1569,11 @@ async def npg_get_user(user_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_user", description="Create a new user. Required: username, email, password. Optional: role_id, is_active.")
-async def npg_create_user(username: str, email: str, password: str, role_id: str | int | None = None, is_active: bool = True) -> dict:
+@mcp.tool(name="npg_create_user", description="CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Optional: is_active. The API rejects creation without a valid role_id (empty string causes 500).")
+async def npg_create_user(username: str, email: str, password: str, role_id: str | int, is_active: bool = True) -> dict:
     c = _get_client()
     try:
-        body = {"username": username, "email": email, "password": password, "is_active": is_active}
-        if role_id is not None:
-            body["role_id"] = _id_path(role_id)
+        body = {"username": username, "email": email, "password": password, "role_id": _id_path(role_id), "is_active": is_active}
         data = c.post("/api/v1/users", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1582,22 +1618,23 @@ async def npg_list_roles() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_role", description="Create a new role. Required: name, permissions (array of permission strings).")
-async def npg_create_role(name: str, permissions: list[str]) -> dict:
+@mcp.tool(name="npg_create_role", description="CREATE a new role. REQUIRED: name. Optional: description, permissions (array of 'area:verb' strings, e.g. ['proxy:read','proxy:write']). Use npg_get_permission_areas to list valid areas and verbs.")
+async def npg_create_role(name: str, permissions: list[str] | None = None, description: str = "") -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "permissions": permissions}
+        body = {"name": name, "description": description, "permissions": permissions or []}
         data = c.post("/api/v1/roles", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_role", description="Update a role. Pass only fields to change. REQUIRED: role_id.")
-async def npg_update_role(role_id: str | int, name: str | None = None, permissions: list[str] | None = None) -> dict:
+@mcp.tool(name="npg_update_role", description="UPDATE a role (partial update — omitted fields left as-is). REQUIRED: role_id. Optional: name, description, permissions (array of 'area:verb' strings).")
+async def npg_update_role(role_id: str | int, name: str | None = None, description: str | None = None, permissions: list[str] | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
         if name is not None: body["name"] = name
+        if description is not None: body["description"] = description
         if permissions is not None: body["permissions"] = permissions
         data = c.put(f"/api/v1/roles/{_id_path(role_id)}", body)
         return {"success": True, "data": data}
@@ -1639,8 +1676,8 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_sso_provider", description="Update an SSO provider. Pass only fields to change. Required: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes.")
-async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None) -> dict:
+@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (full-replace endpoint — omitted fields may reset, consider listing first to merge). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
+async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
@@ -1650,6 +1687,14 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
         if client_id is not None: body["client_id"] = client_id
         if client_secret is not None: body["client_secret"] = client_secret
         if scopes is not None: body["scopes"] = scopes
+        if callback_base_url is not None: body["callback_base_url"] = callback_base_url
+        if enabled is not None: body["enabled"] = enabled
+        if allow_jit is not None: body["allow_jit"] = allow_jit
+        if allowed_email_domains is not None: body["allowed_email_domains"] = allowed_email_domains
+        if allowed_emails is not None: body["allowed_emails"] = allowed_emails
+        if group_claim is not None: body["group_claim"] = group_claim
+        if required_group is not None: body["required_group"] = required_group
+        if default_role_id is not None: body["default_role_id"] = default_role_id
         data = c.put(f"/api/v1/sso-providers/{_id_path(provider_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1810,11 +1855,13 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_add_global_uri_block_rule", description="Add a rule to the global URI block. Required: pattern, action. Optional: is_regex.")
-async def npg_add_global_uri_block_rule(pattern: str, action: str = "block", is_regex: bool = False) -> dict:
+@mcp.tool(name="npg_add_global_uri_block_rule", description="ADD a rule to the global URI block. REQUIRED: pattern. Optional: match_type (exact/prefix/regex, default prefix), description, enabled (default true).")
+async def npg_add_global_uri_block_rule(pattern: str, match_type: str = "prefix", description: str = "", enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"pattern": pattern, "action": action, "is_regex": is_regex}
+        body: dict = {"pattern": pattern, "match_type": match_type}
+        if description: body["description"] = description
+        if enabled is not None: body["enabled"] = enabled
         data = c.post("/api/v1/global-uri-block/rules", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2148,7 +2195,7 @@ async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int
 
 # ── Backups ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_download_backup", description="Download a backup by its ID. Returns the raw backup content.")
+@mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns the raw backup content (gzip binary). Use npg_list_backups to find the ID.")
 async def npg_download_backup(backup_id: str | int) -> dict:
     c = _get_client()
     try:
@@ -2157,12 +2204,17 @@ async def npg_download_backup(backup_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_upload_restore_backup", description="Upload and restore from a backup file. REQUIRED: file_content.")
+@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (base64 or raw bytes of the .tar.gz backup file). The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first.")
 async def npg_upload_restore_backup(file_content: str) -> dict:
     c = _get_client()
     try:
-        body = {"file": file_content}
-        data = c.post("/api/v1/backups/upload-restore", body)
+        import base64
+        # Try base64 decode first; if it fails, treat as raw bytes
+        try:
+            raw = base64.b64decode(file_content)
+        except Exception:
+            raw = file_content.encode("utf-8")
+        data = c.post_file("/api/v1/backups/upload-restore", "backup", raw, "restore.tar.gz")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2257,15 +2309,19 @@ async def npg_list_auth_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_auth_provider", description="Create a ForwardAuth provider. REQUIRED: name, provider_type, config dict (provider-specific).")
-async def npg_create_auth_provider(name: str, provider_type: str, config: dict | None = None, provider_url: str | None = None) -> dict:
+@mcp.tool(name="npg_create_auth_provider", description="CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL, e.g. http://127.0.0.1:9091). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (for Docker-backed providers, provider_url is resolved from container).")
+async def npg_create_auth_provider(name: str, provider_type: str, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
     c = _get_client()
     try:
-        body = {"name": name, "type": provider_type}
-        if config is not None:
-            body["config"] = config
-        if provider_url is not None:
-            body["provider_url"] = provider_url
+        body: dict = {"name": name, "type": provider_type}
+        if provider_url is not None: body["provider_url"] = provider_url
+        if config is not None: body["config"] = config
+        if enabled is not None: body["enabled"] = enabled
+        if timeout_ms is not None: body["timeout_ms"] = timeout_ms
+        if container_name is not None: body["container_name"] = container_name
+        if container_network is not None: body["container_network"] = container_network
+        if container_port is not None: body["container_port"] = container_port
+        if container_scheme is not None: body["container_scheme"] = container_scheme
         data = c.post("/api/v1/auth-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2280,13 +2336,20 @@ async def npg_get_auth_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_auth_provider", description="Update a ForwardAuth provider (partial update). Pass only fields to change. REQUIRED: provider_id.")
-async def npg_update_auth_provider(provider_id: str | int, name: str | None = None, config: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_auth_provider", description="UPDATE a ForwardAuth provider (partial update — omitted fields left as-is). REQUIRED: provider_id. Optional: name, provider_url, config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme.")
+async def npg_update_auth_provider(provider_id: str | int, name: str | None = None, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
         if name is not None: body["name"] = name
+        if provider_url is not None: body["provider_url"] = provider_url
         if config is not None: body["config"] = config
+        if enabled is not None: body["enabled"] = enabled
+        if timeout_ms is not None: body["timeout_ms"] = timeout_ms
+        if container_name is not None: body["container_name"] = container_name
+        if container_network is not None: body["container_network"] = container_network
+        if container_port is not None: body["container_port"] = container_port
+        if container_scheme is not None: body["container_scheme"] = container_scheme
         data = c.put(f"/api/v1/auth-providers/{_id_path(provider_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2313,11 +2376,12 @@ async def npg_list_ddns_records() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_ddns_record", description="Create a DDNS record. REQUIRED: proxy_host_id, domain, provider_id. Optional: proxied (bool).")
-async def npg_create_ddns_record(proxy_host_id: str | int, domain: str, provider_id: str | int, proxied: bool = False) -> dict:
+@mcp.tool(name="npg_create_ddns_record", description="CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool).")
+async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, proxied: bool = False, ttl: int = 0, enabled: bool = True) -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/ddns-records", {"proxy_host_id": _id_path(proxy_host_id), "domain": domain, "provider_id": _id_path(provider_id), "proxied": proxied})
+        body = {"hostname": hostname, "dns_provider_id": _id_path(dns_provider_id), "proxied": proxied, "ttl": ttl, "enabled": enabled}
+        data = c.post("/api/v1/ddns-records", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2331,14 +2395,16 @@ async def npg_get_ddns_record(record_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_ddns_record", description="Update a DDNS record (partial update). Pass only fields to change. REQUIRED: record_id.")
-async def npg_update_ddns_record(record_id: str | int, domain: str | None = None, provider_id: str | int | None = None, proxied: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_ddns_record", description="UPDATE a DDNS record (partial update — omitted fields left as-is). REQUIRED: record_id. Optional: hostname, dns_provider_id, proxied (bool), ttl (int), enabled (bool).")
+async def npg_update_ddns_record(record_id: str | int, hostname: str | None = None, dns_provider_id: str | int | None = None, proxied: bool | None = None, ttl: int | None = None, enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
         body: dict = {}
-        if domain is not None: body["domain"] = domain
-        if provider_id is not None: body["provider_id"] = _id_path(provider_id)
+        if hostname is not None: body["hostname"] = hostname
+        if dns_provider_id is not None: body["dns_provider_id"] = _id_path(dns_provider_id)
         if proxied is not None: body["proxied"] = proxied
+        if ttl is not None: body["ttl"] = ttl
+        if enabled is not None: body["enabled"] = enabled
         data = c.put(f"/api/v1/ddns-records/{_id_path(record_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -3149,12 +3215,11 @@ async def npg_get_waf_host_history(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_disable_waf_rule_by_host", description="Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name, rule_id.")
+@mcp.tool(name="npg_disable_waf_rule_by_host", description="Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API.")
 async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> dict:
     c = _get_client()
     try:
-        encoded = quote(domain_name, safe="")
-        data = c.post(f"/api/v1/waf/rules/disable-by-host", {"domain_name": encoded, "rule_id": _id_path(rule_id)})
+        data = c.post("/api/v1/waf/rules/disable-by-host", {"host": domain_name, "rule_id": int(rule_id)})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
