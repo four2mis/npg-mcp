@@ -52,7 +52,7 @@ Create a `.env` file from the template:
 
 ```bash
 cp .env.example .env
-# then edit .env with your NPG credentials
+# then edit .env with your NPG API token
 ```
 
 Or run with Docker Compose using the included `docker-compose.yml`:
@@ -158,7 +158,7 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 ## Tools Reference
 
-This server exposes **280 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **274 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
@@ -166,7 +166,7 @@ This server exposes **280 MCP tools** across 27 categories. Tool names, descript
 | **Logs** | 32 tools |
 | **Security & WAF** | 27 tools |
 | **DNS Providers** | 15 tools |
-| **Authentication** | 15 tools |
+| **Authentication** | 9 tools |
 | **Certificates** | 14 tools |
 | **Filter Subscriptions** | 14 tools |
 | **Cloud Providers** | 13 tools |
@@ -191,17 +191,16 @@ This server exposes **280 MCP tools** across 27 categories. Tool names, descript
 | **Docker** | 1 tool |
 ## Authentication
 
-The server **auto-authenticates** on first use using `NPG_USERNAME` and `NPG_PASSWORD`. No manual token management needed — every tool call automatically refreshes auth.
+The server authenticates to NPG using a long-lived API token (`ng_...` format), set via the `NPG_API_TOKEN` environment variable. Create one in the NPG web UI or via `POST /api/v1/api-tokens`. The token is immune to password changes and is the only authentication method supported.
 
-Alternatively, call `npg_auth_login` directly for explicit authentication. The resulting NPG session token is stored **server-side only** and is never returned to the client.
+Session-only endpoints (account password changes, 2FA management, account metadata) are not supported — those operations require a browser session and are intentionally excluded for security.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NPG_BASE_URL` | `http://npg-api:8080` | NPG API base URL |
-| `NPG_USERNAME` | — | NPG login username (required) |
-| `NPG_PASSWORD` | — | NPG login password (required) |
+| `NPG_API_TOKEN` | — | NPG API token (`ng_...` format). **Required.** Create one in the NPG web UI or via `POST /api/v1/api-tokens`. |
 | `MCP_PORT` | `8081` | MCP server listening port |
 | `MCP_HOST` | `0.0.0.0` | MCP server bind host |
 | `MCP_API_TOKEN` | *(empty)* | Bearer token required on the MCP endpoint. **Leave empty for open (local/LAN-only) mode.** Generate with `openssl rand -hex 32`. |
@@ -213,13 +212,13 @@ Alternatively, call `npg_auth_login` directly for explicit authentication. The r
 
 ```
 npg_mcp/
-  main.py       # All 280 MCP tools
-  client.py     # HTTP client wrapper with auto-auth
+  main.py       # All 274 MCP tools
+  client.py     # HTTP client wrapper with API token auth
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
 pyproject.toml  # Dependencies: mcp>=1.0, httpx>=0.27
-tool-schemas.yaml  # Full input parameter schemas for all 280 tools
+tool-schemas.yaml  # Full input parameter schemas for all 274 tools
 ```
 
 ## License

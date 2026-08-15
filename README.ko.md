@@ -52,7 +52,7 @@ docker pull ghcr.io/four2mis/npg-mcp:latest
 
 ```bash
 cp .env.example .env
-# 그리고 .env를 NPG 자격 증명으로 편집
+# 그리고 .env를 NPG API 토큰으로 편집
 ```
 
 또는 포함된 `docker-compose.yml`로 Docker Compose 실행:
@@ -158,7 +158,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **280개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **274개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
 | 카테고리 | 도구 |
 |----------|-------|
@@ -166,7 +166,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **로그(Logs)** | 32 tools |
 | **보안 및 WAF(Security & WAF)** | 27 tools |
 | **DNS 제공자(DNS Providers)** | 15 tools |
-| **인증(Authentication)** | 15 tools |
+| **인증(Authentication)** | 9 tools |
 | **인증서(Certificates)** | 14 tools |
 | **필터 구독(Filter Subscriptions)** | 14 tools |
 | **클라우드 제공자(Cloud Providers)** | 13 tools |
@@ -191,15 +191,16 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **Docker** | 1 tool |
 ## 인증
 
-서버는 `NPG_USERNAME`과 `NPG_PASSWORD`를 사용해 **첫 사용 시 자동 인증**합니다. 수동 토큰 관리가 필요 없습니다 — 모든 도구 호출이 인증을 자동으로 갱신합니다.
+서버는 장기 API 토큰(`ng_...` 형식)을 사용하여 NPG에 인증하며, `NPG_API_TOKEN` 환경 변수로 설정합니다. NPG 웹 UI 또는 `POST /api/v1/api-tokens`에서 토큰을 생성하십시오. 이 토큰은 비밀번호 변경에 영향을 받지 않으며, 유일하게 지원되는 인증 방법입니다.
+
+세션 전용 엔드포인트(계정 비밀번호 변경, 2FA 관리, 계정 메타데이터)는 지원되지 않습니다 — 해당 작업은 브라우저 세션이 필요하며 보안상 의도적으로 제외되었습니다.
 
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |
 |----------|---------|-------------|
 | `NPG_BASE_URL` | `http://npg-api:8080` | NPG API 기본 URL |
-| `NPG_USERNAME` | — | NPG 로그인 사용자 이름(필수) |
-| `NPG_PASSWORD` | — | NPG 로그인 비밀번호(필수) |
+| `NPG_API_TOKEN` | — | NPG API 토큰(`ng_...` 형식). **필수.** NPG 웹 UI 또는 `POST /api/v1/api-tokens`에서 생성. |
 | `MCP_PORT` | `8081` | MCP 서버 수신 포트 |
 | `MCP_HOST` | `0.0.0.0` | MCP 서버 바인딩 호스트 |
 | `MCP_API_TOKEN` | *(비어 있음)* | MCP 엔드포인트에 필요한 Bearer 토큰. **열린(로컬/LAN 전용) 모드로 하려면 비워 두십시오.** `openssl rand -hex 32`로 생성. |
@@ -211,13 +212,13 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ```
 npg_mcp/
-  main.py       # 287개의 모든 MCP 도구
-  client.py     # 자동 인증을 갖춘 HTTP 클라이언트 래퍼
+  main.py       # 274개의 모든 MCP 도구
+  client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml
 pyproject.toml  # 의존성: mcp>=1.0, httpx>=0.27
-tool-schemas.yaml  # 287개 도구의 전체 입력 매개변수 스키마
+tool-schemas.yaml  # 274개 도구의 전체 입력 매개변수 스키마
 ```
 
 ## 라이선스

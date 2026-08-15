@@ -1529,63 +1529,9 @@ npg_get_auth_status:
   description: "GET authentication status — returns whether the current session is authenticated and basic user info."
   parameters: []
 
-npg_get_auth_account:
-  description: "GET own account info — returns the authenticated user's account details. NOTE: This endpoint is JWT-only (API tokens not accepted); falls back to JWT auth if needed."
-  parameters: []
-
 npg_get_auth_me:
-  description: "GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Accepts both API token and session JWT on NPG v2.39.+. Use to check what the current credential can actually do."
+  description: "GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Use to check what the current API token can actually do."
   parameters: []
-
-npg_auth_change_credentials:
-  description: "Change own username and password (initial setup). REQUIRED: current_password, new_username, new_password. Used to complete forced initial setup."
-  parameters:
-    - name: current_password
-      type: string
-      required: true
-    - name: new_username
-      type: string
-      required: true
-    - name: new_password
-      type: string
-      required: true
-
-npg_auth_change_username:
-  description: "Change own username. REQUIRED: current_password, new_username."
-  parameters:
-    - name: current_password
-      type: string
-      required: true
-    - name: new_username
-      type: string
-      required: true
-
-npg_auth_2fa_setup:
-  description: "Begin 2FA enrolment — returns QR code / secret for the user to scan with their authenticator app. REQUIRED: password."
-  parameters:
-    - name: password
-      type: string
-      required: true
-
-npg_auth_2fa_enable:
-  description: "Enable 2FA. REQUIRED: password, totp_code (6-digit code from authenticator)."
-  parameters:
-    - name: password
-      type: string
-      required: true
-    - name: totp_code
-      type: string
-      required: true
-
-npg_auth_2fa_disable:
-  description: "Disable 2FA. REQUIRED: password, totp_code."
-  parameters:
-    - name: password
-      type: string
-      required: true
-    - name: totp_code
-      type: string
-      required: true
 
 npg_get_auth_sso_providers:
   description: "List SSO providers available for the login screen (public-facing)."
@@ -2211,11 +2157,11 @@ npg_apply_settings_preset:
       required: true
 
 npg_get_health_detailed:
-  description: "GET a detailed health snapshot (detailed version of health check). Accepts both API token and session JWT on NPG v2.39.+."
+  description: "GET a detailed health snapshot (detailed version of health check)."
   parameters: []
 
 npg_get_status:
-  description: "GET component status — health of all NPG subsystems (API, database, nginx). Accepts both API token and session JWT on NPG v2.39.+."
+  description: "GET component status — health of all NPG subsystems (API, database, nginx)."
   parameters: []
 
 npg_check_npg_update:

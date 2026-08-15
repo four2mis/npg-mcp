@@ -1,4 +1,4 @@
-"""NginxProxyGuard API client — thin HTTP wrapper with JWT auth."""
+"""NginxProxyGuard API client — thin HTTP wrapper with API token auth."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class NPGError(Exception):
 
 
 class NPGClient:
-    """Thin httpx wrapper over NPG API with JWT session auth."""
+    """Thin httpx wrapper over NPG API with bearer token auth."""
 
     def __init__(self, base_url: str | None = None, token: str | None = None):
         self.base_url = (base_url or get_base_url()).rstrip("/")
@@ -131,37 +131,6 @@ class NPGClient:
             raise
         except Exception as e:
             raise self._sanitize(e) from e
-
-    def login(self, username: str, password: str, tfa_code: str | None = None) -> dict:
-        """Authenticate and return JWT token."""
-        try:
-            body = {"username": username, "password": password}
-            if tfa_code:
-                body["tfa_code"] = tfa_code
-            resp = self._client.post(
-                urljoin(self.base_url + "/api/v1/", "auth/login"), json=body
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            token = data["token"]
-            self._token = token
-            set_token(token)
-            self._client.headers["Authorization"] = f"Bearer {token}"
-            return data
-        except NPGError:
-            raise
-        except Exception as e:
-            raise self._sanitize(e) from e
-
-    def logout(self) -> dict | None:
-        """Invalidate current session."""
-        result = self.post("/api/v1/auth/logout")
-        set_token("")
-        return result
-
-    def me(self) -> dict | None:
-        """Get current user info."""
-        return self.get("/api/v1/auth/me")
 
     def close(self) -> None:
         self._client.close()

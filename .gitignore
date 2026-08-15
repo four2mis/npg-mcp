@@ -26,11 +26,6 @@ Thumbs.db
 AGENTS.md
 
 # Generated / attached files
-swagger(1).yaml
-swagger.md
-*.txt
-
-swagger.yaml
 
 # Kanban pipeline working files (agent-managed, not source code)
 .kanban-goals.md
