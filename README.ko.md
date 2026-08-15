@@ -91,7 +91,7 @@ networks:
 
 서버를 배포하면(위 Docker 섹션 참조) MCP 엔드포인트가 `http://<host>:8081/mcp`에 게시됩니다. MCP를 지원하는 모든 에이전트에서 이 URL을 가리키면 사용할 수 있습니다.
 
-> **`MCP_API_TOKEN`이 설정된 경우(네트워크에 노출된 모든 배포에서 권장), 모든 MCP 요청은 `Authorization: Bearer *** 헤더를 반드시 포함해야 합니다** — 없으면 `401`이 반환됩니다. 아래 각 클라이언트 설정에서 헤더를 어디에 넣는지 보여줍니다. 토큰(`openssl rand -hex 32`)은 서버의 `.env`에 `MCP_API_TOKEN`으로 설정됩니다.
+> **`MCP_API_TOKEN`이 설정된 경우(네트워크에 노출된 모든 배포에서 권장), 모든 MCP 요청은 `Authorization: Bearer <MCP_API_TOKEN>` 헤더를 반드시 포함해야 합니다** — 없으면 `401`이 반환됩니다. 아래 각 클라이언트 설정에서 헤더를 어디에 넣는지 보여줍니다. 토큰(`openssl rand -hex 32`)은 서버의 `.env`에 `MCP_API_TOKEN`으로 설정됩니다.
 
 ### Hermes 에이전트
 
@@ -146,7 +146,7 @@ headers = { Authorization = "Bearer <MCP_API_TOKEN>" }
 클라이언트의 MCP 설정에 **원격 / SSE+HTTP MCP 서버** 항목을 추가하십시오:
 
 - **URL:** `http://<host>:8081/mcp`
-- **헤더:** `Authorization: Bearer <MCP_A...(토큰이 설정된 경우)
+- **헤더:** `Authorization: Bearer <MCP_API_TOKEN>` (토큰이 설정된 경우)
 
 Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라이언트가 연결할 수 있습니다. 이 엔드포인트는 표준 FastMCP Streamable HTTP 서버입니다.
 
@@ -189,6 +189,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **SSL / Nginx** | 3 tools |
 | **시스템 및 상태(System & Health)** | 1 tool |
 | **Docker** | 1 tool |
+
 ## 인증
 
 서버는 장기 API 토큰(`ng_...` 형식)을 사용하여 NPG에 인증하며, `NPG_API_TOKEN` 환경 변수로 설정합니다. NPG 웹 UI 또는 `POST /api/v1/api-tokens`에서 토큰을 생성하십시오. 이 토큰은 비밀번호 변경에 영향을 받지 않으며, 유일하게 지원되는 인증 방법입니다.

@@ -91,7 +91,7 @@ networks:
 
 Deploying the server (Docker section above) publishes the MCP endpoint at `http://<host>:8081/mcp`. Add it to any MCP-capable agent by pointing at that URL.
 
-> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), every MCP request MUST carry the `Authorization: Bearer *** header** — requests without it get `401`. Every client config below shows where the header goes. The token (`openssl rand -hex 32`) is set in the server's `.env` as `MCP_API_TOKEN`.
+> **If `MCP_API_TOKEN` is set (recommended for any network-exposed deployment), every MCP request MUST carry the `Authorization: Bearer <MCP_API_TOKEN>` header** — requests without it get `401`. Every client config below shows where the header goes. The token (`openssl rand -hex 32`) is set in the server's `.env` as `MCP_API_TOKEN`.
 
 ### Hermes Agent
 
@@ -146,7 +146,7 @@ headers = { Authorization = "Bearer <MCP_API_TOKEN>" }
 Add a **remote / SSE+HTTP MCP server** entry in the client's MCP settings with:
 
 - **URL:** `http://<host>:8081/mcp`
-- **Headers:** `Authorization: Bearer *** (if a token is configured)
+- **Headers:** `Authorization: Bearer <MCP_API_TOKEN>` (if a token is configured)
 
 Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) can connect. The endpoint is a standard FastMCP Streamable HTTP server.
 
@@ -189,6 +189,7 @@ This server exposes **274 MCP tools** across 27 categories. Tool names, descript
 | **SSL / Nginx** | 3 tools |
 | **System & Health** | 1 tool |
 | **Docker** | 1 tool |
+
 ## Authentication
 
 The server authenticates to NPG using a long-lived API token (`ng_...` format), set via the `NPG_API_TOKEN` environment variable. Create one in the NPG web UI or via `POST /api/v1/api-tokens`. The token is immune to password changes and is the only authentication method supported.
