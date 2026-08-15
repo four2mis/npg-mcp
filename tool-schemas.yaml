@@ -267,7 +267,7 @@ npg_get_proxy_host_upstream:
       required: true
 
 npg_update_proxy_host_upstream:
-  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
+  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'host:port', weight, backup}), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -1174,7 +1174,7 @@ npg_create_sso_provider:
       required: false
 
 npg_update_sso_provider:
-  description: "UPDATE an SSO provider (full-replace endpoint — omitted fields may reset, consider listing first to merge). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
+  description: "UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
   parameters:
     - name: provider_id
       type: integer | string

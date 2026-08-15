@@ -656,7 +656,7 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme, servers (list of {address, port, weight, backup}), load_balance, health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
+@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'host:port', weight, backup}), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
 async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -1676,11 +1676,34 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (full-replace endpoint — omitted fields may reset, consider listing first to merge). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (send '********' to leave unchanged), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
+@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
 async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
+        cid = _id_path(provider_id)
+        # Read-modify-write: API PUT is full-replace (requires slug, issuer_url, client_id, client_secret)
+        # No GET /sso-providers/{id} exists, so fetch the list and find by ID
+        providers = c.get("/api/v1/sso-providers")
+        current = None
+        if isinstance(providers, dict):
+            items = providers.get("data", [])
+        elif isinstance(providers, list):
+            items = providers
+        else:
+            items = []
+        for p in items:
+            if p.get("id") == cid:
+                current = p
+                break
+        if current is None:
+            return {"success": False, "error": f"SSO provider {cid} not found"}
+        # Start with current values for full-replace fields
+        body: dict = {"slug": current.get("slug", ""), "issuer_url": current.get("issuer_url", ""), "client_id": current.get("client_id", ""), "client_secret": current.get("client_secret", "********")}
+        # Merge all current non-replace fields
+        for k in ("name", "scopes", "callback_base_url", "enabled", "allow_jit", "allowed_email_domains", "allowed_emails", "group_claim", "required_group", "default_role_id"):
+            if current.get(k) is not None:
+                body[k] = current[k]
+        # Override with provided values
         if name is not None: body["name"] = name
         if slug is not None: body["slug"] = slug
         if issuer_url is not None: body["issuer_url"] = issuer_url
@@ -1695,7 +1718,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
         if group_claim is not None: body["group_claim"] = group_claim
         if required_group is not None: body["required_group"] = required_group
         if default_role_id is not None: body["default_role_id"] = default_role_id
-        data = c.put(f"/api/v1/sso-providers/{_id_path(provider_id)}", body)
+        data = c.put(f"/api/v1/sso-providers/{cid}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
