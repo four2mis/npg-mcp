@@ -210,6 +210,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | `MCP_REBINDING_PROTECTION` | `true` | DNS 리바인딩 보호 활성화(프록시가 깨지는 경우에만 비활성화) |
 | `MCP_TRANSPORT` | `http` | 전송 모드: 네트워크 배포는 `http`, 직접 파이프는 `stdio`. Docker 이미지 기본값 `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
+| `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 129개), `standard`(파괴적 작업 제외 228개), `full`(전체 274개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가집니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
 
 ### 컨테이너 로그
 
@@ -222,12 +223,25 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 `NPG_LOG_LEVEL=DEBUG`로 더 상세한 출력을 볼 수 있습니다. **토큰은 절대 기록되지 않습니다** — 기본 수준에서는 요청/응답 본문도 기록되지 않습니다(MCP 도구와 1:1로 대응되는 엔드포인트 경로만 기록). DEBUG는 페이로드가 포함될 수 있는 라이브러리 수준의 세부 정보를 표시하므로 디버깅 시에만 사용하십시오.
 
+### 도구 수준(Toolset Levels)
+
+`NPG_TOOL_LEVEL`은 MCP 클라이언트에 노출되는 도구 수를 제어합니다. 서버 시작 시 한 번 읽으며, 숨겨진 도구는 도구 관리자에서 제거되므로 `tools/list`에 표시되지 않고 호출 시 `Unknown tool` 오류를 반환합니다.
+
+| 수준 | 도구 수 | 범위 |
+|-------|-------|-------|
+| `read` | 129 | 읽기 전용 도구만 (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). NPG 상태를 변경하지 않는 모니터링 에이전트에 적합합니다. |
+| `standard` | 228 | 파괴적 작업(모든 삭제/제거, IP 차단, 백업 복원/업로드, 비밀번호/역할/이메일 변경, 토큰 폐기, 정리, 초기화, 세션 종료, 로그 회전)을 제외한 모든 도구. 일상적인 관리 작업에 적합합니다. |
+| `full` | 274 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
+
+그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 274개 도구 참조를 문서화합니다.
+
 ## 프로젝트 구조
 
 ```
 npg_mcp/
   main.py       # 274개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
+  toolsets.py   # 계층형 도구 노출(NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml

@@ -24,6 +24,7 @@ warnings.filterwarnings(
 from mcp.server import transport_security
 from mcp.server.fastmcp import FastMCP
 import npg_mcp.client as client_mod
+import npg_mcp.toolsets as toolsets
 
 logger = logging.getLogger("npg_mcp.main")
 
@@ -3464,6 +3465,11 @@ async def npg_set_user_email(user_id: str | int, email: str) -> dict:
 
 def main() -> None:
     _setup_logging()
+    # Apply the layered toolset filter (NPG_TOOL_LEVEL) before the server
+    # starts. Hidden tools are removed from the FastMCP tool manager, so they
+    # are neither listed in tools/list nor callable via tools/call. Unknown
+    # levels and unset env fall back to "full" (all 274 tools).
+    toolsets.configure_toolset(mcp)
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "http":
         transport = "streamable-http"

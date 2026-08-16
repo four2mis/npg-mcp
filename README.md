@@ -210,6 +210,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
+| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (129 read-only tools), `standard` (228 tools, no destructive ops), `full` (all 274 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 
 ### Container Logs
 
@@ -222,12 +223,25 @@ Session-only endpoints (account password changes, 2FA management, account metada
 
 Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** — at the default level, request/response bodies aren't logged either (only endpoint paths, which map 1:1 to MCP tools). DEBUG surfaces library-level detail that may include payloads, so use it only when debugging.
 
+### Toolset Levels
+
+`NPG_TOOL_LEVEL` controls how much of the tool surface an MCP client sees. It is read once at server startup; hidden tools are removed from the tool manager, so they are not listed in `tools/list` and calling them returns `Unknown tool`.
+
+| Level | Tools | Scope |
+|-------|-------|-------|
+| `read` | 129 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
+| `standard` | 228 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
+| `full` | 274 | All tools. Default; behavior without the variable is unchanged. |
+
+Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 274-tool reference regardless of the selected level.
+
 ## Project Structure
 
 ```
 npg_mcp/
   main.py       # All 274 MCP tools
   client.py     # HTTP client wrapper with API token auth
+  toolsets.py   # Layered toolset exposure (NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
