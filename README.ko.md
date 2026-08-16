@@ -209,6 +209,18 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | `MCP_ALLOWED_ORIGINS` | *(비어 있음)* | 교차 출처 요청에서 허용되는 origin(쉼표 구분); CSRF 제한 |
 | `MCP_REBINDING_PROTECTION` | `true` | DNS 리바인딩 보호 활성화(프록시가 깨지는 경우에만 비활성화) |
 | `MCP_TRANSPORT` | `http` | 전송 모드: 네트워크 배포는 `http`, 직접 파이프는 `stdio`. Docker 이미지 기본값 `http`. |
+| `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
+
+### 컨테이너 로그
+
+`docker logs npg-mcp -f`로 서버가 받는 요청과 오류를 확인할 수 있습니다. 기본 `INFO` 수준에서 다음이 기록됩니다:
+
+- `MCP request POST /mcp tool=npg_get_proxy_host client=192.168.1.50 -> 200 (12 ms)` — 모든 수신 MCP 요청: HTTP 메서드/경로, JSON-RPC 메서드, 도구 이름, 클라이언트 IP, 응답 상태, 소요 시간.
+- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms)` — 모든 발송 NPG API 호출: HTTP 메서드, 엔드포인트 경로, 상태, 소요 시간.
+- `NPG GET /api/v1/proxy-hosts/{id} -> HTTP 404 (3 ms)` (ERROR 수준) — NPG API 오류(`4xx`/`5xx`). 실패한 호출 경로로 어떤 도구가 실패했는지 특정할 수 있습니다.
+- 처리되지 않은 MCP 요청 오류 시 ERROR 수준의 트레이스백.
+
+`NPG_LOG_LEVEL=DEBUG`로 더 상세한 출력을 볼 수 있습니다. **토큰은 절대 기록되지 않습니다** — 기본 수준에서는 요청/응답 본문도 기록되지 않습니다(MCP 도구와 1:1로 대응되는 엔드포인트 경로만 기록). DEBUG는 페이로드가 포함될 수 있는 라이브러리 수준의 세부 정보를 표시하므로 디버깅 시에만 사용하십시오.
 
 ## 프로젝트 구조
 

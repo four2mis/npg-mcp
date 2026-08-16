@@ -1152,7 +1152,7 @@ npg_list_sso_providers:
   parameters: []
 
 npg_create_sso_provider:
-  description: "Create a new SSO provider. Required: slug, name, issuer_url, client_id. Optional: client_secret (defaults to placeholder), scopes."
+  description: "CREATE a new SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. OPTIONAL: client_secret (defaults to placeholder), scopes, trust_provider_email (bool, default false — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; only enable if you control the provider AND its user enrollment). After creation, call npg_list_sso_providers to verify."
   parameters:
     - name: slug
       type: string
@@ -1172,9 +1172,13 @@ npg_create_sso_provider:
     - name: scopes
       type: string
       required: false
+    - name: trust_provider_email
+      type: boolean
+      required: false
+      default: false
 
 npg_update_sso_provider:
-  description: "UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
+  description: "UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, trust_provider_email (bool — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; omit to leave unchanged), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1204,6 +1208,9 @@ npg_update_sso_provider:
       type: boolean
       required: false
     - name: allow_jit
+      type: boolean
+      required: false
+    - name: trust_provider_email
       type: boolean
       required: false
     - name: allowed_email_domains

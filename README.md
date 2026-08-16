@@ -209,6 +209,18 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins accepted for cross-origin requests; restricts CSRF |
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
+| `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
+
+### Container Logs
+
+`docker logs npg-mcp -f` shows what requests and errors the server is getting. At the default `INFO` level you get:
+
+- `MCP request POST /mcp tool=npg_get_proxy_host client=192.168.1.50 -> 200 (12 ms)` — every inbound MCP request: HTTP method/path, JSON-RPC method, extracted tool name, client IP, response status, duration.
+- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms)` — every outbound NPG API call: HTTP method, endpoint path, status, duration.
+- `NPG GET /api/v1/proxy-hosts/{id} -> HTTP 404 (3 ms)` (ERROR level) — NPG API errors (`4xx`/`5xx`). The path of the failing call lets you pin down which tool failed.
+- A traceback at ERROR level for any unhandled MCP request error.
+
+Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** — at the default level, request/response bodies aren't logged either (only endpoint paths, which map 1:1 to MCP tools). DEBUG surfaces library-level detail that may include payloads, so use it only when debugging.
 
 ## Project Structure
 

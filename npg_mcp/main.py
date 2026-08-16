@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hmac
+import json
+import logging
 import os
+import time
 import warnings
 from contextvars import ContextVar
 from typing import Literal
@@ -22,8 +25,127 @@ from mcp.server import transport_security
 from mcp.server.fastmcp import FastMCP
 import npg_mcp.client as client_mod
 
+logger = logging.getLogger("npg_mcp.main")
+
 # Context variable for per-request token (future use)
 _current_token: ContextVar[str] = ContextVar("npg_token", default="")
+
+
+def _setup_logging() -> None:
+    """Configure stdlib logging for container output.
+
+    Level is controlled by NPG_LOG_LEVEL (default INFO). INFO logs one line per
+    inbound MCP request (RPC method, tool name, client IP, status, duration) and
+    one line per outbound NPG API call. DEBUG surfaces library-level detail
+    (uvicorn, mcp SDK, httpx) on top of the structured lines.
+    """
+    level_name = os.environ.get("NPG_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, None)
+    if not isinstance(level, int):
+        level = logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        # force=True replaces the plain "%(message)s" handler that FastMCP
+        # installs at import time, so our timestamped format is used.
+        force=True,
+    )
+    if level > logging.DEBUG:
+        # These libraries log one INFO line per request/session, duplicating
+        # our structured MCP request + NPG API lines. Keep >= WARNING unless
+        # the user explicitly opts into DEBUG.
+        for noisy in (
+            "httpx",
+            "httpcore",
+            "sse_starlette.sse",
+            "mcp.server.lowlevel.server",
+            "mcp.server.streamable_http",
+        ):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+def _request_note(body: bytes) -> str:
+    """Extract a short RPC/tool identifier from a JSON-RPC body for log lines.
+
+    Only the JSON-RPC method and the tool name are read; argument payloads,
+    headers, and tokens are never logged. Returns "" when the body is not
+    parseable JSON-RPC.
+    """
+    if not body:
+        return ""
+    try:
+        data = json.loads(body[:65536].decode("utf-8", "replace"))
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    rpc = data.get("method")
+    if rpc == "tools/call":
+        params = data.get("params")
+        name = params.get("name") if isinstance(params, dict) else None
+        if isinstance(name, str):
+            return f" tool={name}"
+        return " rpc=tools/call"
+    if isinstance(rpc, str):
+        return f" rpc={rpc}"
+    return ""
+
+
+def _access_log_middleware(app):
+    """Log one line per inbound HTTP request to the MCP endpoint.
+
+    Each line carries the HTTP method/path, the JSON-RPC method and tool name
+    (when the body is JSON-RPC), the client IP, the response status, and the
+    duration — so users can debug what requests the server is getting and where
+    they failed. The request body is only snapshotted for tool-name extraction
+    and forwarded to the app unchanged; headers, tokens, and argument payloads
+    are never logged. Unhandled exceptions are logged with a traceback.
+    """
+
+    async def _middleware(scope, receive, send):
+        if scope["type"] != "http":
+            await app(scope, receive, send)
+            return
+
+        method = scope.get("method", "")
+        path = scope.get("path", "")
+        client = scope.get("client") or ("", 0)
+        client_ip = str(client[0] or "")
+
+        chunks: list[bytes] = []
+
+        async def _tee_receive():
+            message = await receive()
+            if message["type"] == "http.request" and message.get("body"):
+                chunks.append(message["body"])
+            return message
+
+        status = {"code": 0}
+        start = time.perf_counter()
+
+        async def _send(message):
+            if message["type"] == "http.response.start":
+                status["code"] = message["status"]
+            await send(message)
+
+        try:
+            await app(scope, _tee_receive, _send)
+        except Exception:
+            ms = (time.perf_counter() - start) * 1000
+            logger.exception(
+                "MCP request %s %s client=%s -> unhandled error (%d ms)",
+                method, path, client_ip, ms,
+            )
+            raise
+        else:
+            ms = (time.perf_counter() - start) * 1000
+            note = _request_note(b"".join(chunks))
+            logger.info(
+                "MCP request %s %s%s client=%s -> %s (%d ms)",
+                method, path, note, client_ip, status["code"] or "?", ms,
+            )
+
+    return _middleware
 
 
 def _load_transport_security() -> transport_security.TransportSecuritySettings:
@@ -3341,6 +3463,7 @@ async def npg_set_user_email(user_id: str | int, email: str) -> dict:
         return {"success": False, "error": str(e)}
 
 def main() -> None:
+    _setup_logging()
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "http":
         transport = "streamable-http"
@@ -3353,17 +3476,30 @@ def main() -> None:
         mcp.run(transport=transport)
         return
 
-    # HTTP transport: build the Starlette app and wrap it with bearer auth.
+    # HTTP transport: build the Starlette app and wrap it with bearer auth
+    # plus request logging (outermost, so every request incl. 401s is logged).
     import uvicorn
 
     app = mcp.streamable_http_app()
     token = os.environ.get("MCP_API_TOKEN", "").strip()
     app = _bearer_auth_middleware(app, token)
+    app = _access_log_middleware(app)
 
     host = os.environ.get("MCP_HOST", "0.0.0.0")
     port = int(os.environ.get("MCP_PORT", "8081"))
     server = uvicorn.Server(
-        uvicorn.Config(app, host=host, port=port, log_level="info")
+        uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            # Keep our own logging config (NPG_LOG_LEVEL + timestamped format)
+            # instead of uvicorn's dictConfig, which would replace it.
+            log_config=None,
+            # One access line per request is already emitted by
+            # _access_log_middleware with tool name + timing — disable uvicorn's
+            # duplicate access log so container logs stay readable.
+            access_log=False,
+        )
     )
     server.run()
 
