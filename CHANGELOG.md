@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.3] - 2026-08-18
+
+### What changed
+- `DESTRUCTIVE_TOOLS` is now auto-derived at import time from tool name prefixes instead of a hand-maintained 46-entry frozenset. A documented regex (`^npg_(delete_|remove_|ban_|bulk_unban_|cleanup_|reset_|restore_|revoke_|rotate_log|set_user_(password|role|email)|upload_restore_backup)`) plus empty allowlist/denylist escape hatches classify destructive tools, so new destructive tools are hidden at the `standard` tool level automatically without manual list maintenance.
+- Added pytest coverage for the derivation logic (`tests/test_toolsets.py`), including the allowlist/denylist escape hatches and the `tier_allowed` helper; the full suite (79 tests incl. 20 toolset tiers) passes.
+- Verified end-to-end on a HEAD-pinned local image against the test stack: `full`=276 tools, `standard`=230 with zero destructive leaks (e.g. `npg_ban_ip` → "Unknown tool"), `read`=129 with zero mutation leaks; regression checks `npg_list_proxy_hosts` / `npg_get_settings` pass.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.2] - 2026-08-17
 
 ### What changed
