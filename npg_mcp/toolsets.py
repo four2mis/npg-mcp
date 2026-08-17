@@ -3,20 +3,49 @@
 Users can vary the number and scope of tools exposed to the MCP client by
 setting ``NPG_TOOL_LEVEL`` in the environment (e.g. in ``.env``):
 
-* ``read``     — 129 strictly read-only tools (GET-only namespaces:
-                 get/list/view/download/check/detect). For monitoring or
-                 read-only agents that must not mutate NPG state.
-* ``standard`` — 228 tools: everything except the 46 destructive tools
-                 (all ``delete_*``/``remove_*``, bans, restores, password /
-                 role / email changes, token revocation, cleanup, reset,
-                 session termination, log rotation). For everyday admin work.
-* ``full``     — all 274 tools (the default; unchanged from legacy behavior).
+* ``read``     — read-only tools (GET-only namespaces: get/list/view/
+                 download/check/detect). For monitoring or read-only agents
+                 that must not mutate NPG state.
+* ``standard`` — everything except the destructive tools. For everyday admin
+                 work.
+* ``full``     — all tools (the default; unchanged from legacy behavior).
 
 The level is applied at startup in ``main()`` via :meth:`configure_toolset`,
 which removes the hidden tools from the FastMCP tool manager *before* the
 server starts, so hidden tools are neither listed nor callable. The tool
 counts are exact at commit time and are verified by the pipeline's static
 checks (see the ``tier_allowed`` helper — used by tests, not by the server).
+
+Destructive-tool naming convention
+----------------------------------
+A tool is classified as *destructive* (hidden at the ``standard`` level)
+purely from its name prefix, per the regex ``_DESTRUCTIVE_NAME_RE`` below:
+
+    ^npg_(delete_|remove_|ban_|bulk_unban_|cleanup_|end_user_sessions|
+         reset_|restore_|revoke_|rotate_log|set_user_(password|role|email)|
+         upload_restore_backup)
+
+That is: any tool whose name begins ``npg_delete_`` / ``npg_remove_`` /
+``npg_ban_`` / ``npg_bulk_unban_`` / ``npg_cleanup_`` / ``npg_reset_`` /
+``npg_restore_`` / ``npg_revoke_`` / ``npg_rotate_log_``, or the exact tools
+``npg_end_user_sessions``, ``npg_set_user_password`` / ``npg_set_user_role`` /
+``npg_set_user_email``, or ``npg_upload_restore_backup`` — is destructive.
+These correspond to irreversible or high-impact state mutations in the NPG
+API (deletes, removes, IP bans, resets, restores, revocations, session
+termination, credential changes, and backup restore).
+
+Two escape-hatch sets let the naming contract overrule the regex for edge
+cases without changing the regex itself:
+
+* ``_DESTRUCTIVE_ALLOWLIST`` — names that *match* the regex but are NOT
+  destructive. Empty; document any entry with a comment.
+* ``_DESTRUCTIVE_DENYLIST``  — names that do NOT match the regex but ARE
+  destructive. Empty; document any entry with a comment.
+
+``DESTRUCTIVE_TOOLS`` is derived at import time by applying the regex (minus
+allowlist, plus denylist) to every registered tool name discovered from
+``npg_mcp/main.py``. Do not hand-edit it — update the regex or one of the
+two lists instead.
 """
 
 from __future__ import annotations
@@ -24,6 +53,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from pathlib import Path
 
 logger = logging.getLogger("npg_mcp.toolsets")
 
@@ -36,59 +66,51 @@ VALID_LEVELS = ("read", "standard", "full")
 # all get/list/view/scan/check/detect tools call NPG GET endpoints only.
 _READ_NAME_RE = re.compile(r"^npg_(get|list|view|download|check|detect)")
 
-# 46 destructive tools hidden by the "standard" level. Derived from
-# npg_mcp/main.py (2026-08-16). Keep in sync when tools are added/removed:
-# re-run scripts/classify via the pipeline scan to regenerate this list.
-DESTRUCTIVE_TOOLS = frozenset(
-    {
-        "npg_ban_ip",
-        "npg_bulk_unban_ips",
-        "npg_cleanup_logs",
-        "npg_cleanup_system_logs",
-        "npg_delete_access_list",
-        "npg_delete_api_token",
-        "npg_delete_auth_provider",
-        "npg_delete_backup",
-        "npg_delete_certificate",
-        "npg_delete_certificate_errors",
-        "npg_delete_cloud_provider",
-        "npg_delete_ddns_record",
-        "npg_delete_dns_provider",
-        "npg_delete_exploit_rule",
-        "npg_delete_filter_subscription",
-        "npg_delete_global_uri_block_rule",
-        "npg_delete_log_file",
-        "npg_delete_log_filter_preset",
-        "npg_delete_notification_channel",
-        "npg_delete_proxy_host",
-        "npg_delete_proxy_host_bot_filter",
-        "npg_delete_proxy_host_challenge",
-        "npg_delete_proxy_host_fail2ban",
-        "npg_delete_proxy_host_geo",
-        "npg_delete_proxy_host_rate_limit",
-        "npg_delete_proxy_host_security_headers",
-        "npg_delete_proxy_host_upstream",
-        "npg_delete_proxy_host_uri_block",
-        "npg_delete_proxy_host_uri_block_rule",
-        "npg_delete_redirect_host",
-        "npg_delete_role",
-        "npg_delete_sso_provider",
-        "npg_delete_user",
-        "npg_end_user_sessions",
-        "npg_remove_exploit_rule_exclusion_from_host",
-        "npg_remove_exploit_rule_global_exclusion",
-        "npg_remove_filter_subscription_entry_exclusion",
-        "npg_remove_filter_subscription_exclusion",
-        "npg_reset_settings",
-        "npg_restore_backup",
-        "npg_revoke_api_token",
-        "npg_rotate_log_file",
-        "npg_set_user_email",
-        "npg_set_user_password",
-        "npg_set_user_role",
-        "npg_upload_restore_backup",
-    }
+# Destructive-prefix regex — see "Destructive-tool naming convention" in the
+# module docstring. A tool is destructive iff its name matches this regex,
+# adjusted by the allowlist/denylist below.
+_DESTRUCTIVE_NAME_RE = re.compile(
+    r"^npg_(delete_|remove_|ban_|bulk_unban_|cleanup_|end_user_sessions|"
+    r"reset_|restore_|revoke_|rotate_log|set_user_(password|role|email)|"
+    r"upload_restore_backup)"
 )
+
+# Names that match _DESTRUCTIVE_NAME_RE but are NOT destructive.
+# (none currently — every regex-matching tool is genuinely destructive)
+_DESTRUCTIVE_ALLOWLIST: frozenset[str] = frozenset()
+
+# Names that do NOT match _DESTRUCTIVE_NAME_RE but ARE destructive.
+# (none currently — every destructive tool follows the prefix convention)
+_DESTRUCTIVE_DENYLIST: frozenset[str] = frozenset()
+
+
+def _discover_tool_names() -> set[str]:
+    """Return every registered tool name from npg_mcp/main.py.
+
+    toolsets.py must not import main.py (main imports toolsets — a cycle), so
+    it discovers names by parsing the ``@mcp.tool(name="...")`` decorators in
+    the co-located main.py source, the same source of truth the pipeline's
+    tool-count checks use.
+    """
+    main_py = Path(__file__).resolve().parent / "main.py"
+    try:
+        source = main_py.read_text(encoding="utf-8")
+    except OSError:  # pragma: no cover - defensive
+        logger.warning("toolsets: cannot read %s — destructive set is empty", main_py)
+        return set()
+    return set(re.findall(r'@mcp\.tool\(name="([^"]+)"', source))
+
+
+# Derived at import time from the naming convention. Regex matches are the
+# destructive set, minus allowlist, plus denylist.
+DESTRUCTIVE_TOOLS: frozenset[str] = frozenset(
+    {
+        name
+        for name in _discover_tool_names()
+        if _DESTRUCTIVE_NAME_RE.match(name)
+    }
+    | _DESTRUCTIVE_DENYLIST
+) - _DESTRUCTIVE_ALLOWLIST
 
 
 def resolve_level(level: str | None = None) -> str:

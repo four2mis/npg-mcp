@@ -22,7 +22,6 @@ from npg_mcp.toolsets import (
     tier_allowed,
 )
 
-
 def _sample_tools() -> set[str]:
     """A representative tool name set mirroring the real naming contract."""
     return {
@@ -144,3 +143,60 @@ class TestDestructiveListIntegrity:
             assert not name.startswith(
                 ("npg_get_", "npg_list_", "npg_view_", "npg_download_", "npg_check_", "npg_detect_")
             ), name
+
+
+class TestDerivedDestructiveTools:
+    """Guardrails for the import-time regex derivation.
+
+    DESTRUCTIVE_TOOLS is auto-derived from tool name prefixes (see the
+    module docstring naming convention). These tests pin that derivation
+    against the real tool surface in npg_mcp/main.py so the manual-list
+    replacement cannot silently change the exposed set at any level.
+    """
+
+    def test_derived_set_matches_regex_semantics(self):
+        from npg_mcp.toolsets import (_DESTRUCTIVE_ALLOWLIST,
+                                      _DESTRUCTIVE_DENYLIST,
+                                      _DESTRUCTIVE_NAME_RE,
+                                      _discover_tool_names)
+
+        all_tools = _discover_tool_names()
+        regex_matches = {n for n in all_tools if _DESTRUCTIVE_NAME_RE.match(n)}
+        # every regex match is destructive (minus allowlist, plus denylist)
+        expected = (regex_matches | _DESTRUCTIVE_DENYLIST) - _DESTRUCTIVE_ALLOWLIST
+        assert DESTRUCTIVE_TOOLS == expected
+        assert DESTRUCTIVE_TOOLS <= all_tools
+        # allowlist/denylist are empty today (edge cases only)
+        assert not _DESTRUCTIVE_ALLOWLIST
+        assert not _DESTRUCTIVE_DENYLIST
+
+    def test_standard_level_matches_total_minus_destructive(self):
+        from npg_mcp.toolsets import _discover_tool_names
+
+        all_tools = _discover_tool_names()
+        # Invariant: standard hides exactly the destructive set.
+        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 230
+        # Live surface guardrail (current HEAD): 276 tools, 46 destructive.
+        assert len(all_tools) == 276
+        assert len(DESTRUCTIVE_TOOLS) == 46
+
+    def test_destructive_count_46_exact(self):
+        # The task's hard guardrail: exactly 46 destructive tools.
+        assert len(DESTRUCTIVE_TOOLS) == 46
+
+    def test_standard_and_read_counts_are_stable(self):
+        from npg_mcp.toolsets import _discover_tool_names
+
+        all_tools = _discover_tool_names()
+        assert len(tier_allowed(all_tools, "standard")) == 230
+        assert len(tier_allowed(all_tools, "read")) == 129
+        assert len(tier_allowed(all_tools, "full")) == 276
+
+    def test_docstring_documents_naming_convention(self):
+        import inspect
+
+        from npg_mcp import toolsets
+
+        doc = inspect.getdoc(toolsets) or ""
+        assert "naming convention" in doc.lower()
+        assert "delete_" in doc and "DESTRUCTIVE_ALLOWLIST" in doc and "DESTRUCTIVE_DENYLIST" in doc
