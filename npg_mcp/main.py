@@ -545,6 +545,74 @@ async def npg_update_proxy_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_create_proxy_host_simple", description="Create a proxy host with common settings. REQUIRED: domain_names=['sub.example.com'], forward_host=IP_or_hostname, forward_port=port. Optional: forward_scheme (default 'http'), ssl_enabled (default true), ssl_forced (default true), enabled (default true), block_exploits (default true). For advanced options (WAF, caching, streaming, DDNS), use npg_create_proxy_host instead.")
+async def npg_create_proxy_host_simple(
+    domain_names: list[str],
+    forward_host: str,
+    forward_port: int,
+    forward_scheme: str | None = None,
+    ssl_enabled: bool = True,
+    ssl_forced: bool = True,
+    enabled: bool = True,
+    block_exploits: bool = True,
+) -> dict:
+    try:
+        _validate_required("domain_names", domain_names)
+        _validate_required("forward_host", forward_host)
+        _validate_required("forward_port", forward_port)
+        c = _get_client()
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_host": "forward_host",
+                "forward_port": "forward_port",
+                "forward_scheme": "forward_scheme",
+                "ssl_enabled": "ssl_enabled",
+                "ssl_forced": "ssl_force_https",
+                "enabled": "enabled",
+                "block_exploits": "block_exploits",
+            },
+        )
+
+        data = c.post("/api/v1/proxy-hosts", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_proxy_host_simple", description="Update a proxy host with common settings (partial update — pass only the fields you want to change; omitted fields are left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options (WAF, caching, streaming, DDNS), use npg_update_proxy_host instead.")
+async def npg_update_proxy_host_simple(
+    host_id: str | int,
+    domain_names: list[str] | None = None,
+    forward_host: str | None = None,
+    forward_port: int | None = None,
+    forward_scheme: str | None = None,
+    enabled: bool | None = None,
+    ssl_forced: bool | None = None,
+    ssl_cert_id: str | int | None = None,
+) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_host": "forward_host",
+                "forward_port": "forward_port",
+                "forward_scheme": "forward_scheme",
+                "enabled": "enabled",
+                "ssl_forced": "ssl_force_https",
+                "ssl_cert_id": "certificate_id",
+            },
+            id_fields={"ssl_cert_id"},
+        )
+
+        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_delete_proxy_host", description="Delete a proxy host by its ID. REQUIRED: host_id.")
 async def npg_delete_proxy_host(host_id: str | int) -> dict:
     try:
