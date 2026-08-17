@@ -28,6 +28,11 @@ jobs:
       - name: Validate Python syntax
         run: python3 -c "import ast; ast.parse(open('npg_mcp/main.py').read()); print('Syntax OK')"
 
+      - name: Run unit tests
+        run: |
+          python3 -m pip install --quiet . pytest respx
+          python3 -m pytest tests/ -q
+
       - name: Check documentation drift
         run: |
           # Verify tool-schemas.yaml (full name set) and README.md/README.ko.md
