@@ -31,4 +31,5 @@ AGENTS.md
 .kanban-goals.md
 .kanban-state.json
 .kanban-upstream-issues/
+.kanban-feature-plans/
 .kanban-pipeline.lock

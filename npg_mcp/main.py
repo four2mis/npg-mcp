@@ -196,14 +196,18 @@ def _get_client() -> client_mod.NPGClient:
     Auth priority (highest first):
     1. NPG_API_TOKEN env var — long-lived API token (ng_... format).
        Immune to password changes; preferred for production.
+       Uses a module-level singleton client with a persistent httpx connection
+       pool, reused across all tool calls instead of opening a new TCP
+       connection per request.
     2. Per-request ContextVar token (set by MCP middleware).
+       Creates a throwaway client (the token changes per request).
     """
-    # 1. Long-lived API token
+    # 1. Long-lived API token — use pooled singleton
     api_token = os.environ.get("NPG_API_TOKEN", "").strip()
     if api_token:
-        return client_mod.NPGClient(token=api_token)
+        return client_mod.get_singleton(api_token)
 
-    # 2. Per-request token from ContextVar
+    # 2. Per-request token from ContextVar — fresh client each time
     token = client_mod.get_token()
     if token:
         return client_mod.NPGClient(token=token)
