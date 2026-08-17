@@ -13,7 +13,57 @@ from __future__ import annotations
 
 import pytest
 
-from npg_mcp.main import _id_path
+from npg_mcp.main import _id_path, _validate_id, _validate_required
+
+
+class TestValidateId:
+    """_validate_id must accept positive ints / non-empty strings and reject
+    everything else with a clear ValueError message."""
+
+    def test_accepts_positive_int(self):
+        _validate_id("host_id", 42)  # no raise
+
+    def test_accepts_uuid_string(self):
+        _validate_id("cert_id", "a7a057e9-6b31-4780-8d66-cfb920918284")  # no raise
+
+    def test_accepts_digit_string(self):
+        _validate_id("host_id", "42")  # no raise
+
+    def test_accepts_slug_string(self):
+        _validate_id("slug", "cloudflare")  # no raise
+
+    @pytest.mark.parametrize("bad", [None, "", "   ", 0, -7, True, False, [], {}])
+    def test_rejects_invalid_values(self, bad):
+        with pytest.raises(ValueError, match="host_id is required"):
+            _validate_id("host_id", bad)
+
+    def test_error_message_uses_param_name(self):
+        with pytest.raises(ValueError, match="cert_id is required \\(got: empty string\\)"):
+            _validate_id("cert_id", "")
+
+
+class TestValidateRequired:
+    """_validate_required must reject None / empty containers and accept
+    non-empty values of any other type."""
+
+    def test_accepts_non_empty_string(self):
+        _validate_required("forward_host", "127.0.0.1")  # no raise
+
+    def test_accepts_non_empty_list(self):
+        _validate_required("domain_names", ["a.example.com"])  # no raise
+
+    def test_accepts_int_and_bool(self):
+        _validate_required("forward_port", 8080)  # no raise
+        _validate_required("favorite", True)  # no raise
+
+    @pytest.mark.parametrize("bad", [None, "", "   ", [], {}])
+    def test_rejects_empty_values(self, bad):
+        with pytest.raises(ValueError, match="domain_names is required"):
+            _validate_required("domain_names", bad)
+
+    def test_error_message_uses_param_name(self):
+        with pytest.raises(ValueError, match="domain_names is required \\(got: empty string\\)"):
+            _validate_required("domain_names", [])
 
 
 class TestIdPath:

@@ -254,6 +254,38 @@ def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) ->
     return body
 
 
+def _validate_id(name: str, value) -> None:
+    """Validate a required ID parameter before any API call is made.
+
+    Accepts a positive integer or a non-empty string (UUIDs, slugs, etc.).
+    Raises ValueError with a clear message — each tool's ``except Exception``
+    block catches it and returns ``{"success": False, "error": str(e)}``.
+    This runs BEFORE ``_get_client()`` so no connection is wasted on bad input.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise ValueError(f"{name} is required (got: empty string)")
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(f"{name} is required (got: {value!r})")
+    if isinstance(value, int) and value <= 0:
+        raise ValueError(f"{name} is required (got: {value!r})")
+
+
+def _validate_required(name: str, value) -> None:
+    """Validate a required (non-ID) parameter before any API call is made.
+
+    Rejects None, empty strings, empty lists, and empty dicts. Non-empty
+    values of any type pass through. Raises ValueError (caught by each tool's
+    ``except Exception`` block) with a clear message.
+    """
+    if value is None:
+        raise ValueError(f"{name} is required (got: empty string)")
+    if isinstance(value, str):
+        if not value.strip():
+            raise ValueError(f"{name} is required (got: empty string)")
+    elif isinstance(value, (list, dict)) and len(value) == 0:
+        raise ValueError(f"{name} is required (got: empty string)")
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_list_proxy_hosts", description="List all proxy hosts. Returns a list of proxy host objects.")
@@ -267,8 +299,9 @@ async def npg_list_proxy_hosts() -> dict:
 
 @mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id.")
 async def npg_get_proxy_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -276,8 +309,9 @@ async def npg_get_proxy_host(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_proxy_host_by_domain", description="Get a proxy host by its domain name.")
 async def npg_get_proxy_host_by_domain(domain: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain", domain)
+        c = _get_client()
         encoded = quote(domain, safe="")
         data = c.get(f"/api/v1/proxy-hosts/by-domain/{encoded}")
         return {"success": True, "data": data}
@@ -339,8 +373,11 @@ async def npg_create_proxy_host(
     stream_proxy_connect_timeout: int | None = None,
     stream_proxy_timeout: int | None = None,
 ) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain_names", domain_names)
+        _validate_required("forward_host", forward_host)
+        _validate_required("forward_port", forward_port)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -451,8 +488,9 @@ async def npg_update_proxy_host(
     forward_container_network: str | None = None,
     skip_nginx: bool = False,
 ) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -509,8 +547,9 @@ async def npg_update_proxy_host(
 
 @mcp.tool(name="npg_delete_proxy_host", description="Delete a proxy host by its ID. REQUIRED: host_id.")
 async def npg_delete_proxy_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
         return {"success": True, "message": f"Proxy host {_id_path(host_id)} deleted"}
     except Exception as e:
@@ -518,8 +557,9 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_test_proxy_host", description="Test upstream connectivity for a proxy host. REQUIRED: host_id.")
 async def npg_test_proxy_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/test")
         return {"success": True, "data": data}
     except Exception as e:
@@ -527,8 +567,9 @@ async def npg_test_proxy_host(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_regenerate_config", description="Regenerate nginx config for a specific proxy host without touching others. REQUIRED: host_id.")
 async def npg_regenerate_config(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/regenerate")
         return {"success": True, "data": data}
     except Exception as e:
@@ -545,8 +586,10 @@ async def npg_sync_proxy_hosts() -> dict:
 
 @mcp.tool(name="npg_clone_proxy_host", description="Clone a proxy host with new domain names. Returns the new proxy host. REQUIRED: host_id, domain_names.")
 async def npg_clone_proxy_host(host_id: str | int, domain_names: list[str]) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_required("domain_names", domain_names)
+        c = _get_client()
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/clone", {"domain_names": domain_names})
         return {"success": True, "data": data}
     except Exception as e:
@@ -566,8 +609,9 @@ async def npg_list_certificates() -> dict:
 
 @mcp.tool(name="npg_get_certificate", description="Get a certificate by its ID. REQUIRED: cert_id.")
 async def npg_get_certificate(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         data = c.get(f"/api/v1/certificates/{_id_path(cert_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -580,8 +624,10 @@ async def npg_create_certificate(
     provider: str = "letsencrypt",
     dns_provider_id: str | None = None,
 ) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain_names", domain_names)
+        _validate_required("email", email)
+        c = _get_client()
         body = {
             "domain_names": domain_names,
             "email": email,
@@ -595,8 +641,9 @@ async def npg_create_certificate(
 
 @mcp.tool(name="npg_delete_certificate", description="Delete a certificate by its ID. REQUIRED: cert_id.")
 async def npg_delete_certificate(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         c.delete(f"/api/v1/certificates/{_id_path(cert_id)}")
         return {"success": True, "message": f"Certificate {_id_path(cert_id)} deleted"}
     except Exception as e:
@@ -604,8 +651,9 @@ async def npg_delete_certificate(cert_id: str | int) -> dict:
 
 @mcp.tool(name="npg_renew_certificate", description="Renew a certificate by its ID. REQUIRED: cert_id.")
 async def npg_renew_certificate(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         data = c.post(f"/api/v1/certificates/{_id_path(cert_id)}/renew")
         return {"success": True, "data": data}
     except Exception as e:
@@ -658,8 +706,9 @@ async def npg_list_redirect_hosts() -> dict:
 
 @mcp.tool(name="npg_get_redirect_host", description="Get a redirect host by its ID. REQUIRED: host_id.")
 async def npg_get_redirect_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -673,8 +722,10 @@ async def npg_create_redirect_host(
     preserve_path: bool = True,
     redirect_code: Literal[301, 302, 307, 308] = 301,
 ) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain_names", domain_names)
+        _validate_required("forward_domain_name", forward_domain_name)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -699,8 +750,9 @@ async def npg_update_redirect_host(
     preserve_path: bool | None = None,
     redirect_code: int | None = None,
 ) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -718,8 +770,9 @@ async def npg_update_redirect_host(
 
 @mcp.tool(name="npg_delete_redirect_host", description="Delete a redirect host by its ID. REQUIRED: host_id.")
 async def npg_delete_redirect_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
         return {"success": True, "message": f"Redirect host {_id_path(host_id)} deleted"}
     except Exception as e:
@@ -730,8 +783,9 @@ async def npg_delete_redirect_host(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_proxy_host_rate_limit", description="GET rate limit configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
         return {"success": True, "data": data}
     except Exception as e:
@@ -739,8 +793,9 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id.")
 async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -760,8 +815,9 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
 
 @mcp.tool(name="npg_get_proxy_host_bot_filter", description="GET bot filter configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
         return {"success": True, "data": data}
     except Exception as e:
@@ -769,8 +825,9 @@ async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_bot_filter", description="UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list).")
 async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, disable_global: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -792,8 +849,9 @@ async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | N
 
 @mcp.tool(name="npg_get_proxy_host_security_headers", description="GET security headers configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
         return {"success": True, "data": data}
     except Exception as e:
@@ -801,8 +859,9 @@ async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id.")
 async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -826,8 +885,10 @@ async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bo
 
 @mcp.tool(name="npg_apply_security_header_preset", description="APPLY a security header preset to a proxy host. preset: moderate, relaxed, or strict. REQUIRED: host_id.")
 async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["moderate", "relaxed", "strict"]) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_required("preset", preset)
+        c = _get_client()
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers/preset/{preset}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -835,8 +896,9 @@ async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["
 
 @mcp.tool(name="npg_get_proxy_host_upstream", description="GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
         return {"success": True, "data": data}
     except Exception as e:
@@ -844,8 +906,9 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'host:port', weight, backup}), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
 async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -864,8 +927,9 @@ async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None 
 
 @mcp.tool(name="npg_get_proxy_host_uri_block", description="GET URI block configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
         return {"success": True, "data": data}
     except Exception as e:
@@ -873,8 +937,9 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id.")
 async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -969,8 +1034,9 @@ async def npg_list_access_lists() -> dict:
 
 @mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id.")
 async def npg_get_access_list(list_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("list_id", list_id)
+        c = _get_client()
         data = c.get(f"/api/v1/access-lists/{_id_path(list_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -978,8 +1044,9 @@ async def npg_get_access_list(list_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_access_list", description="CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth (bool, allow authenticated users to bypass), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all, description, sort_order).")
 async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        c = _get_client()
         # Non-standard: pre-seeded required field + optional if-not-None — kept as-is (not _build_body).
         body: dict = {"name": name}
         if satisfy_any is not None: body["satisfy_any"] = satisfy_any
@@ -993,8 +1060,9 @@ async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pas
 
 @mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth (bool), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all).")
 async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("list_id", list_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -1012,8 +1080,9 @@ async def npg_update_access_list(list_id: str | int, name: str | None = None, sa
 
 @mcp.tool(name="npg_delete_access_list", description="Delete an access list by its ID. REQUIRED: list_id.")
 async def npg_delete_access_list(list_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("list_id", list_id)
+        c = _get_client()
         c.delete(f"/api/v1/access-lists/{_id_path(list_id)}")
         return {"success": True, "message": f"Access list {_id_path(list_id)} deleted"}
     except Exception as e:
@@ -1033,8 +1102,9 @@ async def npg_list_dns_providers() -> dict:
 
 @mcp.tool(name="npg_get_dns_provider", description="Get a DNS provider by its ID. REQUIRED: provider_id.")
 async def npg_get_dns_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         data = c.get(f"/api/v1/dns-providers/{_id_path(provider_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1042,8 +1112,10 @@ async def npg_get_dns_provider(provider_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}).")
 async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_required("provider_type", provider_type)
+        c = _get_client()
         body = {"name": name, "provider_type": provider_type}
         if credentials:
             body["credentials"] = credentials
@@ -1056,8 +1128,9 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
 
 @mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change (dict). REQUIRED: provider_id.")
 async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         data = c.put(f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1065,8 +1138,9 @@ async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = 
 
 @mcp.tool(name="npg_delete_dns_provider", description="Delete a DNS provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_dns_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         c.delete(f"/api/v1/dns-providers/{_id_path(provider_id)}")
         return {"success": True, "message": f"DNS provider {_id_path(provider_id)} deleted"}
     except Exception as e:
@@ -1074,8 +1148,9 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
 
 @mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials. REQUIRED: provider_id.")
 async def npg_test_dns_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         data = c.post(f"/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1095,8 +1170,9 @@ async def npg_list_cloud_providers() -> dict:
 
 @mcp.tool(name="npg_get_cloud_provider", description="Get a cloud provider by its slug.")
 async def npg_get_cloud_provider(slug: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("slug", slug)
+        c = _get_client()
         data = c.get(f"/api/v1/cloud-providers/{slug}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1104,8 +1180,11 @@ async def npg_get_cloud_provider(slug: str) -> dict:
 
 @mcp.tool(name="npg_create_cloud_provider", description="Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description.")
 async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], region: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_id("slug", slug)
+        _validate_required("ip_ranges", ip_ranges)
+        c = _get_client()
         body = {"name": name, "slug": slug, "ip_ranges": ip_ranges}
         if region:
             body["region"] = region
@@ -1120,8 +1199,9 @@ async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], 
 
 @mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change (dict).")
 async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("slug", slug)
+        c = _get_client()
         data = c.put(f"/api/v1/cloud-providers/{slug}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1129,8 +1209,9 @@ async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None) -> di
 
 @mcp.tool(name="npg_delete_cloud_provider", description="Delete a cloud provider by its slug.")
 async def npg_delete_cloud_provider(slug: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("slug", slug)
+        c = _get_client()
         c.delete(f"/api/v1/cloud-providers/{slug}")
         return {"success": True, "message": f"Cloud provider {slug} deleted"}
     except Exception as e:
@@ -1138,8 +1219,9 @@ async def npg_delete_cloud_provider(slug: str) -> dict:
 
 @mcp.tool(name="npg_get_proxy_host_cloud_blocking", description="GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id.")
 async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1147,8 +1229,9 @@ async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global). REQUIRED: host_id.")
 async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None, cloud_disable_global: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         # Read-modify-write: upstream SetBlockedProviders full-replaces all 4 fields.
         current = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
         body = {
@@ -1194,8 +1277,9 @@ async def npg_list_countries() -> dict:
 
 @mcp.tool(name="npg_get_proxy_host_geo", description="GET geo restriction configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1203,8 +1287,10 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots")
 async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_required("countries", countries)
+        c = _get_client()
         # Non-standard: pre-seeded defaults dict (create semantics) + conditional — kept as-is (not _build_body).
         body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
         if allowed_ips is not None: body["allowed_ips"] = allowed_ips
@@ -1215,8 +1301,9 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
 
 @mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots REQUIRED: host_id.")
 async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -1237,8 +1324,9 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
 
 @mcp.tool(name="npg_delete_proxy_host_geo", description="DELETE geo restriction for a proxy host. REQUIRED: host_id.")
 async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
         return {"success": True, "message": f"Geo restriction for host {_id_path(host_id)} deleted"}
     except Exception as e:
@@ -1249,8 +1337,9 @@ async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_proxy_host_fail2ban", description="GET fail2ban configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1258,8 +1347,9 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). REQUIRED: host_id.")
 async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "challenge"] | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -1281,8 +1371,9 @@ async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | Non
 
 @mcp.tool(name="npg_get_proxy_host_challenge", description="GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id.")
 async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1290,8 +1381,9 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) REQUIRED: host_id.")
 async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | None = None, challenge_type: str | None = None, site_key: str | None = None, token_validity: int | None = None, min_score: float | None = None, apply_to: str | None = None, page_title: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -1311,8 +1403,9 @@ async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | No
 
 @mcp.tool(name="npg_delete_proxy_host_challenge", description="DELETE CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id.")
 async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
         return {"success": True, "message": f"Challenge configuration for host {_id_path(host_id)} deleted"}
     except Exception as e:
@@ -1320,8 +1413,10 @@ async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_verify_challenge", description="Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution.")
 async def npg_verify_challenge(token: str, solution: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("token", token)
+        _validate_required("solution", solution)
+        c = _get_client()
         data = c.post("/api/v1/challenge/verify", {"token": token, "solution": solution})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1342,8 +1437,9 @@ async def npg_list_banned_ips() -> dict:
 @mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: ban_time (seconds).")
 async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", duration: int = 3600) -> dict:
     """Ban an IP address. Required: ip_address. Optional: reason, duration (seconds, 0=permanent)."""
-    c = _get_client()
     try:
+        _validate_required("ip_address", ip_address)
+        c = _get_client()
         data = c.post("/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "duration": duration})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1351,8 +1447,9 @@ async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", durati
 
 @mcp.tool(name="npg_unban_ip", description="Unban an IP by its ID. REQUIRED: ip_id.")
 async def npg_unban_ip(ip_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("ip_id", ip_id)
+        c = _get_client()
         c.delete(f"/api/v1/banned-ips/{_id_path(ip_id)}")
         return {"success": True, "message": f"IP ban {_id_path(ip_id)} removed"}
     except Exception as e:
@@ -1360,8 +1457,9 @@ async def npg_unban_ip(ip_id: str | int) -> dict:
 
 @mcp.tool(name="npg_unban_ip_by_address", description="Unban an IP address without needing its ban record ID. REQUIRED: ip (the IP address string, e.g. '1.2.3.4').")
 async def npg_unban_ip_by_address(ip: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("ip", ip)
+        c = _get_client()
         c.delete("/api/v1/banned-ips", params={"ip": ip})
         return {"success": True, "message": f"IP {ip} unbanned"}
     except Exception as e:
@@ -1399,8 +1497,9 @@ async def npg_list_exploit_rules() -> dict:
 
 @mcp.tool(name="npg_get_exploit_rule", description="Get an exploit rule by its ID. REQUIRED: rule_id.")
 async def npg_get_exploit_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.get(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1408,8 +1507,12 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description.")
 async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("category", category)
+        _validate_required("name", name)
+        _validate_required("pattern", pattern)
+        _validate_required("pattern_type", pattern_type)
+        c = _get_client()
         body = {"category": category, "name": name, "pattern": pattern, "pattern_type": pattern_type}
         if severity:
             body["severity"] = severity
@@ -1424,8 +1527,9 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
 
 @mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change (dict). REQUIRED: rule_id.")
 async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.put(f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1433,8 +1537,9 @@ async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None
 
 @mcp.tool(name="npg_delete_exploit_rule", description="Delete an exploit rule by its ID. REQUIRED: rule_id.")
 async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
         return {"success": True, "message": f"Exploit rule {_id_path(rule_id)} deleted"}
     except Exception as e:
@@ -1442,8 +1547,9 @@ async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_toggle_exploit_rule", description="Toggle an exploit rule's enabled status. REQUIRED: rule_id.")
 async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post(f"/api/v1/exploit-rules/{_id_path(rule_id)}/toggle")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1472,8 +1578,9 @@ async def npg_get_waf_hosts() -> dict:
 
 @mcp.tool(name="npg_get_waf_host_config", description="Get WAF config for a specific proxy host. REQUIRED: host_id.")
 async def npg_get_waf_host_config(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/waf/hosts/{_id_path(host_id)}/config")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1481,8 +1588,10 @@ async def npg_get_waf_host_config(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_disable_waf_rule", description="Disable a WAF rule for a specific proxy host. REQUIRED: host_id, rule_id.")
 async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1558,8 +1667,9 @@ async def npg_list_backups() -> dict:
 
 @mcp.tool(name="npg_get_backup", description="Get a backup by its ID. REQUIRED: backup_id.")
 async def npg_get_backup(backup_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("backup_id", backup_id)
+        c = _get_client()
         data = c.get(f"/api/v1/backups/{_id_path(backup_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1576,8 +1686,9 @@ async def npg_create_backup() -> dict:
 
 @mcp.tool(name="npg_delete_backup", description="Delete a backup by its ID. REQUIRED: backup_id.")
 async def npg_delete_backup(backup_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("backup_id", backup_id)
+        c = _get_client()
         c.delete(f"/api/v1/backups/{_id_path(backup_id)}")
         return {"success": True, "message": f"Backup {_id_path(backup_id)} deleted"}
     except Exception as e:
@@ -1585,8 +1696,9 @@ async def npg_delete_backup(backup_id: str | int) -> dict:
 
 @mcp.tool(name="npg_restore_backup", description="Restore from a backup. Required: backup_id.")
 async def npg_restore_backup(backup_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("backup_id", backup_id)
+        c = _get_client()
         data = c.post(f"/api/v1/backups/{_id_path(backup_id)}/restore")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1606,8 +1718,9 @@ async def npg_list_api_tokens() -> dict:
 
 @mcp.tool(name="npg_get_api_token", description="Get an API token by its ID. REQUIRED: token_id.")
 async def npg_get_api_token(token_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("token_id", token_id)
+        c = _get_client()
         data = c.get(f"/api/v1/api-tokens/{_id_path(token_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1615,8 +1728,10 @@ async def npg_get_api_token(token_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, permissions (array). Optional: expires_at.")
 async def npg_create_api_token(name: str, permissions: list[str], expires_at: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_required("permissions", permissions)
+        c = _get_client()
         body = {"name": name, "permissions": permissions, "expires_at": expires_at}
         data = c.post("/api/v1/api-tokens", body)
         return {"success": True, "data": data}
@@ -1625,8 +1740,9 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_at: st
 
 @mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change (dict). REQUIRED: token_id.")
 async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("token_id", token_id)
+        c = _get_client()
         data = c.put(f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1634,8 +1750,9 @@ async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) 
 
 @mcp.tool(name="npg_revoke_api_token", description="Revoke an API token by its ID. REQUIRED: token_id.")
 async def npg_revoke_api_token(token_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("token_id", token_id)
+        c = _get_client()
         data = c.post(f"/api/v1/api-tokens/{_id_path(token_id)}/revoke")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1643,8 +1760,9 @@ async def npg_revoke_api_token(token_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_api_token", description="Delete an API token by its ID. REQUIRED: token_id.")
 async def npg_delete_api_token(token_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("token_id", token_id)
+        c = _get_client()
         c.delete(f"/api/v1/api-tokens/{_id_path(token_id)}")
         return {"success": True, "message": f"API token {_id_path(token_id)} deleted"}
     except Exception as e:
@@ -1663,8 +1781,10 @@ async def npg_list_notification_channels() -> dict:
 
 @mcp.tool(name="npg_create_notification_channel", description="Create a notification channel. REQUIRED: name, channel_type ('webhook'/'discord'/'telegram'). Optional: config (dict, e.g. {'url': '...'} for webhook/discord, {'bot_token': '...', 'chat_id': '...'} for telegram), events (list of event keys, e.g. ['ip.banned', 'cert.renewal_failed'] — at least one event or digest_enabled required), allow_private_target (bool, allow private-network webhook URLs), digest_enabled (bool), digest_hour (int 0-23).")
 async def npg_create_notification_channel(name: str, channel_type: str, config: dict | None = None, events: list[str] | None = None, allow_private_target: bool = False, digest_enabled: bool = False, digest_hour: int = 9) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_required("channel_type", channel_type)
+        c = _get_client()
         body = {"name": name, "type": channel_type, "allow_private_target": allow_private_target, "digest_enabled": digest_enabled, "digest_hour": digest_hour}
         if config:
             body["config"] = config
@@ -1677,8 +1797,9 @@ async def npg_create_notification_channel(name: str, channel_type: str, config: 
 
 @mcp.tool(name="npg_update_notification_channel", description="UPDATE a notification channel (full-replace — read-modify-write: omitted fields are preserved by listing channels first and merging). REQUIRED: channel_id. Optional: name, channel_type (webhook/discord/telegram), config (dict with url/bot_token/chat_id), events, enabled, digest_enabled, digest_hour, allow_private_target, rich_format, language, dashboard_url, template. The API validates type+config together, so the current channel is fetched from the list endpoint first to merge existing values with provided ones.")
 async def npg_update_notification_channel(channel_id: str | int, name: str | None = None, channel_type: str | None = None, config: dict | None = None, events: list[str] | None = None, enabled: bool | None = None, digest_enabled: bool | None = None, digest_hour: int | None = None, allow_private_target: bool | None = None, rich_format: bool | None = None, language: str | None = None, dashboard_url: str | None = None, template: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("channel_id", channel_id)
+        c = _get_client()
         cid = _id_path(channel_id)
         # Read-modify-write: API is full-replace (UpdateNotificationChannelRequest = CreateNotificationChannelRequest)
         # There is no GET /:id endpoint, so we use the list endpoint and find by ID
@@ -1723,8 +1844,9 @@ async def npg_update_notification_channel(channel_id: str | int, name: str | Non
 
 @mcp.tool(name="npg_delete_notification_channel", description="Delete a notification channel by its ID. REQUIRED: channel_id.")
 async def npg_delete_notification_channel(channel_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("channel_id", channel_id)
+        c = _get_client()
         c.delete(f"/api/v1/notification-channels/{_id_path(channel_id)}")
         return {"success": True, "message": f"Notification channel {_id_path(channel_id)} deleted"}
     except Exception as e:
@@ -1732,8 +1854,9 @@ async def npg_delete_notification_channel(channel_id: str | int) -> dict:
 
 @mcp.tool(name="npg_test_notification_channel", description="Test a notification channel by sending a test message. REQUIRED: channel_id.")
 async def npg_test_notification_channel(channel_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("channel_id", channel_id)
+        c = _get_client()
         data = c.post(f"/api/v1/notification-channels/{_id_path(channel_id)}/test")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1741,8 +1864,9 @@ async def npg_test_notification_channel(channel_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel. REQUIRED: channel_id.")
 async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("channel_id", channel_id)
+        c = _get_client()
         data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1775,8 +1899,9 @@ async def npg_list_users() -> dict:
 
 @mcp.tool(name="npg_get_user", description="Get a user by their ID. REQUIRED: user_id.")
 async def npg_get_user(user_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        c = _get_client()
         data = c.get(f"/api/v1/users/{_id_path(user_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1784,8 +1909,12 @@ async def npg_get_user(user_id: str | int) -> dict:
 
 @mcp.tool(name="npg_create_user", description="CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Optional: is_active. The API rejects creation without a valid role_id (empty string causes 500).")
 async def npg_create_user(username: str, email: str, password: str, role_id: str | int, is_active: bool = True) -> dict:
-    c = _get_client()
     try:
+        _validate_required("username", username)
+        _validate_required("email", email)
+        _validate_required("password", password)
+        _validate_id("role_id", role_id)
+        c = _get_client()
         body = {"username": username, "email": email, "password": password, "role_id": _id_path(role_id), "is_active": is_active}
         data = c.post("/api/v1/users", body)
         return {"success": True, "data": data}
@@ -1794,8 +1923,10 @@ async def npg_create_user(username: str, email: str, password: str, role_id: str
 
 @mcp.tool(name="npg_set_user_password", description="Set/reset a user's password. Required: user_id, new_password.")
 async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        _validate_required("new_password", new_password)
+        c = _get_client()
         data = c.put(f"/api/v1/users/{_id_path(user_id)}/password", {"password": new_password})
         return {"success": True, "data": data}
     except Exception as e:
@@ -1803,8 +1934,9 @@ async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
 
 @mcp.tool(name="npg_end_user_sessions", description="End all sessions for a user (force logout). Required: user_id.")
 async def npg_end_user_sessions(user_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        c = _get_client()
         data = c.post(f"/api/v1/users/{_id_path(user_id)}/end-sessions")
         return {"success": True, "data": data}
     except Exception as e:
@@ -1812,8 +1944,9 @@ async def npg_end_user_sessions(user_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_user", description="Delete a user by their ID. REQUIRED: user_id.")
 async def npg_delete_user(user_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        c = _get_client()
         c.delete(f"/api/v1/users/{_id_path(user_id)}")
         return {"success": True, "message": f"User {_id_path(user_id)} deleted"}
     except Exception as e:
@@ -1833,8 +1966,9 @@ async def npg_list_roles() -> dict:
 
 @mcp.tool(name="npg_create_role", description="CREATE a new role. REQUIRED: name. Optional: description, permissions (array of 'area:verb' strings, e.g. ['proxy:read','proxy:write']). Use npg_get_permission_areas to list valid areas and verbs.")
 async def npg_create_role(name: str, permissions: list[str] | None = None, description: str = "") -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        c = _get_client()
         body = {"name": name, "description": description, "permissions": permissions or []}
         data = c.post("/api/v1/roles", body)
         return {"success": True, "data": data}
@@ -1843,8 +1977,9 @@ async def npg_create_role(name: str, permissions: list[str] | None = None, descr
 
 @mcp.tool(name="npg_update_role", description="UPDATE a role (partial update — omitted fields left as-is). REQUIRED: role_id. Optional: name, description, permissions (array of 'area:verb' strings).")
 async def npg_update_role(role_id: str | int, name: str | None = None, description: str | None = None, permissions: list[str] | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("role_id", role_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {"name": "name", "description": "description", "permissions": "permissions"},
@@ -1856,8 +1991,9 @@ async def npg_update_role(role_id: str | int, name: str | None = None, descripti
 
 @mcp.tool(name="npg_delete_role", description="Delete a role by its ID. REQUIRED: role_id.")
 async def npg_delete_role(role_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("role_id", role_id)
+        c = _get_client()
         c.delete(f"/api/v1/roles/{_id_path(role_id)}")
         return {"success": True, "message": f"Role {_id_path(role_id)} deleted"}
     except Exception as e:
@@ -1877,8 +2013,12 @@ async def npg_list_sso_providers() -> dict:
 
 @mcp.tool(name="npg_create_sso_provider", description="CREATE a new SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. OPTIONAL: client_secret (defaults to placeholder), scopes, trust_provider_email (bool, default false — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; only enable if you control the provider AND its user enrollment). After creation, call npg_list_sso_providers to verify.")
 async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False) -> dict:
-    c = _get_client()
     try:
+        _validate_id("slug", slug)
+        _validate_required("name", name)
+        _validate_required("issuer_url", issuer_url)
+        _validate_id("client_id", client_id)
+        c = _get_client()
         body = {"slug": slug, "name": name, "issuer_url": issuer_url, "client_id": client_id, "trust_provider_email": trust_provider_email}
         if client_secret is not None:
             body["client_secret"] = client_secret
@@ -1891,8 +2031,9 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
 
 @mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, trust_provider_email (bool — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; omit to leave unchanged), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
 async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, trust_provider_email: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         cid = _id_path(provider_id)
         # Read-modify-write: API PUT is full-replace (requires slug, issuer_url, client_id, client_secret)
         # No GET /sso-providers/{id} exists, so fetch the list and find by ID
@@ -1940,8 +2081,9 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
 
 @mcp.tool(name="npg_delete_sso_provider", description="Delete an SSO provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_sso_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         c.delete(f"/api/v1/sso-providers/{_id_path(provider_id)}")
         return {"success": True, "message": f"SSO provider {_id_path(provider_id)} deleted"}
     except Exception as e:
@@ -1949,8 +2091,9 @@ async def npg_delete_sso_provider(provider_id: str | int) -> dict:
 
 @mcp.tool(name="npg_test_sso_provider", description="Probe an OIDC issuer's discovery document without saving a provider. REQUIRED: issuer_url (e.g. 'https://accounts.google.com'). Optional: scopes (space-separated, defaults to 'openid profile email', must contain 'openid'). Returns issuer, authorization_endpoint, token_endpoint, scopes_supported, supports_pkce, missing_scopes.")
 async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("issuer_url", issuer_url)
+        c = _get_client()
         body: dict = {"issuer_url": issuer_url}
         if scopes is not None:
             body["scopes"] = scopes
@@ -1973,8 +2116,9 @@ async def npg_list_log_files() -> dict:
 
 @mcp.tool(name="npg_download_log_file", description="Download a log file by its filename. Returns the raw log content.")
 async def npg_download_log_file(filename: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("filename", filename)
+        c = _get_client()
         encoded = quote(filename, safe="")
         data = c.get_text(f"/api/v1/system-settings/log-files/{encoded}/download")
         return {"success": True, "data": data}
@@ -1983,8 +2127,9 @@ async def npg_download_log_file(filename: str) -> dict:
 
 @mcp.tool(name="npg_view_log_file", description="View the contents of a log file. REQUIRED: filename.")
 async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
-    c = _get_client()
     try:
+        _validate_required("filename", filename)
+        c = _get_client()
         encoded = quote(filename, safe="")
         data = c.get(f"/api/v1/system-settings/log-files/{encoded}/view", params={"lines": lines})
         return {"success": True, "data": data}
@@ -2002,8 +2147,9 @@ async def npg_rotate_log_file() -> dict:
 
 @mcp.tool(name="npg_delete_log_file", description="Delete a log file by its filename.")
 async def npg_delete_log_file(filename: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("filename", filename)
+        c = _get_client()
         encoded = quote(filename, safe="")
         c.delete(f"/api/v1/system-settings/log-files/{encoded}")
         return {"success": True, "message": f"Log file {filename} deleted"}
@@ -2033,8 +2179,11 @@ async def npg_get_certificate_history() -> dict:
 
 @mcp.tool(name="npg_upload_certificate", description="Upload a certificate file. Required: domain_names, cert_content, key_content.")
 async def npg_upload_certificate(domain_names: list[str], cert_content: str, key_content: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain_names", domain_names)
+        _validate_required("cert_content", cert_content)
+        _validate_required("key_content", key_content)
+        c = _get_client()
         body = {"domain_names": domain_names, "certificate_pem": cert_content, "private_key_pem": key_content}
         data = c.post("/api/v1/certificates/upload", body)
         return {"success": True, "data": data}
@@ -2055,8 +2204,9 @@ async def npg_list_uri_blocks() -> dict:
 
 @mcp.tool(name="npg_bulk_add_uri_block_rule", description="Bulk add a URI block rule to multiple or all proxy hosts. REQUIRED: pattern. Optional: match_type ('exact'/'prefix'/'regex', default 'exact'), description, host_ids (list of host UUIDs; empty = all enabled hosts).")
 async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", description: str | None = None, host_ids: list[str] | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("pattern", pattern)
+        c = _get_client()
         # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
@@ -2100,8 +2250,9 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
 
 @mcp.tool(name="npg_add_global_uri_block_rule", description="ADD a rule to the global URI block. REQUIRED: pattern. Optional: match_type (exact/prefix/regex, default prefix), description, enabled (default true).")
 async def npg_add_global_uri_block_rule(pattern: str, match_type: str = "prefix", description: str = "", enabled: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("pattern", pattern)
+        c = _get_client()
         # Non-standard: pre-seeded required fields + truthy-description conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description: body["description"] = description
@@ -2113,8 +2264,9 @@ async def npg_add_global_uri_block_rule(pattern: str, match_type: str = "prefix"
 
 @mcp.tool(name="npg_delete_global_uri_block_rule", description="Delete a rule from the global URI block by its ID. REQUIRED: rule_id.")
 async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
         return {"success": True, "message": f"Global URI block rule {_id_path(rule_id)} deleted"}
     except Exception as e:
@@ -2125,8 +2277,9 @@ async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream pool. REQUIRED: upstream_id (UUID string).")
 async def npg_get_upstream_health(upstream_id: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("upstream_id", upstream_id)
+        c = _get_client()
         data = c.get(f"/api/v1/upstreams/{_id_path(upstream_id)}/health")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2465,8 +2618,9 @@ async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int
 
 @mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns the raw backup content (gzip binary). Use npg_list_backups to find the ID.")
 async def npg_download_backup(backup_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("backup_id", backup_id)
+        c = _get_client()
         data = c.get_text(f"/api/v1/backups/{_id_path(backup_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2474,8 +2628,9 @@ async def npg_download_backup(backup_id: str | int) -> dict:
 
 @mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (base64 or raw bytes of the .tar.gz backup file). The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first.")
 async def npg_upload_restore_backup(file_content: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("file_content", file_content)
+        c = _get_client()
         import base64
         # Try base64 decode first; if it fails, treat as raw bytes
         try:
@@ -2558,8 +2713,9 @@ async def npg_get_auth_sso_providers() -> dict:
 
 @mcp.tool(name="npg_auth_sso_start", description="Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns a redirect URL.")
 async def npg_auth_sso_start(slug: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("slug", slug)
+        c = _get_client()
         data = c.get(f"/api/v1/auth/sso/{quote(slug, safe='')}/start")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2579,8 +2735,10 @@ async def npg_list_auth_providers() -> dict:
 
 @mcp.tool(name="npg_create_auth_provider", description="CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL, e.g. http://127.0.0.1:9091). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (for Docker-backed providers, provider_url is resolved from container).")
 async def npg_create_auth_provider(name: str, provider_type: str, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_required("provider_type", provider_type)
+        c = _get_client()
         # Non-standard: pre-seeded required fields + param->API rename (provider_type -> type) — kept as-is (not _build_body).
         body: dict = {"name": name, "type": provider_type}
         if provider_url is not None: body["provider_url"] = provider_url
@@ -2598,8 +2756,9 @@ async def npg_create_auth_provider(name: str, provider_type: str, provider_url: 
 
 @mcp.tool(name="npg_get_auth_provider", description="Get a ForwardAuth provider by its ID. REQUIRED: provider_id.")
 async def npg_get_auth_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         data = c.get(f"/api/v1/auth-providers/{_id_path(provider_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2607,8 +2766,9 @@ async def npg_get_auth_provider(provider_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_auth_provider", description="UPDATE a ForwardAuth provider (partial update — omitted fields left as-is). REQUIRED: provider_id. Optional: name, provider_url, config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme.")
 async def npg_update_auth_provider(provider_id: str | int, name: str | None = None, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -2630,8 +2790,9 @@ async def npg_update_auth_provider(provider_id: str | int, name: str | None = No
 
 @mcp.tool(name="npg_delete_auth_provider", description="Delete a ForwardAuth provider by its ID. REQUIRED: provider_id.")
 async def npg_delete_auth_provider(provider_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("provider_id", provider_id)
+        c = _get_client()
         c.delete(f"/api/v1/auth-providers/{_id_path(provider_id)}")
         return {"success": True, "message": f"Auth provider {_id_path(provider_id)} deleted"}
     except Exception as e:
@@ -2651,8 +2812,10 @@ async def npg_list_ddns_records() -> dict:
 
 @mcp.tool(name="npg_create_ddns_record", description="CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool).")
 async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, proxied: bool = False, ttl: int = 0, enabled: bool = True) -> dict:
-    c = _get_client()
     try:
+        _validate_required("hostname", hostname)
+        _validate_id("dns_provider_id", dns_provider_id)
+        c = _get_client()
         body = {"hostname": hostname, "dns_provider_id": _id_path(dns_provider_id), "proxied": proxied, "ttl": ttl, "enabled": enabled}
         data = c.post("/api/v1/ddns-records", body)
         return {"success": True, "data": data}
@@ -2661,8 +2824,9 @@ async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, prox
 
 @mcp.tool(name="npg_get_ddns_record", description="Get a DDNS record by its ID. REQUIRED: record_id.")
 async def npg_get_ddns_record(record_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("record_id", record_id)
+        c = _get_client()
         data = c.get(f"/api/v1/ddns-records/{_id_path(record_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2670,8 +2834,9 @@ async def npg_get_ddns_record(record_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_ddns_record", description="UPDATE a DDNS record (partial update — omitted fields left as-is). REQUIRED: record_id. Optional: hostname, dns_provider_id, proxied (bool), ttl (int), enabled (bool).")
 async def npg_update_ddns_record(record_id: str | int, hostname: str | None = None, dns_provider_id: str | int | None = None, proxied: bool | None = None, ttl: int | None = None, enabled: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("record_id", record_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {
@@ -2690,8 +2855,9 @@ async def npg_update_ddns_record(record_id: str | int, hostname: str | None = No
 
 @mcp.tool(name="npg_delete_ddns_record", description="Delete a DDNS record by its ID. REQUIRED: record_id.")
 async def npg_delete_ddns_record(record_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("record_id", record_id)
+        c = _get_client()
         c.delete(f"/api/v1/ddns-records/{_id_path(record_id)}")
         return {"success": True, "message": f"DDNS record {_id_path(record_id)} deleted"}
     except Exception as e:
@@ -2708,8 +2874,9 @@ async def npg_sync_ddns_records() -> dict:
 
 @mcp.tool(name="npg_sync_ddns_record", description="Sync one DDNS record now (force DNS update for a specific record). REQUIRED: record_id.")
 async def npg_sync_ddns_record(record_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("record_id", record_id)
+        c = _get_client()
         data = c.post(f"/api/v1/ddns-records/{_id_path(record_id)}/sync")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2717,8 +2884,10 @@ async def npg_sync_ddns_record(record_id: str | int) -> dict:
 
 @mcp.tool(name="npg_import_ddns_from_hosts", description="Import DDNS records from existing proxy hosts that have DDNS enabled. REQUIRED: proxy_host_ids (list of host UUIDs), dns_provider_id (UUID of the DNS provider to use).")
 async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("proxy_host_ids", proxy_host_ids)
+        _validate_id("dns_provider_id", dns_provider_id)
+        c = _get_client()
         body = {"proxy_host_ids": proxy_host_ids, "dns_provider_id": _id_path(dns_provider_id)}
         data = c.post("/api/v1/ddns-records/import-from-hosts", body)
         return {"success": True, "data": data}
@@ -2739,8 +2908,9 @@ async def npg_list_filter_subscriptions() -> dict:
 
 @mcp.tool(name="npg_subscribe_filter_catalog", description="Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json').")
 async def npg_subscribe_filter_catalog(paths: list[str]) -> dict:
-    c = _get_client()
     try:
+        _validate_required("paths", paths)
+        c = _get_client()
         data = c.post("/api/v1/filter-subscriptions/catalog/subscribe", {"paths": paths})
         return {"success": True, "data": data}
     except Exception as e:
@@ -2748,8 +2918,9 @@ async def npg_subscribe_filter_catalog(paths: list[str]) -> dict:
 
 @mcp.tool(name="npg_create_filter_subscription", description="Subscribe to a filter list URL. REQUIRED: url. Optional: name.")
 async def npg_create_filter_subscription(url: str, name: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("url", url)
+        c = _get_client()
         body = {"url": url}
         if name is not None:
             body["name"] = name
@@ -2760,8 +2931,9 @@ async def npg_create_filter_subscription(url: str, name: str | None = None) -> d
 
 @mcp.tool(name="npg_get_filter_subscription", description="Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id.")
 async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2769,8 +2941,9 @@ async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
 
 @mcp.tool(name="npg_update_filter_subscription", description="Update a filter subscription (partial update). Pass only fields to change. REQUIRED: subscription_id.")
 async def npg_update_filter_subscription(subscription_id: str | int, name: str | None = None, url: str | None = None, enabled: bool | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {"name": "name", "url": "url", "enabled": "enabled"},
@@ -2782,8 +2955,9 @@ async def npg_update_filter_subscription(subscription_id: str | int, name: str |
 
 @mcp.tool(name="npg_delete_filter_subscription", description="Delete a filter subscription by its ID. REQUIRED: subscription_id.")
 async def npg_delete_filter_subscription(subscription_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
         return {"success": True, "message": f"Filter subscription {_id_path(subscription_id)} deleted"}
     except Exception as e:
@@ -2791,8 +2965,9 @@ async def npg_delete_filter_subscription(subscription_id: str | int) -> dict:
 
 @mcp.tool(name="npg_refresh_filter_subscription", description="Re-fetch entries for a filter subscription now. REQUIRED: subscription_id.")
 async def npg_refresh_filter_subscription(subscription_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/refresh")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2800,8 +2975,9 @@ async def npg_refresh_filter_subscription(subscription_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_filter_subscription_exclusions", description="List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id.")
 async def npg_get_filter_subscription_exclusions(subscription_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2809,8 +2985,10 @@ async def npg_get_filter_subscription_exclusions(subscription_id: str | int) -> 
 
 @mcp.tool(name="npg_add_filter_subscription_exclusion", description="Exclude a proxy host from a filter subscription. REQUIRED: subscription_id, host_id.")
 async def npg_add_filter_subscription_exclusion(subscription_id: str | int, host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2818,8 +2996,10 @@ async def npg_add_filter_subscription_exclusion(subscription_id: str | int, host
 
 @mcp.tool(name="npg_remove_filter_subscription_exclusion", description="Remove a host exclusion from a filter subscription. REQUIRED: subscription_id, host_id.")
 async def npg_remove_filter_subscription_exclusion(subscription_id: str | int, host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
         return {"success": True, "message": f"Exclusion removed for host {_id_path(host_id)}"}
     except Exception as e:
@@ -2827,8 +3007,9 @@ async def npg_remove_filter_subscription_exclusion(subscription_id: str | int, h
 
 @mcp.tool(name="npg_get_filter_subscription_entry_exclusions", description="List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id.")
 async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        c = _get_client()
         data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2836,8 +3017,10 @@ async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | in
 
 @mcp.tool(name="npg_add_filter_subscription_entry_exclusion", description="Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value.")
 async def npg_add_filter_subscription_entry_exclusion(subscription_id: str | int, entry_value: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        _validate_required("entry_value", entry_value)
+        c = _get_client()
         data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"entry_value": entry_value})
         return {"success": True, "data": data}
     except Exception as e:
@@ -2845,8 +3028,10 @@ async def npg_add_filter_subscription_entry_exclusion(subscription_id: str | int
 
 @mcp.tool(name="npg_remove_filter_subscription_entry_exclusion", description="Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value.")
 async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | int, entry_value: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("subscription_id", subscription_id)
+        _validate_required("entry_value", entry_value)
+        c = _get_client()
         c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"entry_value": entry_value})
         return {"success": True, "message": f"Entry exclusion removed: {entry_value}"}
     except Exception as e:
@@ -2866,8 +3051,9 @@ async def npg_get_exploit_rules_hosts() -> dict:
 
 @mcp.tool(name="npg_get_exploit_rules_for_host", description="List exploit rules with this host's exclusion status. REQUIRED: host_id.")
 async def npg_get_exploit_rules_for_host(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2875,8 +3061,10 @@ async def npg_get_exploit_rules_for_host(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_exclude_exploit_rule_from_host", description="Exclude an exploit rule on ONE proxy host (stop it blocking there). REQUIRED: host_id, rule_id.")
 async def npg_exclude_exploit_rule_from_host(host_id: str | int, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2884,8 +3072,10 @@ async def npg_exclude_exploit_rule_from_host(host_id: str | int, rule_id: str | 
 
 @mcp.tool(name="npg_remove_exploit_rule_exclusion_from_host", description="Remove a host exclusion for an exploit rule (re-enable the rule for that host). REQUIRED: host_id, rule_id.")
 async def npg_remove_exploit_rule_exclusion_from_host(host_id: str | int, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
         return {"success": True, "message": f"Rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}"}
     except Exception as e:
@@ -2893,8 +3083,9 @@ async def npg_remove_exploit_rule_exclusion_from_host(host_id: str | int, rule_i
 
 @mcp.tool(name="npg_global_exclude_exploit_rule", description="Exclude an exploit rule on EVERY host (stop it blocking anywhere). REQUIRED: rule_id.")
 async def npg_global_exclude_exploit_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2902,8 +3093,9 @@ async def npg_global_exclude_exploit_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_remove_exploit_rule_global_exclusion", description="Remove a global exclusion for an exploit rule (re-enable the rule everywhere). REQUIRED: rule_id.")
 async def npg_remove_exploit_rule_global_exclusion(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
         return {"success": True, "message": f"Rule {_id_path(rule_id)} re-enabled globally"}
     except Exception as e:
@@ -2923,8 +3115,9 @@ async def npg_delete_certificate_errors() -> dict:
 
 @mcp.tool(name="npg_clear_certificate_error", description="Clear a certificate's error state (mark as resolved). REQUIRED: cert_id.")
 async def npg_clear_certificate_error(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         c.delete(f"/api/v1/certificates/{_id_path(cert_id)}/error")
         return {"success": True, "message": f"Certificate {_id_path(cert_id)} error cleared"}
     except Exception as e:
@@ -2932,8 +3125,10 @@ async def npg_clear_certificate_error(cert_id: str | int) -> dict:
 
 @mcp.tool(name="npg_upload_certificate_pem", description="Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM string).")
 async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        _validate_required("pem_content", pem_content)
+        c = _get_client()
         data = c.put(f"/api/v1/certificates/{_id_path(cert_id)}/upload", {"pem": pem_content})
         return {"success": True, "data": data}
     except Exception as e:
@@ -2941,8 +3136,9 @@ async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str) -> di
 
 @mcp.tool(name="npg_get_certificate_logs", description="Get the issuance log stream for a certificate. REQUIRED: cert_id.")
 async def npg_get_certificate_logs(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         data = c.get(f"/api/v1/certificates/{_id_path(cert_id)}/logs")
         return {"success": True, "data": data}
     except Exception as e:
@@ -2950,8 +3146,9 @@ async def npg_get_certificate_logs(cert_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns the raw content.")
 async def npg_get_certificate_download(cert_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("cert_id", cert_id)
+        c = _get_client()
         data = c.get_text(f"/api/v1/certificates/{_id_path(cert_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3014,8 +3211,10 @@ async def npg_get_dns_provider_default() -> dict:
 
 @mcp.tool(name="npg_post_log", description="Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags.")
 async def npg_post_log(level: str, message: str, source: str | None = None, component: str | None = None, log_type: str = "access") -> dict:
-    c = _get_client()
     try:
+        _validate_required("level", level)
+        _validate_required("message", message)
+        c = _get_client()
         # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body = {"level": level, "message": message, "log_type": log_type}
         if source is not None: body["source"] = source
@@ -3099,8 +3298,10 @@ async def npg_get_log_filter_presets() -> dict:
 
 @mcp.tool(name="npg_create_log_filter_preset", description="Save a log filter preset. REQUIRED: name, filter (dict). Optional: description.")
 async def npg_create_log_filter_preset(name: str, filter: dict, description: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("name", name)
+        _validate_required("filter", filter)
+        c = _get_client()
         body = {"name": name, "filter": filter}
         if description is not None:
             body["description"] = description
@@ -3111,8 +3312,9 @@ async def npg_create_log_filter_preset(name: str, filter: dict, description: str
 
 @mcp.tool(name="npg_update_log_filter_preset", description="Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter, description.")
 async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = None, filter: dict | None = None, description: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("preset_id", preset_id)
+        c = _get_client()
         body = _build_body(
             locals(),
             {"name": "name", "filter": "filter", "description": "description"},
@@ -3124,8 +3326,9 @@ async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = 
 
 @mcp.tool(name="npg_delete_log_filter_preset", description="Delete a log filter preset by its ID. REQUIRED: preset_id.")
 async def npg_delete_log_filter_preset(preset_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("preset_id", preset_id)
+        c = _get_client()
         c.delete(f"/api/v1/log-filter-presets/{_id_path(preset_id)}")
         return {"success": True, "message": f"Log filter preset {_id_path(preset_id)} deleted"}
     except Exception as e:
@@ -3220,8 +3423,9 @@ async def npg_get_audit_log_api_tokens() -> dict:
 # ── Notification Channels Extras ───────────────────────────────────────
 @mcp.tool(name="npg_get_notification_channel_deliveries", description="List recent deliveries for a notification channel. REQUIRED: channel_id.")
 async def npg_get_notification_channel_deliveries(channel_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("channel_id", channel_id)
+        c = _get_client()
         data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3232,8 +3436,10 @@ async def npg_get_notification_channel_deliveries(channel_id: str | int) -> dict
 
 @mcp.tool(name="npg_set_proxy_host_favorite", description="Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool).")
 async def npg_set_proxy_host_favorite(host_id: str | int, favorite: bool) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_required("favorite", favorite)
+        c = _get_client()
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/favorite", {"favorite": favorite})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3253,8 +3459,9 @@ async def npg_sync_redirect_hosts() -> dict:
 # ── SSO Extras ─────────────────────────────────────────────────────────
 @mcp.tool(name="npg_delete_proxy_host_rate_limit", description="Delete the rate limit config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_rate_limit(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
         return {"success": True, "message": f"Rate limit deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3262,8 +3469,9 @@ async def npg_delete_proxy_host_rate_limit(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_proxy_host_bot_filter", description="Delete the bot filter config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_bot_filter(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
         return {"success": True, "message": f"Bot filter deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3271,8 +3479,9 @@ async def npg_delete_proxy_host_bot_filter(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_proxy_host_security_headers", description="Delete the security headers config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_security_headers(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
         return {"success": True, "message": f"Security headers deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3280,8 +3489,9 @@ async def npg_delete_proxy_host_security_headers(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_proxy_host_upstream", description="Delete the upstream/load balancing config for a proxy host — host falls back to defaults. REQUIRED: host_id.")
 async def npg_delete_proxy_host_upstream(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
         return {"success": True, "message": f"Upstream config deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3289,8 +3499,9 @@ async def npg_delete_proxy_host_upstream(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_proxy_host_uri_block", description="Delete the URI block config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_uri_block(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
         return {"success": True, "message": f"URI block deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3298,8 +3509,9 @@ async def npg_delete_proxy_host_uri_block(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_delete_proxy_host_fail2ban", description="Delete the fail2ban config for a proxy host — host falls back to global default. REQUIRED: host_id.")
 async def npg_delete_proxy_host_fail2ban(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
         return {"success": True, "message": f"Fail2ban config deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3307,8 +3519,9 @@ async def npg_delete_proxy_host_fail2ban(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_bulk_unban_ips", description="Unban multiple banned-IP records at once. REQUIRED: ids (list of record IDs).")
 async def npg_bulk_unban_ips(ids: list[str | int]) -> dict:
-    c = _get_client()
     try:
+        _validate_required("ids", ids)
+        c = _get_client()
         data = c.post("/api/v1/banned-ips/bulk-unban", {"ids": [_id_path(i) for i in ids]})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3334,8 +3547,9 @@ async def npg_get_ban_history_stats() -> dict:
 
 @mcp.tool(name="npg_get_ban_history_for_ip", description="Get ban history for a specific IP address. REQUIRED: ip.")
 async def npg_get_ban_history_for_ip(ip: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("ip", ip)
+        c = _get_client()
         data = c.get(f"/api/v1/banned-ips/history/ip/{quote(ip, safe='')}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3343,8 +3557,9 @@ async def npg_get_ban_history_for_ip(ip: str) -> dict:
 
 @mcp.tool(name="npg_get_ip_traffic_stats", description="Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default).")
 async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_required("ip", ip)
+        c = _get_client()
         params: dict = {}
         if days is not None:
             params["days"] = days
@@ -3355,8 +3570,10 @@ async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
 
 @mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description.")
 async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_required("pattern", pattern)
+        c = _get_client()
         # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
@@ -3368,8 +3585,10 @@ async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, ma
 
 @mcp.tool(name="npg_delete_proxy_host_uri_block_rule", description="Remove a single URI block rule from a proxy host. REQUIRED: host_id, rule_id.")
 async def npg_delete_proxy_host_uri_block_rule(host_id: str | int, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules/{_id_path(rule_id)}")
         return {"success": True, "message": f"URI block rule {_id_path(rule_id)} deleted for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3398,8 +3617,9 @@ async def npg_get_settings_presets() -> dict:
 
 @mcp.tool(name="npg_apply_settings_preset", description="Apply a global settings preset. REQUIRED: preset (preset name/identifier).")
 async def npg_apply_settings_preset(preset: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("preset", preset)
+        c = _get_client()
         data = c.post(f"/api/v1/settings/preset/{quote(preset, safe='')}")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3474,8 +3694,9 @@ async def npg_get_waf_global_history() -> dict:
 
 @mcp.tool(name="npg_disable_waf_global_rule", description="Disable a CRS rule for EVERY host (globally). REQUIRED: rule_id.")
 async def npg_disable_waf_global_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3483,8 +3704,9 @@ async def npg_disable_waf_global_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_enable_waf_global_rule", description="Re-enable a CRS rule globally (remove global disable). REQUIRED: rule_id.")
 async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "message": f"WAF rule {_id_path(rule_id)} re-enabled globally"}
     except Exception as e:
@@ -3492,8 +3714,9 @@ async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
 
 @mcp.tool(name="npg_get_waf_host_history", description="Get the WAF policy change history for a proxy host. REQUIRED: host_id.")
 async def npg_get_waf_host_history(host_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
         data = c.get(f"/api/v1/waf/hosts/{_id_path(host_id)}/history")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3501,8 +3724,10 @@ async def npg_get_waf_host_history(host_id: str | int) -> dict:
 
 @mcp.tool(name="npg_disable_waf_rule_by_host", description="Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API.")
 async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_required("domain_name", domain_name)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         data = c.post("/api/v1/waf/rules/disable-by-host", {"host": domain_name, "rule_id": int(rule_id)})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3510,8 +3735,10 @@ async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> 
 
 @mcp.tool(name="npg_enable_waf_rule_by_host", description="Re-enable a CRS rule for a specific proxy host (removes per-host exclusion). REQUIRED: host_id (proxy host UUID), rule_id (CRS rule ID).")
 async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
         c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "message": f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}"}
     except Exception as e:
@@ -3531,8 +3758,9 @@ async def npg_get_api_token_permissions() -> dict:
 
 @mcp.tool(name="npg_get_api_token_usage", description="Get recent usage for an API token. REQUIRED: token_id.")
 async def npg_get_api_token_usage(token_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("token_id", token_id)
+        c = _get_client()
         data = c.get(f"/api/v1/api-tokens/{_id_path(token_id)}/usage")
         return {"success": True, "data": data}
     except Exception as e:
@@ -3552,8 +3780,10 @@ async def npg_get_waf_test_patterns() -> dict:
 
 @mcp.tool(name="npg_test_waf_pattern", description="Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, attack_type (attack type name or index).")
 async def npg_test_waf_pattern(target_url: str, attack_type: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("target_url", target_url)
+        _validate_required("attack_type", attack_type)
+        c = _get_client()
         data = c.post("/api/v1/waf-test/test", {"target_url": target_url, "attack_type": attack_type})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3561,8 +3791,9 @@ async def npg_test_waf_pattern(target_url: str, attack_type: str) -> dict:
 
 @mcp.tool(name="npg_test_waf_all_patterns", description="Fire every attack payload at a target URL for comprehensive WAF testing. REQUIRED: target_url.")
 async def npg_test_waf_all_patterns(target_url: str) -> dict:
-    c = _get_client()
     try:
+        _validate_required("target_url", target_url)
+        c = _get_client()
         data = c.post("/api/v1/waf-test/test-all", {"target_url": target_url})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3584,8 +3815,10 @@ async def npg_get_geoip_history() -> dict:
 # ── Users Extras ───────────────────────────────────────────────────────
 @mcp.tool(name="npg_set_user_role", description="Assign a role to a user account. REQUIRED: user_id, role_id.")
 async def npg_set_user_role(user_id: str | int, role_id: str | int) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        _validate_id("role_id", role_id)
+        c = _get_client()
         data = c.put(f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
         return {"success": True, "data": data}
     except Exception as e:
@@ -3593,8 +3826,10 @@ async def npg_set_user_role(user_id: str | int, role_id: str | int) -> dict:
 
 @mcp.tool(name="npg_set_user_email", description="Set the SSO linking email for a user account. This is the address an identity provider's verified email is matched against when linking a sign-in to an existing account. REQUIRED: user_id, email (must be a plain email address, no display name).")
 async def npg_set_user_email(user_id: str | int, email: str) -> dict:
-    c = _get_client()
     try:
+        _validate_id("user_id", user_id)
+        _validate_required("email", email)
+        c = _get_client()
         c.put(f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
         return {"success": True, "message": f"Email updated for user {_id_path(user_id)}"}
     except Exception as e:
