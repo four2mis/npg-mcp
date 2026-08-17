@@ -85,10 +85,12 @@ class TestBuildBody:
         _build_body = self._helper()
         domains = ["a.example.com", "b.example.com"]
         servers = [{"host": "10.0.0.1", "port": 8080}]
+        # Mapping is var_name -> api_field_name: var upstream_servers maps to
+        # API field "servers" (as in npg_update_proxy_host_upstream).
         body = _build_body(
             {"domain_names": domains, "upstream_servers": servers},
             {"domain_names": "domain_names", "upstream_servers": "servers"},
         )
-        assert body == {"domain_names": domains, "upstream_servers": servers}
+        assert body == {"domain_names": domains, "servers": servers}
         assert body["domain_names"] is domains
-        assert body["upstream_servers"] is servers
+        assert body["servers"] is servers

@@ -222,6 +222,38 @@ def _id_path(id_val) -> str:
     return str(id_val)
 
 
+# Local-variable names that must never leak into an API request body.
+_INTERNAL_BODY_KEYS = frozenset({"self", "c", "body"})
+
+
+def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) -> dict:
+    """Build an API request body dict from local variables, keeping only non-None values.
+
+    Eliminates the repeated ``if x is not None: body["api_field"] = x`` pattern
+    across create/update tools. ``mapping`` is a dict of local-variable name ->
+    API field name. Internal keys (``self``/``c``/``body``), values that are
+    None, and variables absent from ``vars_dict`` are skipped. All other values
+    are passed through unchanged (including list[str] and list[dict] params),
+    except fields listed in ``id_fields`` which are coerced via ``_id_path``
+    (int -> str, matching URL path interpolation semantics).
+    """
+    body: dict = {}
+    id_fields = id_fields or set()
+    for var_name, api_field in mapping.items():
+        if var_name in _INTERNAL_BODY_KEYS:
+            continue
+        if var_name not in vars_dict:
+            continue
+        value = vars_dict[var_name]
+        if value is None:
+            continue
+        if var_name in id_fields:
+            body[api_field] = _id_path(value)
+        else:
+            body[api_field] = value
+    return body
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_list_proxy_hosts", description="List all proxy hosts. Returns a list of proxy host objects.")
@@ -309,59 +341,64 @@ async def npg_create_proxy_host(
 ) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        body["domain_names"] = domain_names
-        body["forward_host"] = forward_host
-        body["forward_port"] = forward_port
-        if forward_scheme is not None: body["forward_scheme"] = forward_scheme
-        if block_normal is not None: body["block_normal_access"] = block_normal
-        if waf_enabled is not None: body["waf_enabled"] = waf_enabled
-        if block_http is not None: body["block_http_requests"] = block_http
-        if ssl_enabled is not None: body["ssl_enabled"] = ssl_enabled
-        if ssl_forced is not None: body["ssl_force_https"] = ssl_forced
-        if ssl_http2 is not None: body["ssl_http2"] = ssl_http2
-        if ssl_http3 is not None: body["ssl_http3"] = ssl_http3
-        if ssl_cert_id is not None: body["certificate_id"] = ssl_cert_id
-        if cache_enabled is not None: body["cache_enabled"] = cache_enabled
-        if cache_static_only is not None: body["cache_static_only"] = cache_static_only
-        if cache_ttl is not None: body["cache_ttl"] = cache_ttl
-        if cache_template is not None: body["cache_template"] = cache_template
-        if advanced_config is not None: body["advanced_config"] = advanced_config
-        if enable_proxy_headers is not None: body["enable_proxy_headers"] = enable_proxy_headers
-        if host_header is not None: body["pass_host_header"] = host_header
-        if extra_domains is not None: body["extra_domains"] = extra_domains
-        if block_exploits is not None: body["block_exploits"] = block_exploits
-        if block_exploits_exceptions is not None: body["block_exploits_exceptions"] = block_exploits_exceptions
-        if allow_websocket_upgrade is not None: body["allow_websocket_upgrade"] = allow_websocket_upgrade
-        if waf_use_global is not None: body["waf_use_global"] = waf_use_global
-        if waf_paranoia_level is not None: body["waf_paranoia_level"] = waf_paranoia_level
-        if waf_anomaly_threshold is not None: body["waf_anomaly_threshold"] = waf_anomaly_threshold
-        if waf_mode is not None: body["waf_mode"] = waf_mode
-        if proxy_connect_timeout is not None: body["proxy_connect_timeout"] = proxy_connect_timeout
-        if proxy_send_timeout is not None: body["proxy_send_timeout"] = proxy_send_timeout
-        if proxy_read_timeout is not None: body["proxy_read_timeout"] = proxy_read_timeout
-        if proxy_buffering is not None: body["proxy_buffering"] = proxy_buffering
-        if proxy_request_buffering is not None: body["proxy_request_buffering"] = proxy_request_buffering
-        if client_max_body_size is not None: body["client_max_body_size"] = client_max_body_size
-        if proxy_max_temp_file_size is not None: body["proxy_max_temp_file_size"] = proxy_max_temp_file_size
-        if access_list_id is not None: body["access_list_id"] = _id_path(access_list_id)
-        if auth_provider_id is not None: body["auth_provider_id"] = _id_path(auth_provider_id)
-        if auth_bypass_paths is not None: body["auth_bypass_paths"] = auth_bypass_paths
-        if ddns_enabled is not None: body["ddns_enabled"] = ddns_enabled
-        if ddns_provider_id is not None: body["ddns_provider_id"] = _id_path(ddns_provider_id)
-        if ddns_proxied is not None: body["ddns_proxied"] = ddns_proxied
-        if forward_container_name is not None: body["forward_container_name"] = forward_container_name
-        if forward_container_network is not None: body["forward_container_network"] = forward_container_network
-        body["proxy_type"] = proxy_type
-        body["enabled"] = enabled
-        if stream_listen_host is not None: body["stream_listen_host"] = stream_listen_host
-        if stream_listen_port is not None: body["stream_listen_port"] = stream_listen_port
-        if stream_protocol is not None: body["stream_protocol"] = stream_protocol
-        if stream_ssl_preread is not None: body["stream_ssl_preread"] = stream_ssl_preread
-        if stream_accept_proxy_protocol is not None: body["stream_accept_proxy_protocol"] = stream_accept_proxy_protocol
-        if stream_send_proxy_protocol is not None: body["stream_send_proxy_protocol"] = stream_send_proxy_protocol
-        if stream_proxy_connect_timeout is not None: body["stream_proxy_connect_timeout"] = stream_proxy_connect_timeout
-        if stream_proxy_timeout is not None: body["stream_proxy_timeout"] = stream_proxy_timeout
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_host": "forward_host",
+                "forward_port": "forward_port",
+                "forward_scheme": "forward_scheme",
+                "block_normal": "block_normal_access",
+                "waf_enabled": "waf_enabled",
+                "block_http": "block_http_requests",
+                "ssl_enabled": "ssl_enabled",
+                "ssl_forced": "ssl_force_https",
+                "ssl_http2": "ssl_http2",
+                "ssl_http3": "ssl_http3",
+                "ssl_cert_id": "certificate_id",
+                "cache_enabled": "cache_enabled",
+                "cache_static_only": "cache_static_only",
+                "cache_ttl": "cache_ttl",
+                "cache_template": "cache_template",
+                "advanced_config": "advanced_config",
+                "enable_proxy_headers": "enable_proxy_headers",
+                "host_header": "pass_host_header",
+                "extra_domains": "extra_domains",
+                "block_exploits": "block_exploits",
+                "block_exploits_exceptions": "block_exploits_exceptions",
+                "allow_websocket_upgrade": "allow_websocket_upgrade",
+                "waf_use_global": "waf_use_global",
+                "waf_paranoia_level": "waf_paranoia_level",
+                "waf_anomaly_threshold": "waf_anomaly_threshold",
+                "waf_mode": "waf_mode",
+                "proxy_connect_timeout": "proxy_connect_timeout",
+                "proxy_send_timeout": "proxy_send_timeout",
+                "proxy_read_timeout": "proxy_read_timeout",
+                "proxy_buffering": "proxy_buffering",
+                "proxy_request_buffering": "proxy_request_buffering",
+                "client_max_body_size": "client_max_body_size",
+                "proxy_max_temp_file_size": "proxy_max_temp_file_size",
+                "access_list_id": "access_list_id",
+                "auth_provider_id": "auth_provider_id",
+                "auth_bypass_paths": "auth_bypass_paths",
+                "ddns_enabled": "ddns_enabled",
+                "ddns_provider_id": "ddns_provider_id",
+                "ddns_proxied": "ddns_proxied",
+                "forward_container_name": "forward_container_name",
+                "forward_container_network": "forward_container_network",
+                "proxy_type": "proxy_type",
+                "enabled": "enabled",
+                "stream_listen_host": "stream_listen_host",
+                "stream_listen_port": "stream_listen_port",
+                "stream_protocol": "stream_protocol",
+                "stream_ssl_preread": "stream_ssl_preread",
+                "stream_accept_proxy_protocol": "stream_accept_proxy_protocol",
+                "stream_send_proxy_protocol": "stream_send_proxy_protocol",
+                "stream_proxy_connect_timeout": "stream_proxy_connect_timeout",
+                "stream_proxy_timeout": "stream_proxy_timeout",
+            },
+            id_fields={"access_list_id", "auth_provider_id", "ddns_provider_id"},
+        )
 
         data = c.post("/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
@@ -416,48 +453,53 @@ async def npg_update_proxy_host(
 ) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if domain_names is not None: body["domain_names"] = domain_names
-        if forward_host is not None: body["forward_host"] = forward_host
-        if forward_port is not None: body["forward_port"] = forward_port
-        if forward_scheme is not None: body["forward_scheme"] = forward_scheme
-        if block_normal is not None: body["block_normal_access"] = block_normal
-        if waf_enabled is not None: body["waf_enabled"] = waf_enabled
-        if waf_use_global is not None: body["waf_use_global"] = waf_use_global
-        if waf_paranoia_level is not None: body["waf_paranoia_level"] = waf_paranoia_level
-        if waf_anomaly_threshold is not None: body["waf_anomaly_threshold"] = waf_anomaly_threshold
-        if block_http is not None: body["block_http_requests"] = block_http
-        if ssl_forced is not None: body["ssl_force_https"] = ssl_forced
-        if ssl_cert_id is not None: body["certificate_id"] = ssl_cert_id
-        if cache_enabled is not None: body["cache_enabled"] = cache_enabled
-        if cache_static_only is not None: body["cache_static_only"] = cache_static_only
-        if cache_ttl is not None: body["cache_ttl"] = cache_ttl
-        if cache_template is not None: body["cache_template"] = cache_template
-        if advanced_config is not None: body["advanced_config"] = advanced_config
-        if enable_proxy_headers is not None: body["enable_proxy_headers"] = enable_proxy_headers
-        if host_header is not None: body["pass_host_header"] = host_header
-        if extra_domains is not None: body["extra_domains"] = extra_domains
-        if enabled is not None: body["enabled"] = enabled
-        if ssl_http2 is not None: body["ssl_http2"] = ssl_http2
-        if ssl_http3 is not None: body["ssl_http3"] = ssl_http3
-        if block_exploits is not None: body["block_exploits"] = block_exploits
-        if block_exploits_exceptions is not None: body["block_exploits_exceptions"] = block_exploits_exceptions
-        if allow_websocket_upgrade is not None: body["allow_websocket_upgrade"] = allow_websocket_upgrade
-        if proxy_connect_timeout is not None: body["proxy_connect_timeout"] = proxy_connect_timeout
-        if proxy_send_timeout is not None: body["proxy_send_timeout"] = proxy_send_timeout
-        if proxy_read_timeout is not None: body["proxy_read_timeout"] = proxy_read_timeout
-        if proxy_buffering is not None: body["proxy_buffering"] = proxy_buffering
-        if proxy_request_buffering is not None: body["proxy_request_buffering"] = proxy_request_buffering
-        if client_max_body_size is not None: body["client_max_body_size"] = client_max_body_size
-        if proxy_max_temp_file_size is not None: body["proxy_max_temp_file_size"] = proxy_max_temp_file_size
-        if access_list_id is not None: body["access_list_id"] = _id_path(access_list_id)
-        if auth_provider_id is not None: body["auth_provider_id"] = _id_path(auth_provider_id)
-        if auth_bypass_paths is not None: body["auth_bypass_paths"] = auth_bypass_paths
-        if ddns_enabled is not None: body["ddns_enabled"] = ddns_enabled
-        if ddns_provider_id is not None: body["ddns_provider_id"] = _id_path(ddns_provider_id)
-        if ddns_proxied is not None: body["ddns_proxied"] = ddns_proxied
-        if forward_container_name is not None: body["forward_container_name"] = forward_container_name
-        if forward_container_network is not None: body["forward_container_network"] = forward_container_network
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_host": "forward_host",
+                "forward_port": "forward_port",
+                "forward_scheme": "forward_scheme",
+                "block_normal": "block_normal_access",
+                "waf_enabled": "waf_enabled",
+                "waf_use_global": "waf_use_global",
+                "waf_paranoia_level": "waf_paranoia_level",
+                "waf_anomaly_threshold": "waf_anomaly_threshold",
+                "block_http": "block_http_requests",
+                "ssl_forced": "ssl_force_https",
+                "ssl_cert_id": "certificate_id",
+                "cache_enabled": "cache_enabled",
+                "cache_static_only": "cache_static_only",
+                "cache_ttl": "cache_ttl",
+                "cache_template": "cache_template",
+                "advanced_config": "advanced_config",
+                "enable_proxy_headers": "enable_proxy_headers",
+                "host_header": "pass_host_header",
+                "extra_domains": "extra_domains",
+                "enabled": "enabled",
+                "ssl_http2": "ssl_http2",
+                "ssl_http3": "ssl_http3",
+                "block_exploits": "block_exploits",
+                "block_exploits_exceptions": "block_exploits_exceptions",
+                "allow_websocket_upgrade": "allow_websocket_upgrade",
+                "proxy_connect_timeout": "proxy_connect_timeout",
+                "proxy_send_timeout": "proxy_send_timeout",
+                "proxy_read_timeout": "proxy_read_timeout",
+                "proxy_buffering": "proxy_buffering",
+                "proxy_request_buffering": "proxy_request_buffering",
+                "client_max_body_size": "client_max_body_size",
+                "proxy_max_temp_file_size": "proxy_max_temp_file_size",
+                "access_list_id": "access_list_id",
+                "auth_provider_id": "auth_provider_id",
+                "auth_bypass_paths": "auth_bypass_paths",
+                "ddns_enabled": "ddns_enabled",
+                "ddns_provider_id": "ddns_provider_id",
+                "ddns_proxied": "ddns_proxied",
+                "forward_container_name": "forward_container_name",
+                "forward_container_network": "forward_container_network",
+            },
+            id_fields={"access_list_id", "auth_provider_id", "ddns_provider_id"},
+        )
 
         params = {"skip_nginx": "true"} if skip_nginx else None
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}", body, params=params)
@@ -633,13 +675,16 @@ async def npg_create_redirect_host(
 ) -> dict:
     c = _get_client()
     try:
-        body = {
-            "domain_names": domain_names,
-            "forward_domain_name": forward_domain_name,
-            "forward_scheme": forward_scheme,
-            "preserve_path": preserve_path,
-            "redirect_code": redirect_code,
-        }
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_domain_name": "forward_domain_name",
+                "forward_scheme": "forward_scheme",
+                "preserve_path": "preserve_path",
+                "redirect_code": "redirect_code",
+            },
+        )
         data = c.post("/api/v1/redirect-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -656,12 +701,16 @@ async def npg_update_redirect_host(
 ) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if domain_names is not None: body["domain_names"] = domain_names
-        if forward_domain_name is not None: body["forward_domain_name"] = forward_domain_name
-        if forward_scheme is not None: body["forward_scheme"] = forward_scheme
-        if preserve_path is not None: body["preserve_path"] = preserve_path
-        if redirect_code is not None: body["redirect_code"] = redirect_code
+        body = _build_body(
+            locals(),
+            {
+                "domain_names": "domain_names",
+                "forward_domain_name": "forward_domain_name",
+                "forward_scheme": "forward_scheme",
+                "preserve_path": "preserve_path",
+                "redirect_code": "redirect_code",
+            },
+        )
         data = c.put(f"/api/v1/redirect-hosts/{_id_path(host_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -692,14 +741,18 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
 async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if requests_per_second is not None: body["requests_per_second"] = requests_per_second
-        if burst_size is not None: body["burst_size"] = burst_size
-        if zone_size is not None: body["zone_size"] = zone_size
-        if limit_by is not None: body["limit_by"] = limit_by
-        if limit_response is not None: body["limit_response"] = limit_response
-        if disable_global is not None: body["disable_global"] = disable_global
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "requests_per_second": "requests_per_second",
+                "burst_size": "burst_size",
+                "zone_size": "zone_size",
+                "limit_by": "limit_by",
+                "limit_response": "limit_response",
+                "disable_global": "disable_global",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -718,18 +771,20 @@ async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
 async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, disable_global: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if block_bad_bots is not None: body["block_bad_bots"] = block_bad_bots
-        if block_ai_bots is not None: body["block_ai_bots"] = block_ai_bots
-        if allow_search_engines is not None: body["allow_search_engines"] = allow_search_engines
-        if block_suspicious_clients is not None: body["block_suspicious_clients"] = block_suspicious_clients
-        if challenge_suspicious is not None: body["challenge_suspicious"] = challenge_suspicious
-        if disable_global is not None: body["disable_global"] = disable_global
-        if custom_blocked_agents is not None:
-            body["custom_blocked_agents"] = custom_blocked_agents
-        if custom_allowed_agents is not None:
-            body["custom_allowed_agents"] = custom_allowed_agents
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "block_bad_bots": "block_bad_bots",
+                "block_ai_bots": "block_ai_bots",
+                "allow_search_engines": "allow_search_engines",
+                "block_suspicious_clients": "block_suspicious_clients",
+                "challenge_suspicious": "challenge_suspicious",
+                "disable_global": "disable_global",
+                "custom_blocked_agents": "custom_blocked_agents",
+                "custom_allowed_agents": "custom_allowed_agents",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -748,18 +803,22 @@ async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
 async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if hsts_enabled is not None: body["hsts_enabled"] = hsts_enabled
-        if hsts_max_age is not None: body["hsts_max_age"] = hsts_max_age
-        if hsts_include_subdomains is not None: body["hsts_include_subdomains"] = hsts_include_subdomains
-        if hsts_preload is not None: body["hsts_preload"] = hsts_preload
-        if x_frame_options is not None: body["x_frame_options"] = x_frame_options
-        if x_content_type_options is not None: body["x_content_type_options"] = x_content_type_options
-        if x_xss_protection is not None: body["x_xss_protection"] = x_xss_protection
-        if referrer_policy is not None: body["referrer_policy"] = referrer_policy
-        if content_security_policy is not None: body["content_security_policy"] = content_security_policy
-        if disable_global is not None: body["disable_global"] = disable_global
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "hsts_enabled": "hsts_enabled",
+                "hsts_max_age": "hsts_max_age",
+                "hsts_include_subdomains": "hsts_include_subdomains",
+                "hsts_preload": "hsts_preload",
+                "x_frame_options": "x_frame_options",
+                "x_content_type_options": "x_content_type_options",
+                "x_xss_protection": "x_xss_protection",
+                "referrer_policy": "referrer_policy",
+                "content_security_policy": "content_security_policy",
+                "disable_global": "disable_global",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -787,13 +846,17 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
 async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if scheme is not None: body["scheme"] = scheme
-        if servers is not None: body["servers"] = servers
-        if load_balance is not None: body["load_balance"] = load_balance
-        if health_check_enabled is not None: body["health_check_enabled"] = health_check_enabled
-        if health_check_path is not None: body["health_check_path"] = health_check_path
-        if health_check_interval is not None: body["health_check_interval"] = health_check_interval
+        body = _build_body(
+            locals(),
+            {
+                "scheme": "scheme",
+                "servers": "servers",
+                "load_balance": "load_balance",
+                "health_check_enabled": "health_check_enabled",
+                "health_check_path": "health_check_path",
+                "health_check_interval": "health_check_interval",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -812,11 +875,15 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
 async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if rules is not None: body["rules"] = rules
-        if exception_ips is not None: body["exception_ips"] = exception_ips
-        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "rules": "rules",
+                "exception_ips": "exception_ips",
+                "allow_private_ips": "allow_private_ips",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -913,6 +980,7 @@ async def npg_get_access_list(list_id: str | int) -> dict:
 async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required field + optional if-not-None — kept as-is (not _build_body).
         body: dict = {"name": name}
         if satisfy_any is not None: body["satisfy_any"] = satisfy_any
         if pass_auth is not None: body["pass_auth"] = pass_auth
@@ -927,12 +995,16 @@ async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pas
 async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if name is not None: body["name"] = name
-        if satisfy_any is not None: body["satisfy_any"] = satisfy_any
-        if pass_auth is not None: body["pass_auth"] = pass_auth
-        if description is not None: body["description"] = description
-        if items is not None: body["items"] = items
+        body = _build_body(
+            locals(),
+            {
+                "name": "name",
+                "satisfy_any": "satisfy_any",
+                "pass_auth": "pass_auth",
+                "description": "description",
+                "items": "items",
+            },
+        )
         data = c.put(f"/api/v1/access-lists/{_id_path(list_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1133,6 +1205,7 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
 async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded defaults dict (create semantics) + conditional — kept as-is (not _build_body).
         body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
         if allowed_ips is not None: body["allowed_ips"] = allowed_ips
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
@@ -1144,15 +1217,19 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
 async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if mode is not None: body["mode"] = mode
-        if countries is not None: body["countries"] = countries
-        if allowed_ips is not None: body["allowed_ips"] = allowed_ips
-        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
-        if disable_global is not None: body["disable_global"] = disable_global
-        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
-        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "mode": "mode",
+                "countries": "countries",
+                "allowed_ips": "allowed_ips",
+                "challenge_mode": "challenge_mode",
+                "disable_global": "disable_global",
+                "allow_private_ips": "allow_private_ips",
+                "allow_search_bots": "allow_search_bots",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1183,13 +1260,17 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
 async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "challenge"] | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if max_retries is not None: body["max_retries"] = max_retries
-        if find_time is not None: body["find_time"] = find_time
-        if ban_time is not None: body["ban_time"] = ban_time
-        if fail_codes is not None: body["fail_codes"] = fail_codes
-        if action is not None: body["action"] = action
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "max_retries": "max_retries",
+                "find_time": "find_time",
+                "ban_time": "ban_time",
+                "fail_codes": "fail_codes",
+                "action": "action",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1211,14 +1292,18 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
 async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | None = None, challenge_type: str | None = None, site_key: str | None = None, token_validity: int | None = None, min_score: float | None = None, apply_to: str | None = None, page_title: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if challenge_type is not None: body["challenge_type"] = challenge_type
-        if site_key is not None: body["site_key"] = site_key
-        if token_validity is not None: body["token_validity"] = token_validity
-        if min_score is not None: body["min_score"] = min_score
-        if apply_to is not None: body["apply_to"] = apply_to
-        if page_title is not None: body["page_title"] = page_title
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "challenge_type": "challenge_type",
+                "site_key": "site_key",
+                "token_validity": "token_validity",
+                "min_score": "min_score",
+                "apply_to": "apply_to",
+                "page_title": "page_title",
+            },
+        )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1619,7 +1704,7 @@ async def npg_update_notification_channel(channel_id: str | int, name: str | Non
             "template": existing.get("template", ""),
         }
         if enabled is not None: body["enabled"] = enabled
-        # Overlay provided fields
+        # Overlay provided fields (read-modify-write pattern — kept as-is, not _build_body)
         if name is not None: body["name"] = name
         if channel_type is not None: body["type"] = channel_type
         if config is not None: body["config"] = config
@@ -1667,9 +1752,10 @@ async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
 async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if bot_token is not None: body["bot_token"] = bot_token
-        if channel_id is not None: body["channel_id"] = channel_id
+        body = _build_body(
+            locals(),
+            {"bot_token": "bot_token", "channel_id": "channel_id"},
+        )
         data = c.post("/api/v1/notification-channels/detect-telegram-chats", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1759,10 +1845,10 @@ async def npg_create_role(name: str, permissions: list[str] | None = None, descr
 async def npg_update_role(role_id: str | int, name: str | None = None, description: str | None = None, permissions: list[str] | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if name is not None: body["name"] = name
-        if description is not None: body["description"] = description
-        if permissions is not None: body["permissions"] = permissions
+        body = _build_body(
+            locals(),
+            {"name": "name", "description": "description", "permissions": "permissions"},
+        )
         data = c.put(f"/api/v1/roles/{_id_path(role_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -1824,6 +1910,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
                 break
         if current is None:
             return {"success": False, "error": f"SSO provider {cid} not found"}
+        # Read-modify-write full-replace merge — kept as-is (not _build_body).
         # Start with current values for full-replace fields
         body: dict = {"slug": current.get("slug", ""), "issuer_url": current.get("issuer_url", ""), "client_id": current.get("client_id", ""), "client_secret": current.get("client_secret", "********")}
         # Merge all current non-replace fields (incl. trust_provider_email to avoid data-loss)
@@ -1970,6 +2057,7 @@ async def npg_list_uri_blocks() -> dict:
 async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", description: str | None = None, host_ids: list[str] | None = None) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
             body["description"] = description
@@ -1996,11 +2084,15 @@ async def npg_get_global_uri_block() -> dict:
 async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if rules is not None: body["rules"] = rules
-        if exception_ips is not None: body["exception_ips"] = exception_ips
-        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "rules": "rules",
+                "exception_ips": "exception_ips",
+                "allow_private_ips": "allow_private_ips",
+            },
+        )
         data = c.put("/api/v1/global-uri-block", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2010,6 +2102,7 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
 async def npg_add_global_uri_block_rule(pattern: str, match_type: str = "prefix", description: str = "", enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required fields + truthy-description conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description: body["description"] = description
         if enabled is not None: body["enabled"] = enabled
@@ -2189,17 +2282,21 @@ async def npg_get_global_security_headers() -> dict:
 async def npg_update_global_security_headers(enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if hsts_enabled is not None: body["hsts_enabled"] = hsts_enabled
-        if hsts_max_age is not None: body["hsts_max_age"] = hsts_max_age
-        if hsts_include_subdomains is not None: body["hsts_include_subdomains"] = hsts_include_subdomains
-        if hsts_preload is not None: body["hsts_preload"] = hsts_preload
-        if x_frame_options is not None: body["x_frame_options"] = x_frame_options
-        if x_content_type_options is not None: body["x_content_type_options"] = x_content_type_options
-        if x_xss_protection is not None: body["x_xss_protection"] = x_xss_protection
-        if referrer_policy is not None: body["referrer_policy"] = referrer_policy
-        if content_security_policy is not None: body["content_security_policy"] = content_security_policy
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "hsts_enabled": "hsts_enabled",
+                "hsts_max_age": "hsts_max_age",
+                "hsts_include_subdomains": "hsts_include_subdomains",
+                "hsts_preload": "hsts_preload",
+                "x_frame_options": "x_frame_options",
+                "x_content_type_options": "x_content_type_options",
+                "x_xss_protection": "x_xss_protection",
+                "referrer_policy": "referrer_policy",
+                "content_security_policy": "content_security_policy",
+            },
+        )
         data = c.put("/api/v1/settings/global-security-headers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2221,15 +2318,19 @@ async def npg_get_global_bot_filter() -> dict:
 async def npg_update_global_bot_filter(enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if block_bad_bots is not None: body["block_bad_bots"] = block_bad_bots
-        if block_ai_bots is not None: body["block_ai_bots"] = block_ai_bots
-        if allow_search_engines is not None: body["allow_search_engines"] = allow_search_engines
-        if block_suspicious_clients is not None: body["block_suspicious_clients"] = block_suspicious_clients
-        if challenge_suspicious is not None: body["challenge_suspicious"] = challenge_suspicious
-        if custom_blocked_agents is not None: body["custom_blocked_agents"] = custom_blocked_agents
-        if custom_allowed_agents is not None: body["custom_allowed_agents"] = custom_allowed_agents
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "block_bad_bots": "block_bad_bots",
+                "block_ai_bots": "block_ai_bots",
+                "allow_search_engines": "allow_search_engines",
+                "block_suspicious_clients": "block_suspicious_clients",
+                "challenge_suspicious": "challenge_suspicious",
+                "custom_blocked_agents": "custom_blocked_agents",
+                "custom_allowed_agents": "custom_allowed_agents",
+            },
+        )
         data = c.put("/api/v1/settings/global-bot-filter", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2251,10 +2352,14 @@ async def npg_get_global_cloud_providers() -> dict:
 async def npg_update_global_cloud_providers(blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if blocked_providers is not None: body["blocked_providers"] = blocked_providers
-        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
-        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
+        body = _build_body(
+            locals(),
+            {
+                "blocked_providers": "blocked_providers",
+                "challenge_mode": "challenge_mode",
+                "allow_search_bots": "allow_search_bots",
+            },
+        )
         data = c.put("/api/v1/settings/global-cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2276,14 +2381,18 @@ async def npg_get_global_geo() -> dict:
 async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None, challenge_mode: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if mode is not None: body["mode"] = mode
-        if countries is not None: body["countries"] = countries
-        if allowed_ips is not None: body["allowed_ips"] = allowed_ips
-        if allow_private_ips is not None: body["allow_private_ips"] = allow_private_ips
-        if allow_search_bots is not None: body["allow_search_bots"] = allow_search_bots
-        if challenge_mode is not None: body["challenge_mode"] = challenge_mode
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "mode": "mode",
+                "countries": "countries",
+                "allowed_ips": "allowed_ips",
+                "allow_private_ips": "allow_private_ips",
+                "allow_search_bots": "allow_search_bots",
+                "challenge_mode": "challenge_mode",
+            },
+        )
         data = c.put("/api/v1/settings/global-geo", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2305,13 +2414,17 @@ async def npg_get_global_rate_limit() -> dict:
 async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if requests_per_second is not None: body["requests_per_second"] = requests_per_second
-        if burst_size is not None: body["burst_size"] = burst_size
-        if zone_size is not None: body["zone_size"] = zone_size
-        if limit_by is not None: body["limit_by"] = limit_by
-        if limit_response is not None: body["limit_response"] = limit_response
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "requests_per_second": "requests_per_second",
+                "burst_size": "burst_size",
+                "zone_size": "zone_size",
+                "limit_by": "limit_by",
+                "limit_response": "limit_response",
+            },
+        )
         data = c.put("/api/v1/settings/global-rate-limit", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2333,11 +2446,15 @@ async def npg_get_global_waf() -> dict:
 async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int | None = None, anomaly_threshold: int | None = None, rules: list[dict] | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if paranoia_level is not None: body["paranoia_level"] = paranoia_level
-        if anomaly_threshold is not None: body["anomaly_threshold"] = anomaly_threshold
-        if rules is not None: body["rules"] = rules
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "paranoia_level": "paranoia_level",
+                "anomaly_threshold": "anomaly_threshold",
+                "rules": "rules",
+            },
+        )
         data = c.put("/api/v1/settings/global-waf", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2464,6 +2581,7 @@ async def npg_list_auth_providers() -> dict:
 async def npg_create_auth_provider(name: str, provider_type: str, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required fields + param->API rename (provider_type -> type) — kept as-is (not _build_body).
         body: dict = {"name": name, "type": provider_type}
         if provider_url is not None: body["provider_url"] = provider_url
         if config is not None: body["config"] = config
@@ -2491,16 +2609,20 @@ async def npg_get_auth_provider(provider_id: str | int) -> dict:
 async def npg_update_auth_provider(provider_id: str | int, name: str | None = None, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if name is not None: body["name"] = name
-        if provider_url is not None: body["provider_url"] = provider_url
-        if config is not None: body["config"] = config
-        if enabled is not None: body["enabled"] = enabled
-        if timeout_ms is not None: body["timeout_ms"] = timeout_ms
-        if container_name is not None: body["container_name"] = container_name
-        if container_network is not None: body["container_network"] = container_network
-        if container_port is not None: body["container_port"] = container_port
-        if container_scheme is not None: body["container_scheme"] = container_scheme
+        body = _build_body(
+            locals(),
+            {
+                "name": "name",
+                "provider_url": "provider_url",
+                "config": "config",
+                "enabled": "enabled",
+                "timeout_ms": "timeout_ms",
+                "container_name": "container_name",
+                "container_network": "container_network",
+                "container_port": "container_port",
+                "container_scheme": "container_scheme",
+            },
+        )
         data = c.put(f"/api/v1/auth-providers/{_id_path(provider_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2550,12 +2672,17 @@ async def npg_get_ddns_record(record_id: str | int) -> dict:
 async def npg_update_ddns_record(record_id: str | int, hostname: str | None = None, dns_provider_id: str | int | None = None, proxied: bool | None = None, ttl: int | None = None, enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if hostname is not None: body["hostname"] = hostname
-        if dns_provider_id is not None: body["dns_provider_id"] = _id_path(dns_provider_id)
-        if proxied is not None: body["proxied"] = proxied
-        if ttl is not None: body["ttl"] = ttl
-        if enabled is not None: body["enabled"] = enabled
+        body = _build_body(
+            locals(),
+            {
+                "hostname": "hostname",
+                "dns_provider_id": "dns_provider_id",
+                "proxied": "proxied",
+                "ttl": "ttl",
+                "enabled": "enabled",
+            },
+            id_fields={"dns_provider_id"},
+        )
         data = c.put(f"/api/v1/ddns-records/{_id_path(record_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2644,10 +2771,10 @@ async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
 async def npg_update_filter_subscription(subscription_id: str | int, name: str | None = None, url: str | None = None, enabled: bool | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if name is not None: body["name"] = name
-        if url is not None: body["url"] = url
-        if enabled is not None: body["enabled"] = enabled
+        body = _build_body(
+            locals(),
+            {"name": "name", "url": "url", "enabled": "enabled"},
+        )
         data = c.put(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2846,12 +2973,16 @@ async def npg_get_challenge_config() -> dict:
 async def npg_update_challenge_config(enabled: bool | None = None, provider: str | None = None, secret_key: str | None = None, site_key: str | None = None, challenge_type: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if enabled is not None: body["enabled"] = enabled
-        if provider is not None: body["provider"] = provider
-        if secret_key is not None: body["secret_key"] = secret_key
-        if site_key is not None: body["site_key"] = site_key
-        if challenge_type is not None: body["challenge_type"] = challenge_type
+        body = _build_body(
+            locals(),
+            {
+                "enabled": "enabled",
+                "provider": "provider",
+                "secret_key": "secret_key",
+                "site_key": "site_key",
+                "challenge_type": "challenge_type",
+            },
+        )
         data = c.put("/api/v1/challenge-config", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2885,6 +3016,7 @@ async def npg_get_dns_provider_default() -> dict:
 async def npg_post_log(level: str, message: str, source: str | None = None, component: str | None = None, log_type: str = "access") -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body = {"level": level, "message": message, "log_type": log_type}
         if source is not None: body["source"] = source
         if component is not None: body["component"] = component
@@ -2981,10 +3113,10 @@ async def npg_create_log_filter_preset(name: str, filter: dict, description: str
 async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = None, filter: dict | None = None, description: str | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if name is not None: body["name"] = name
-        if filter is not None: body["filter"] = filter
-        if description is not None: body["description"] = description
+        body = _build_body(
+            locals(),
+            {"name": "name", "filter": "filter", "description": "description"},
+        )
         data = c.put(f"/api/v1/log-filter-presets/{_id_path(preset_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -3048,10 +3180,10 @@ async def npg_get_system_settings_logs() -> dict:
 async def npg_update_system_settings_logs(max_age: str | None = None, max_size: str | None = None, max_files: int | None = None) -> dict:
     c = _get_client()
     try:
-        body: dict = {}
-        if max_age is not None: body["max_age"] = max_age
-        if max_size is not None: body["max_size"] = max_size
-        if max_files is not None: body["max_files"] = max_files
+        body = _build_body(
+            locals(),
+            {"max_age": "max_age", "max_size": "max_size", "max_files": "max_files"},
+        )
         data = c.put("/api/v1/system-settings/logs", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -3225,6 +3357,7 @@ async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
 async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None) -> dict:
     c = _get_client()
     try:
+        # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
             body["description"] = description
