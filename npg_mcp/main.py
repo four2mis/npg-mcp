@@ -619,13 +619,13 @@ async def npg_get_redirect_host(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_redirect_host", description="Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, default 301).")
+@mcp.tool(name="npg_create_redirect_host", description="Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, 301/302/307/308 only — 303 rejected by API v2.44.0+, default 301).")
 async def npg_create_redirect_host(
     domain_names: list[str],
     forward_domain_name: str,
     forward_scheme: str = "auto",
     preserve_path: bool = True,
-    redirect_code: Literal[301, 302, 303, 307, 308] = 301,
+    redirect_code: Literal[301, 302, 307, 308] = 301,
 ) -> dict:
     c = _get_client()
     try:
@@ -641,7 +641,7 @@ async def npg_create_redirect_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_redirect_host", description="Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code. REQUIRED: host_id.")
+@mcp.tool(name="npg_update_redirect_host", description="Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code (301/302/307/308 only — 303 rejected by API v2.44.0+). REQUIRED: host_id.")
 async def npg_update_redirect_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
