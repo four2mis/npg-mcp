@@ -664,7 +664,7 @@ npg_get_proxy_host_fail2ban:
       required: true
 
 npg_update_proxy_host_fail2ban:
-  description: "UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). REQUIRED: host_id."
+  description: "UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds, 0=permanent), fail_codes, action (block/challenge). REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -745,7 +745,7 @@ npg_list_banned_ips:
   parameters: []
 
 npg_ban_ip:
-  description: "Ban an IP address. REQUIRED: ip_address. Optional: ban_time (seconds)."
+  description: "Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address."
   parameters:
     - name: ip_address
       type: string
@@ -754,7 +754,7 @@ npg_ban_ip:
       type: string
       required: false
       default: "Manual ban via API"
-    - name: duration
+    - name: ban_time
       type: integer
       required: false
       default: 3600
@@ -771,6 +771,16 @@ npg_unban_ip_by_address:
   parameters:
     - name: ip
       type: string
+      required: true
+
+npg_update_ban_duration:
+  description: "RE-DATE an existing ban: change how long it still runs. REQUIRED: ban_id (UUID), ban_time (seconds from NOW — counts from now, not from when the ban started; 0 = permanent ban). Does not regenerate nginx configs. Verify with npg_list_banned_ips."
+  parameters:
+    - name: ban_id
+      type: integer | string
+      required: true
+    - name: ban_time
+      type: integer
       required: true
 
 npg_get_bots_known:

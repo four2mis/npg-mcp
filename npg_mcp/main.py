@@ -1573,7 +1573,7 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds), fail_codes, action (block/challenge). REQUIRED: host_id.")
+@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds, 0=permanent), fail_codes, action (block/challenge). REQUIRED: host_id.")
 async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "challenge"] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -1662,13 +1662,13 @@ async def npg_list_banned_ips() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: ban_time (seconds).")
-async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", duration: int = 3600) -> dict:
-    """Ban an IP address. Required: ip_address. Optional: reason, duration (seconds, 0=permanent)."""
+@mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address.")
+async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", ban_time: int = 3600) -> dict:
+    """Ban an IP address. Required: ip_address. Optional: reason, ban_time (seconds, 0=permanent)."""
     try:
         _validate_required("ip_address", ip_address)
         c = _get_client()
-        data = c.post("/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "duration": duration})
+        data = c.post("/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "ban_time": ban_time})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1690,6 +1690,17 @@ async def npg_unban_ip_by_address(ip: str) -> dict:
         c = _get_client()
         c.delete("/api/v1/banned-ips", params={"ip": ip})
         return {"success": True, "message": f"IP {ip} unbanned"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_ban_duration", description="RE-DATE an existing ban: change how long it still runs. REQUIRED: ban_id (UUID), ban_time (seconds from NOW — counts from now, not from when the ban started; 0 = permanent ban). Does not regenerate nginx configs. Verify with npg_list_banned_ips.")
+async def npg_update_ban_duration(ban_id: str | int, ban_time: int) -> dict:
+    """Re-date an existing ban. ban_time is seconds from now; 0 makes it permanent."""
+    try:
+        _validate_id("ban_id", ban_id)
+        c = _get_client()
+        data = c.put(f"/api/v1/banned-ips/{_id_path(ban_id)}/duration", {"ban_time": ban_time})
+        return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
