@@ -3,7 +3,7 @@
 Covers:
 * tier_allowed at read/standard/full levels.
 * read-level returns only get/list/view/download/check/detect prefixed tools.
-* standard-level excludes all 46 DESTRUCTIVE_TOOLS.
+* standard-level excludes all 47 DESTRUCTIVE_TOOLS.
 * full-level returns everything.
 * resolve_level normalizes unknown values to full.
 
@@ -93,10 +93,10 @@ class TestTierAllowed:
         for mut in ("npg_create_proxy_host", "npg_ban_ip", "npg_sync_nginx", "npg_delete_proxy_host"):
             assert mut not in allowed
 
-    def test_standard_excludes_all_46_destructive_tools(self):
+    def test_standard_excludes_all_47_destructive_tools(self):
         tools = _sample_tools()
         allowed = tier_allowed(tools, "standard")
-        assert len(DESTRUCTIVE_TOOLS) == 46
+        assert len(DESTRUCTIVE_TOOLS) == 47
         # every destructive tool in the sample set is hidden
         for name in tools:
             if name in DESTRUCTIVE_TOOLS:
@@ -166,31 +166,31 @@ class TestDerivedDestructiveTools:
         expected = (regex_matches | _DESTRUCTIVE_DENYLIST) - _DESTRUCTIVE_ALLOWLIST
         assert DESTRUCTIVE_TOOLS == expected
         assert DESTRUCTIVE_TOOLS <= all_tools
-        # allowlist/denylist are empty today (edge cases only)
+        # allowlist is empty; denylist holds exactly the bulk-delete tool
         assert not _DESTRUCTIVE_ALLOWLIST
-        assert not _DESTRUCTIVE_DENYLIST
+        assert _DESTRUCTIVE_DENYLIST == frozenset({"npg_bulk_delete_proxy_hosts"})
 
     def test_standard_level_matches_total_minus_destructive(self):
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
         # Invariant: standard hides exactly the destructive set.
-        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 230
-        # Live surface guardrail (current HEAD): 276 tools, 46 destructive.
-        assert len(all_tools) == 276
-        assert len(DESTRUCTIVE_TOOLS) == 46
+        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 231
+        # Live surface guardrail (current HEAD): 278 tools, 47 destructive.
+        assert len(all_tools) == 278
+        assert len(DESTRUCTIVE_TOOLS) == 47
 
-    def test_destructive_count_46_exact(self):
-        # The task's hard guardrail: exactly 46 destructive tools.
-        assert len(DESTRUCTIVE_TOOLS) == 46
+    def test_destructive_count_47_exact(self):
+        # The task's hard guardrail: exactly 47 destructive tools.
+        assert len(DESTRUCTIVE_TOOLS) == 47
 
     def test_standard_and_read_counts_are_stable(self):
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(tier_allowed(all_tools, "standard")) == 230
+        assert len(tier_allowed(all_tools, "standard")) == 231
         assert len(tier_allowed(all_tools, "read")) == 129
-        assert len(tier_allowed(all_tools, "full")) == 276
+        assert len(tier_allowed(all_tools, "full")) == 278
 
     def test_docstring_documents_naming_convention(self):
         import inspect
@@ -200,3 +200,17 @@ class TestDerivedDestructiveTools:
         doc = inspect.getdoc(toolsets) or ""
         assert "naming convention" in doc.lower()
         assert "delete_" in doc and "DESTRUCTIVE_ALLOWLIST" in doc and "DESTRUCTIVE_DENYLIST" in doc
+
+    def test_bulk_delete_denylisted_bulk_apply_not(self):
+        """The bulk-delete tool is destructive (denylist); the bulk cert-apply
+        tool is a normal mutation and must NOT be hidden at standard level."""
+        from npg_mcp.toolsets import _discover_tool_names
+
+        all_tools = _discover_tool_names()
+        assert "npg_bulk_apply_certificate" in all_tools
+        assert "npg_bulk_delete_proxy_hosts" in all_tools
+        assert "npg_bulk_delete_proxy_hosts" in DESTRUCTIVE_TOOLS
+        assert "npg_bulk_apply_certificate" not in DESTRUCTIVE_TOOLS
+        allowed = tier_allowed(all_tools, "standard")
+        assert "npg_bulk_delete_proxy_hosts" not in allowed
+        assert "npg_bulk_apply_certificate" in allowed

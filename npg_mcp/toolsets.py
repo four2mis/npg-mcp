@@ -40,7 +40,10 @@ cases without changing the regex itself:
 * ``_DESTRUCTIVE_ALLOWLIST`` — names that *match* the regex but are NOT
   destructive. Empty; document any entry with a comment.
 * ``_DESTRUCTIVE_DENYLIST``  — names that do NOT match the regex but ARE
-  destructive. Empty; document any entry with a comment.
+  destructive. Currently contains ``npg_bulk_delete_proxy_hosts`` (a bulk
+  delete whose ``bulk_`` prefix the regex deliberately does not match, so it
+  is listed here to keep it out of the ``standard`` tier); document any
+  entry with a comment.
 
 ``DESTRUCTIVE_TOOLS`` is derived at import time by applying the regex (minus
 allowlist, plus denylist) to every registered tool name discovered from
@@ -80,8 +83,20 @@ _DESTRUCTIVE_NAME_RE = re.compile(
 _DESTRUCTIVE_ALLOWLIST: frozenset[str] = frozenset()
 
 # Names that do NOT match _DESTRUCTIVE_NAME_RE but ARE destructive.
-# (none currently — every destructive tool follows the prefix convention)
-_DESTRUCTIVE_DENYLIST: frozenset[str] = frozenset()
+# Each entry is documented with the reason it cannot be matched by the regex.
+# (The regex deliberately matches the existing `npg_bulk_unban_` prefix but
+# NOT `npg_bulk_*` in general — a hypothetical future bulk-update tool must
+# not be hidden. `npg_bulk_delete_proxy_hosts` deletes proxy hosts, so it is
+# destructive and is listed here explicitly to keep it out of the `standard`
+# tier.)
+_DESTRUCTIVE_DENYLIST: frozenset[str] = frozenset(
+    {
+        # Deletes N proxy hosts in one call (same DELETE endpoint as
+        # npg_delete_proxy_host). Name starts with bulk_, not delete_, so the
+        # regex alone would leak it into `standard` — the denylist closes that.
+        "npg_bulk_delete_proxy_hosts",
+    }
+)
 
 
 def _discover_tool_names() -> set[str]:

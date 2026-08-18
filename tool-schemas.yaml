@@ -67,6 +67,23 @@ npg_clone_proxy_host:
       type: array<string>
       required: true
 
+npg_bulk_apply_certificate:
+  description: "Apply one certificate to multiple proxy hosts in a single call (loops PUT /api/v1/proxy-hosts/{id} per host — the same endpoint/field npg_update_proxy_host uses for ssl_cert_id, mapped to API field certificate_id). REQUIRED: cert_id, host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result (the PUT response), or host_id + success:false + error (why that host failed). Each host is processed independently — one failure does not abort the batch. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Existing single-host tools are unchanged."
+  parameters:
+    - name: cert_id
+      type: integer | string
+      required: true
+    - name: host_ids
+      type: array<st> | int]
+      required: true
+
+npg_bulk_delete_proxy_hosts:
+  description: "DESTRUCTIVE: delete multiple proxy hosts in a single call (loops DELETE /api/v1/proxy-hosts/{id} per host — the same endpoint npg_delete_proxy_host uses). REQUIRED: host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result, or host_id + success:false + error (why that host failed). Each host is deleted independently — one failure does not abort the batch. Deletion is permanent: sub-configs (WAF, geo, rate limit, fail2ban, challenge, etc.) cascade-delete with each host. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Hidden from the standard tool tier (destructive). Existing single-host tools are unchanged."
+  parameters:
+    - name: host_ids
+      type: array<st> | int]
+      required: true
+
 npg_list_certificates:
   description: "List all SSL/TLS certificates."
   parameters: []

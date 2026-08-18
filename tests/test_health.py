@@ -49,16 +49,16 @@ def probe_down(monkeypatch):
 class TestHealthApp:
     """The /health route behavior in isolation."""
 
-    def _client(self, exposed_tools=276):
+    def _client(self, exposed_tools=278):
         return TestClient(main_mod._health_app(exposed_tools))
 
     def test_healthy_returns_200_ok_json(self, token_env, probe_ok):
-        with self._client(276) as client:
+        with self._client(278) as client:
             resp = client.get("/health")
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "ok"
-        assert body["tools"] == 276
+        assert body["tools"] == 278
         assert body["npg_reachable"] is True
 
     def test_tools_count_reflects_exposed_toolset(self, token_env, probe_ok):
@@ -67,12 +67,12 @@ class TestHealthApp:
         assert body["tools"] == 123
 
     def test_unreachable_npg_returns_503_error_body(self, token_env, probe_down):
-        with self._client(276) as client:
+        with self._client(278) as client:
             resp = client.get("/health")
         assert resp.status_code == 503
         body = resp.json()
         assert body["status"] == "error"
-        assert body["tools"] == 276
+        assert body["tools"] == 278
         assert body["npg_reachable"] is False
         assert body["error"] == "NPG API unreachable"
 
@@ -80,7 +80,7 @@ class TestHealthApp:
         # NPG_API_TOKEN unset; MCP_API_TOKEN may be anything.
         monkeypatch.delenv("NPG_API_TOKEN", raising=False)
         monkeypatch.setenv("MCP_API_TOKEN", "mcp_secret")
-        with self._client(276) as client:
+        with self._client(278) as client:
             resp = client.get("/health")
         assert resp.status_code == 503
         body = resp.json()
@@ -88,13 +88,13 @@ class TestHealthApp:
         assert body["error"] == "NPG_API_TOKEN not configured"
 
     def test_healthy_body_never_contains_token(self, token_env, probe_ok):
-        with self._client(276) as client:
+        with self._client(278) as client:
             body = client.get("/health").json()
         assert "ng_test_token" not in str(body)
         assert "mcp_secret" not in str(body)
 
     def test_only_get_method(self, token_env, probe_ok):
-        with self._client(276) as client:
+        with self._client(278) as client:
             resp = client.post("/health")
         assert resp.status_code == 405
 
@@ -103,13 +103,13 @@ class TestHealthBypassesBearerAuth:
     """/health must work without MCP_API_TOKEN; all other paths must not."""
 
     def test_health_allowed_without_token(self, token_env, probe_ok):
-        app = main_mod._bearer_auth_middleware(main_mod._health_app(276), "mcp_secret")
+        app = main_mod._bearer_auth_middleware(main_mod._health_app(278), "mcp_secret")
         with TestClient(app) as client:
             resp = client.get("/health")
         assert resp.status_code == 200
 
     def test_other_paths_still_require_token(self, token_env, probe_ok):
-        app = main_mod._bearer_auth_middleware(main_mod._health_app(276), "mcp_secret")
+        app = main_mod._bearer_auth_middleware(main_mod._health_app(278), "mcp_secret")
         with TestClient(app) as client:
             missing = client.get("/mcp")
             with_token = client.get(
@@ -124,7 +124,7 @@ class TestHealthBypassesBearerAuth:
         # The healthcheck container cannot carry MCP_API_TOKEN at all.
         monkeypatch.delenv("NPG_API_TOKEN", raising=False)
         monkeypatch.delenv("MCP_API_TOKEN", raising=False)
-        app = main_mod._bearer_auth_middleware(main_mod._health_app(276), "mcp_secret")
+        app = main_mod._bearer_auth_middleware(main_mod._health_app(278), "mcp_secret")
         with TestClient(app) as client:
             # probe is faked healthy, but NPG_API_TOKEN is missing → 503 with
             # the "not configured" body — still answered, still no 401.
@@ -143,7 +143,7 @@ class TestHealthIsNotAnMCPTool:
 
     def test_tool_count_unchanged(self):
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 276
+        assert len(names) == 278
 
 
 class TestAccessLogRequestId:

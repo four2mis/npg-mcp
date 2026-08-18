@@ -323,6 +323,12 @@ def _id_path(id_val) -> str:
 # Local-variable names that must never leak into an API request body.
 _INTERNAL_BODY_KEYS = frozenset({"self", "c", "body"})
 
+# Hard cap on host_ids per bulk call. A bulk tool replaces N sequential MCP
+# calls — it is not meant to sweep the whole inventory in one shot, so any
+# call asking for more than this is rejected outright (ValueError) instead of
+# being partially executed.
+_BULK_HOST_LIMIT = 50
+
 
 def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) -> dict:
     """Build an API request body dict from local variables, keeping only non-None values.
@@ -758,6 +764,62 @@ async def npg_clone_proxy_host(host_id: str | int, domain_names: list[str]) -> d
         c = _get_client()
         data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/clone", {"domain_names": domain_names})
         return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_bulk_apply_certificate", description="Apply one certificate to multiple proxy hosts in a single call (loops PUT /api/v1/proxy-hosts/{id} per host — the same endpoint/field npg_update_proxy_host uses for ssl_cert_id, mapped to API field certificate_id). REQUIRED: cert_id, host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result (the PUT response), or host_id + success:false + error (why that host failed). Each host is processed independently — one failure does not abort the batch. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Existing single-host tools are unchanged.")
+async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | int]) -> dict:
+    try:
+        _validate_id("cert_id", cert_id)
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(host_ids)})"
+            )
+        c = _get_client()
+        results: list[dict] = []
+        for host_id in host_ids:
+            entry: dict = {"host_id": _id_path(host_id)}
+            try:
+                _validate_id("host_id", host_id)
+                data = c.put(
+                    f"/api/v1/proxy-hosts/{_id_path(host_id)}",
+                    {"certificate_id": _id_path(cert_id)},
+                )
+                entry["success"] = True
+                entry["result"] = data
+            except Exception as e:
+                entry["success"] = False
+                entry["error"] = str(e)
+            results.append(entry)
+        return {"success": True, "data": results}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_bulk_delete_proxy_hosts", description="DESTRUCTIVE: delete multiple proxy hosts in a single call (loops DELETE /api/v1/proxy-hosts/{id} per host — the same endpoint npg_delete_proxy_host uses). REQUIRED: host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result, or host_id + success:false + error (why that host failed). Each host is deleted independently — one failure does not abort the batch. Deletion is permanent: sub-configs (WAF, geo, rate limit, fail2ban, challenge, etc.) cascade-delete with each host. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Hidden from the standard tool tier (destructive). Existing single-host tools are unchanged.")
+async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
+    try:
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(host_ids)})"
+            )
+        c = _get_client()
+        results: list[dict] = []
+        for host_id in host_ids:
+            entry: dict = {"host_id": _id_path(host_id)}
+            try:
+                _validate_id("host_id", host_id)
+                c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+                entry["success"] = True
+                entry["result"] = {"deleted": True}
+            except Exception as e:
+                entry["success"] = False
+                entry["error"] = str(e)
+            results.append(entry)
+        return {"success": True, "data": results}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
