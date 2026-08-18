@@ -143,7 +143,7 @@ class TestHealthIsNotAnMCPTool:
 
     def test_tool_count_unchanged(self):
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 278
+        assert len(names) == 279
 
 
 class TestAccessLogRequestId:
