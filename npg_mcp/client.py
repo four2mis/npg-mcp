@@ -119,7 +119,8 @@ class NPGClient:
             detail = ""
             try:
                 body = exc.response.json()
-                # NPG error shapes: {"message": "..."} or {"error": "..."} or {"errors": {...}}
+                # NPG error shapes: {"message": "..."} or {"error": "..."} or
+                # {"errors": {...}}
                 if isinstance(body, dict):
                     detail = str(body.get("message") or body.get("error") or "")
                     if not detail and isinstance(body.get("errors"), dict):
@@ -144,16 +145,20 @@ class NPGClient:
         ms = (time.perf_counter() - start) * 1000
         logger.info("NPG %s %s -> %s (%d ms)", method, path, status, ms)
 
-    def _log_err(self, method: str, path: str, exc: Exception, start: float) -> NPGError:
+    def _log_err(
+        self, method: str, path: str, exc: Exception, start: float
+    ) -> NPGError:
         """Log an outbound NPG API failure, then return the sanitized error."""
         ms = (time.perf_counter() - start) * 1000
         if isinstance(exc, httpx.HTTPStatusError):
             logger.error(
-                "NPG %s %s -> HTTP %s (%d ms)", method, path, exc.response.status_code, ms
+                "NPG %s %s -> HTTP %s (%d ms)",
+                method, path, exc.response.status_code, ms,
             )
         else:
             logger.warning(
-                "NPG %s %s -> request failed: %s (%d ms)", method, path, type(exc).__name__, ms
+                "NPG %s %s -> request failed: %s (%d ms)",
+                method, path, type(exc).__name__, ms,
             )
         return self._sanitize(exc)
 
@@ -162,7 +167,9 @@ class NPGClient:
         if isinstance(exc, httpx.HTTPStatusError):
             return exc.response.status_code in _RETRYABLE_STATUS
         # Transport-level errors (connect, read, timeout) are also retryable
-        return isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout))
+        return isinstance(
+            exc, (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout)
+        )
 
     def _retry_delay(self, attempt: int) -> float:
         """Exponential backoff: 0.5s, 1.0s, ..."""
@@ -195,7 +202,8 @@ class NPGClient:
         raise NPGError("NPG API request failed after retries")
 
     def get_text(self, path: str, params: dict | None = None) -> str:
-        """GET returning raw response text (for non-JSON endpoints like log downloads)."""
+        """GET returning raw response text (for non-JSON endpoints like log
+        downloads)."""
         url = urljoin(self.base_url + "/", path.lstrip("/"))
         for attempt in range(_MAX_RETRIES + 1):
             start = time.perf_counter()
@@ -218,7 +226,9 @@ class NPGClient:
                 raise self._log_err("GET", path, e, start) from e
         raise NPGError("NPG API request failed after retries")
 
-    def post(self, path: str, body: dict | None = None, params: dict | None = None) -> dict | None:
+    def post(
+        self, path: str, body: dict | None = None, params: dict | None = None
+    ) -> dict | None:
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -235,7 +245,9 @@ class NPGClient:
         except Exception as e:
             raise self._log_err("POST", path, e, start) from e
 
-    def put(self, path: str, body: dict | None = None, params: dict | None = None) -> dict | None:
+    def put(
+        self, path: str, body: dict | None = None, params: dict | None = None
+    ) -> dict | None:
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -267,13 +279,23 @@ class NPGClient:
         except Exception as e:
             raise self._log_err("DELETE", path, e, start) from e
 
-    def post_file(self, path: str, file_field: str, file_content: bytes, filename: str, extra_fields: dict | None = None) -> dict | None:
-        """POST a multipart file upload (for backup restore, certificate upload, etc.)."""
+    def post_file(
+        self,
+        path: str,
+        file_field: str,
+        file_content: bytes,
+        filename: str,
+        extra_fields: dict | None = None,
+    ) -> dict | None:
+        """POST a multipart file upload (for backup restore, certificate
+        upload, etc.)."""
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
             files = {file_field: (filename, file_content, "application/octet-stream")}
-            resp = self._client.post(url, files=files, data=extra_fields, headers=self._headers())
+            resp = self._client.post(
+                url, files=files, data=extra_fields, headers=self._headers()
+            )
             resp.raise_for_status()
             self._log_ok("POST", path, resp.status_code, start)
             if resp.status_code == 204 or not resp.content:

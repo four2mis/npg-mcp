@@ -9,7 +9,7 @@ import os
 import time
 import warnings
 from contextvars import ContextVar
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import quote
 
 # Suppress MCP SDK v1.x pydantic-settings warning for unresolved forward
@@ -21,11 +21,12 @@ warnings.filterwarnings(
     module="pydantic_settings",
 )
 
-from mcp.server import transport_security
-from mcp.server.fastmcp import FastMCP
-import httpx
-import npg_mcp.client as client_mod
-import npg_mcp.toolsets as toolsets
+import httpx  # noqa: E402  (third-party import after filterwarnings setup)
+from mcp.server import transport_security  # noqa: E402
+from mcp.server.fastmcp import FastMCP  # noqa: E402
+
+import npg_mcp.client as client_mod  # noqa: E402
+import npg_mcp.toolsets as toolsets  # noqa: E402
 
 logger = logging.getLogger("npg_mcp.main")
 
@@ -821,7 +822,7 @@ async def npg_test_nginx() -> dict:
     """Test nginx configuration for validity."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/proxy-hosts/sync")
+        data = c.post("/api/v1/proxy-hosts/sync") or {}
         return {"success": True, "data": {"test_success": data.get("test_success", True), "reload_success": data.get("reload_success", True)}}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1250,7 +1251,7 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
         _validate_required("name", name)
         _validate_required("provider_type", provider_type)
         c = _get_client()
-        body = {"name": name, "provider_type": provider_type}
+        body: dict[str, Any] = {"name": name, "provider_type": provider_type}
         if credentials:
             body["credentials"] = credentials
         if kwargs:
@@ -1285,7 +1286,7 @@ async def npg_test_dns_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.post(f"/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
+        data = c.post("/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1367,7 +1368,7 @@ async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_provi
         _validate_id("host_id", host_id)
         c = _get_client()
         # Read-modify-write: upstream SetBlockedProviders full-replaces all 4 fields.
-        current = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
+        current = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers") or {}
         body = {
             "blocked_providers": blocked_providers if blocked_providers is not None else (current.get("blocked_providers") or []),
             "challenge_mode": challenge_mode if challenge_mode is not None else bool(current.get("challenge_mode", False)),
@@ -3990,7 +3991,9 @@ def main() -> None:
         transport = "stdio"
 
     if transport == "stdio":
-        mcp.run(transport=transport)
+        # transport is normalized to "stdio" above; pass the literal so mypy
+        # sees the exact Literal type the MCP SDK's run() expects.
+        mcp.run(transport="stdio")
         return
 
     # HTTP transport: build the Starlette app and wrap it with bearer auth

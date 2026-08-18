@@ -28,9 +28,17 @@ jobs:
       - name: Validate Python syntax
         run: python3 -c "import ast; ast.parse(open('npg_mcp/main.py').read()); print('Syntax OK')"
 
+      - name: Install test/lint dependencies
+        run: python3 -m pip install --quiet . pytest respx ruff mypy
+
+      - name: Run ruff linter
+        run: ruff check npg_mcp/
+
+      - name: Run mypy type checker
+        run: mypy npg_mcp/ --ignore-missing-imports
+
       - name: Run unit tests
         run: |
-          python3 -m pip install --quiet . pytest respx
           python3 -m pytest tests/ -q
 
       - name: Check documentation drift

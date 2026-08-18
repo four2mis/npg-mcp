@@ -12,11 +12,43 @@ dependencies = [
 dev = [
     "pytest",
     "respx",
+    "ruff",
+    "mypy",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+# Sensible default selection: pycodestyle (E), pyflakes (F), pycodestyle
+# warnings (W), and isort import sorting (I). Deliberately NOT the full rule
+# set — see AGENTS.md lint guardrails. Rules that would force runtime-behavior
+# changes (e.g. blanket BLE001 blind-exception bans) are not enabled.
+lint.select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# npg_mcp/main.py keeps the project's documented one-liner convention for tool
+# definitions: the @mcp.tool decorator and the `async def` signature must each
+# stay on a single line so the AST-driven doc tooling
+# (scripts/regenerate_all_docs.py, scripts/check_tool_descriptions.py) parses
+# them correctly — rewrapping would corrupt tool-schemas.yaml. E701 sites are
+# the compact `if x is not None: body[...] = x` guard idiom used throughout.
+"npg_mcp/main.py" = ["E501", "E701"]
+# client.py / toolsets.py have no structural constraint — keep lines <= 88.
+
+[tool.mypy]
+# Non-strict type checking. The `mcp` and `httpx` packages ship incomplete
+# stubs, so missing imports are ignored. explicit-package-bases +
+# namespace-packages let `mypy npg_mcp/` run from the repo root even though the
+# checkout dir name (npg-mcp) is not a valid Python package name.
+python_version = "3.11"
+ignore_missing_imports = true
+explicit_package_bases = true
+namespace_packages = true
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]

@@ -115,7 +115,9 @@ DESTRUCTIVE_TOOLS: frozenset[str] = frozenset(
 
 def resolve_level(level: str | None = None) -> str:
     """Normalize an NPG_TOOL_LEVEL value; unknown values fall back to full."""
-    raw = (level if level is not None else os.environ.get(LEVEL_ENV, "")).strip().lower()
+    raw = (
+        level if level is not None else os.environ.get(LEVEL_ENV, "")
+    ).strip().lower()
     if raw not in VALID_LEVELS:
         if raw:
             logger.warning("Unknown NPG_TOOL_LEVEL=%r — falling back to 'full'", raw)
@@ -157,5 +159,7 @@ def configure_toolset(mcp, level: str | None = None) -> int:
             removed += 1
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("toolsets: could not remove %r: %s", name, exc)
-    logger.info("NPG_TOOL_LEVEL=%s: exposing %d of %d tools", level, len(keep), len(names))
+    logger.info(
+        "NPG_TOOL_LEVEL=%s: exposing %d of %d tools", level, len(keep), len(names)
+    )
     return len(keep)
