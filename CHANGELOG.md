@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.5] - 2026-08-19
+
+### What changed
+- Fixed `npg_ban_ip`: the request body sent the key `duration` while the NPG API binds `ban_time`. Go silently ignored the unknown key, so `ban_time` defaulted to 0 and **every manual ban was created as PERMANENT** regardless of the requested duration. The parameter is renamed to `ban_time` (seconds, 0=permanent, default 3600) and the body now sends `ban_time`. Live-confirmed on the v2.45.0 test stack: `ban_time=3600` now returns `is_permanent: false` with an `expires_at`.
+- Added `npg_update_ban_duration` for the new upstream v2.45.0 endpoint `PUT /api/v1/banned-ips/{id}/duration`: re-dates an existing ban. `ban_time` counts from NOW (not from when the ban started) and 0 makes it permanent. nginx configs are not regenerated.
+- Updated `npg_update_proxy_host_fail2ban` description: `ban_time` is seconds, 0=permanent (upstream `CreateFail2banRequest.ban_time` is now a pointer — omitted keeps the stored value, 0 persists as permanent on update).
+
+### What's new
+- `npg_update_ban_duration` — change how long an existing ban still runs (seconds from now; 0 = permanent ban).
+
+### Breaking changes
+- `npg_ban_ip` parameter renamed `duration` → `ban_time`. Callers passing the old `duration` name now get a validation error; update call sites. This fixes the silent permanent-ban bug for existing callers.
+
 ## [0.5.4] - 2026-08-19
 
 ### What changed
