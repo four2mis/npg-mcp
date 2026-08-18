@@ -222,10 +222,12 @@ Session-only endpoints (account password changes, 2FA management, account metada
 
 `docker logs npg-mcp -f` shows what requests and errors the server is getting. At the default `INFO` level you get:
 
-- `MCP request POST /mcp tool=npg_get_proxy_host client=192.168.1.50 -> 200 (12 ms)` — every inbound MCP request: HTTP method/path, JSON-RPC method, extracted tool name, client IP, response status, duration.
-- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms)` — every outbound NPG API call: HTTP method, endpoint path, status, duration.
+- `MCP request POST /mcp tool=npg_get_proxy_host req=r-1a2b3c4d client=192.168.1.50 -> 200 (12 ms)` — every inbound MCP request: HTTP method/path, JSON-RPC method, extracted tool name, per-request correlation ID, client IP, response status, duration.
+- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms) req=r-1a2b3c4d` — every outbound NPG API call: HTTP method, endpoint path, status, duration. The `req=` correlation ID matches the inbound line above, so you can tell which NPG calls belong to which MCP request even with concurrent clients.
 - `NPG GET /api/v1/proxy-hosts/{id} -> HTTP 404 (3 ms)` (ERROR level) — NPG API errors (`4xx`/`5xx`). The path of the failing call lets you pin down which tool failed.
 - A traceback at ERROR level for any unhandled MCP request error.
+
+The `req=` ID (`r-<8 hex chars>`) is generated fresh per inbound request, shared by the request's inbound and outbound log lines, and appears only in logs — never in API responses or tool results. Log lines outside a request (startup, stdio mode) have no `req=` field, so existing log parsers keep working.
 
 Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** — at the default level, request/response bodies aren't logged either (only endpoint paths, which map 1:1 to MCP tools). DEBUG surfaces library-level detail that may include payloads, so use it only when debugging.
 

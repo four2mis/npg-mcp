@@ -14,6 +14,9 @@ Every HTTP call is mocked with respx — there is NO real network access.
 
 from __future__ import annotations
 
+import contextvars
+import logging
+
 import httpx
 import pytest
 import respx
@@ -204,6 +207,83 @@ class TestRetryLogic:
                 client.delete("/api/v1/hosts/1")
             assert route.call_count == 1
         assert ei.value.message == "NPG API returned HTTP 503"
+
+
+class TestRequestIdCorrelation:
+    """Per-request correlation ID plumbing in npg_mcp.client.
+
+    The ContextVar defaults to "" so code paths outside a request (startup,
+    stdio mode, health probe) log without a req= prefix — byte-identical to
+    the pre-feature format. When set, outbound NPG log lines carry
+    `` req=r-<8 hex>``.
+    """
+
+    def test_default_empty_no_suffix(self):
+        # Fresh context (no middleware ran) — no req= in log lines.
+        assert client_mod.get_request_id() == ""
+        assert client_mod._req_suffix() == ""
+
+    def test_set_get_roundtrip(self):
+        client_mod.set_request_id("r-1a2b3c4d")
+        try:
+            assert client_mod.get_request_id() == "r-1a2b3c4d"
+        finally:
+            client_mod.set_request_id("")
+
+    def test_suffix_formats_with_req_prefix(self):
+        client_mod.set_request_id("r-1a2b3c4d")
+        try:
+            assert client_mod._req_suffix() == " req=r-1a2b3c4d"
+        finally:
+            client_mod.set_request_id("")
+
+    def test_contextvar_isolated_between_contexts(self):
+        # A value set in one context must not leak into another (concurrent
+        # requests each get their own id).
+        ctx = contextvars.copy_context()
+
+        def _set():
+            client_mod.set_request_id("r-abc12345")
+
+        ctx.run(_set)
+        # The test's own context is untouched.
+        assert client_mod.get_request_id() == ""
+        # The forked context still sees its own value.
+        assert ctx.run(client_mod.get_request_id) == "r-abc12345"
+
+    def test_log_line_carries_req_suffix_when_set(self, client, caplog):
+        with caplog.at_level(logging.INFO, logger="npg_mcp.client"):
+            client_mod.set_request_id("r-1a2b3c4d")
+            try:
+                with respx.mock:
+                    respx.get(f"{BASE}/api/v1/hosts").mock(
+                        return_value=httpx.Response(200, json={"data": []})
+                    )
+                    client.get("/api/v1/hosts")
+            finally:
+                client_mod.set_request_id("")
+        messages = [r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"]
+        ok_lines = [m for m in messages if m.startswith("NPG GET /api/v1/hosts -> 200")]
+        assert ok_lines, f"expected NPG GET success log line, got: {messages}"
+        # Existing format preserved — only a req= suffix added.
+        assert ok_lines[0].endswith("req=r-1a2b3c4d")
+
+    def test_log_line_unchanged_without_request_id(self, client, caplog):
+        # No request context — the log line is byte-identical to the old format
+        # (no req= anywhere), so existing log parsers keep working.
+        with caplog.at_level(logging.INFO, logger="npg_mcp.client"):
+            with respx.mock:
+                respx.get(f"{BASE}/api/v1/hosts").mock(
+                    return_value=httpx.Response(200, json={"data": []})
+                )
+                client.get("/api/v1/hosts")
+        messages = [r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"]
+        ok_lines = [m for m in messages if m.startswith("NPG GET /api/v1/hosts -> 200")]
+        assert ok_lines, f"expected NPG GET success log line, got: {messages}"
+        assert "req=" not in ok_lines[0]
+        # And the core fields (method, path, status, ms) are all present.
+        assert "NPG GET /api/v1/hosts -> 200 (" in ok_lines[0]
+        assert "ms)" in ok_lines[0]
 
 
 class TestSingletonLifecycle:

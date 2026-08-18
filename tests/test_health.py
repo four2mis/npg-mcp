@@ -15,8 +15,13 @@ raises and never leaks secrets; the response body never contains a token.
 
 from __future__ import annotations
 
+import json
+import logging
+
+import httpx
 import pytest
 
+import npg_mcp.client as client_mod
 import npg_mcp.main as main_mod
 
 # starlette TestClient drives the ASGI app in-process (httpx-based).
@@ -139,3 +144,179 @@ class TestHealthIsNotAnMCPTool:
     def test_tool_count_unchanged(self):
         names = main_mod.mcp._tool_manager.list_tools()
         assert len(names) == 276
+
+
+class TestAccessLogRequestId:
+    """_access_log_middleware emits a unique req=<id> per inbound request.
+
+    The ID must appear in BOTH the inbound MCP request log line and — via the
+    propagated ContextVar — the outbound NPG API log line, so container logs
+    correlate them under concurrent clients. Outside a request (startup,
+    stdio, health probe) the ContextVar stays empty and log lines carry no
+    req= prefix.
+    """
+
+    @staticmethod
+    def _make_app(do_api_call: bool):
+        """Fake JSON-RPC app: performs one NPGClient.get inside the request
+        context when do_api_call (mirroring how tool functions call
+        _get_client), then returns 200 with a minimal body."""
+        from respx import MockRouter
+
+        async def _app(scope, receive, send):
+            body = b""
+            while True:
+                msg = await receive()
+                if msg["type"] == "http.request":
+                    body += msg.get("body") or b""
+                    if not msg.get("more_body"):
+                        break
+            payload = json.loads(body) if body else {}
+            if do_api_call and payload.get("method") == "tools/call":
+                with MockRouter() as router:
+                    router.get("https://npg.test/api/v1/hosts").mock(
+                        return_value=httpx.Response(200, json={"data": []})
+                    )
+                    client_mod.NPGClient(base_url="https://npg.test", token="t").get(
+                        "/api/v1/hosts"
+                    )
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [(b"content-type", b"application/json")],
+                }
+            )
+            await send({"type": "http.response.body", "body": b"{}"})
+
+        return _app
+
+    @staticmethod
+    def _make_receive(body: bytes):
+        sent = False
+
+        async def receive():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        return receive
+
+    @staticmethod
+    def _make_send():
+        messages: list[dict] = []
+
+        async def send(message: dict):
+            messages.append(message)
+
+        return send, messages
+
+    @staticmethod
+    def _request_body(n: int = 1) -> bytes:
+        return json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": n,
+                "method": "tools/call",
+                "params": {"name": "npg_get_proxy_host", "arguments": {}},
+            }
+        ).encode()
+
+    def test_request_id_in_both_log_lines(self, caplog):
+        """A tools/call request logs one MCP line and one NPG line sharing the
+        same unique req= prefix."""
+        middleware = main_mod._access_log_middleware(self._make_app(do_api_call=True))
+        import anyio
+        import re
+
+        with caplog.at_level(logging.INFO):
+            send, _ = self._make_send()
+            anyio.run(
+                lambda: middleware(
+                    {
+                        "type": "http",
+                        "method": "POST",
+                        "path": "/mcp",
+                        "client": ("10.0.0.1", 1234),
+                    },
+                    self._make_receive(self._request_body()),
+                    send,
+                )
+            )
+
+        records = [r for r in caplog.records if r.name.startswith("npg_mcp")]
+        mcp_lines = [r.getMessage() for r in records if "MCP request" in r.getMessage()]
+        npg_lines = [r.getMessage() for r in records if r.getMessage().startswith("NPG ")]
+        assert mcp_lines, "expected an MCP request log line"
+        assert npg_lines, "expected an outbound NPG log line"
+        mcp_req = re.search(r"req=(r-[0-9a-f]{8})", mcp_lines[0])
+        npg_req = re.search(r"req=(r-[0-9a-f]{8})", npg_lines[0])
+        assert mcp_req, f"MCP line missing req=: {mcp_lines[0]}"
+        assert npg_req, f"NPG line missing req=: {npg_lines[0]}"
+        assert mcp_req.group(1) == npg_req.group(1)
+        # MCP line keeps tool name + client + status + duration fields.
+        assert "tool=npg_get_proxy_host" in mcp_lines[0]
+        assert "client=10.0.0.1" in mcp_lines[0]
+        assert "-> 200 (" in mcp_lines[0]
+
+    def test_ids_unique_across_requests(self, caplog):
+        """Two sequential requests get different req= IDs."""
+        middleware = main_mod._access_log_middleware(self._make_app(do_api_call=True))
+        import anyio
+        import re
+
+        with caplog.at_level(logging.INFO):
+            for n in (1, 2):
+                send, _ = self._make_send()
+                anyio.run(
+                    lambda: middleware(
+                        {
+                            "type": "http",
+                            "method": "POST",
+                            "path": "/mcp",
+                            "client": ("10.0.0.2", 5678),
+                        },
+                        self._make_receive(self._request_body(n)),
+                        send,
+                    )
+                )
+
+        mcp_ids = [
+            re.search(r"req=(r-[0-9a-f]{8})", r.getMessage()).group(1)
+            for r in caplog.records
+            if r.name.startswith("npg_mcp") and "MCP request" in r.getMessage()
+        ]
+        assert len(mcp_ids) == 2
+        assert mcp_ids[0] != mcp_ids[1]
+
+    def test_contextvar_reset_after_request(self):
+        """After a request completes, the ContextVar is back to empty."""
+        middleware = main_mod._access_log_middleware(self._make_app(do_api_call=False))
+        import anyio
+
+        send, _ = self._make_send()
+        anyio.run(
+            lambda: middleware(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/mcp",
+                    "client": ("10.0.0.3", 9999),
+                },
+                self._make_receive(b"{}"),
+                send,
+            )
+        )
+        # Both ContextVars (main + client) reset after the request.
+        assert main_mod._request_id.get() == ""
+        assert client_mod.get_request_id() == ""
+
+    def test_new_request_id_format(self):
+        rid = main_mod._new_request_id()
+        import re
+
+        assert re.fullmatch(r"r-[0-9a-f]{8}", rid)
+        # Random per request — not derived from anything request-specific.
+        assert main_mod._new_request_id() != rid

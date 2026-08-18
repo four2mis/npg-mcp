@@ -15,6 +15,13 @@ logger = logging.getLogger("npg_mcp.client")
 # Per-request token store — scoped to the current request context var so
 # concurrent clients cannot overwrite each other's session token.
 _request_token: ContextVar[str] = ContextVar("npg_request_token", default="")
+# Per-request correlation ID — set once per inbound MCP request by the access
+# log middleware in main.py and read by NPGClient per-call logging, so each
+# inbound request and the outbound NPG API calls it makes share a `req=`
+# prefix in container logs. Empty by default: code paths outside a request
+# (startup, stdio mode, health probe) log without the prefix, byte-identical
+# to the previous format.
+_request_id: ContextVar[str] = ContextVar("npg_request_id", default="")
 _current_base_url: str = ""
 
 # Module-level singleton client for connection pooling. The env-var token
@@ -38,6 +45,32 @@ def set_token(token: str) -> None:
 
 def get_token() -> str:
     return _request_token.get()
+
+
+def set_request_id(request_id: str) -> None:
+    """Set the correlation ID for the *current* request context (not process-wide)."""
+    _request_id.set(request_id)
+
+
+def get_request_id() -> str:
+    """Return the correlation ID for the current request context.
+
+    Returns "" outside a request (startup, stdio mode, health probe).
+    """
+    return _request_id.get()
+
+
+def _req_suffix() -> str:
+    """Correlation-ID suffix for outbound NPG log lines.
+
+    Returns `` req=r-1a2b3c4d`` when a request correlation ID is set for the
+    current context, otherwise "" — keeping log lines outside a request
+    (startup, stdio mode, health probe) byte-identical to the pre-feature
+    format. Used by NPGClient per-call logging so each inbound MCP request
+    and the NPG API calls it triggers share the same ``req=`` prefix.
+    """
+    rid = _request_id.get()
+    return f" req={rid}" if rid else ""
 
 
 def set_base_url(base_url: str) -> None:
@@ -143,7 +176,10 @@ class NPGClient:
 
     def _log_ok(self, method: str, path: str, status: int, start: float) -> None:
         ms = (time.perf_counter() - start) * 1000
-        logger.info("NPG %s %s -> %s (%d ms)", method, path, status, ms)
+        logger.info(
+            "NPG %s %s -> %s (%d ms)%s",
+            method, path, status, ms, _req_suffix(),
+        )
 
     def _log_err(
         self, method: str, path: str, exc: Exception, start: float
@@ -152,13 +188,13 @@ class NPGClient:
         ms = (time.perf_counter() - start) * 1000
         if isinstance(exc, httpx.HTTPStatusError):
             logger.error(
-                "NPG %s %s -> HTTP %s (%d ms)",
-                method, path, exc.response.status_code, ms,
+                "NPG %s %s -> HTTP %s (%d ms)%s",
+                method, path, exc.response.status_code, ms, _req_suffix(),
             )
         else:
             logger.warning(
-                "NPG %s %s -> request failed: %s (%d ms)",
-                method, path, type(exc).__name__, ms,
+                "NPG %s %s -> request failed: %s (%d ms)%s",
+                method, path, type(exc).__name__, ms, _req_suffix(),
             )
         return self._sanitize(exc)
 

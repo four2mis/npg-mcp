@@ -6,6 +6,7 @@ import hmac
 import json
 import logging
 import os
+import secrets
 import time
 import warnings
 from contextvars import ContextVar
@@ -32,6 +33,13 @@ logger = logging.getLogger("npg_mcp.main")
 
 # Context variable for per-request token (future use)
 _current_token: ContextVar[str] = ContextVar("npg_token", default="")
+
+# Context variable for the per-request correlation ID. Set once per inbound
+# MCP request by _access_log_middleware; consumed by NPGClient per-call
+# logging so inbound request lines and their outbound NPG API lines share a
+# unique req=r-<8 hex> prefix. Default "" keeps code paths outside a request
+# (startup, stdio transport, /health probe) logging cleanly without it.
+_request_id: ContextVar[str] = ContextVar("npg_request_id", default="")
 
 
 def _setup_logging() -> None:
@@ -94,15 +102,30 @@ def _request_note(body: bytes) -> str:
     return ""
 
 
+def _new_request_id() -> str:
+    """Generate a fresh, collision-resistant per-request correlation ID.
+
+    Format ``r-<8 hex chars>`` — short enough for easy scanning in container
+    logs, random enough that concurrent clients never share one. Derived from
+    ``secrets.token_hex`` (NOT from any request content, token, or payload),
+    so it never leaks sensitive material and appears only in log lines.
+    """
+    return f"r-{secrets.token_hex(4)}"
+
+
 def _access_log_middleware(app):
     """Log one line per inbound HTTP request to the MCP endpoint.
 
     Each line carries the HTTP method/path, the JSON-RPC method and tool name
     (when the body is JSON-RPC), the client IP, the response status, and the
     duration — so users can debug what requests the server is getting and where
-    they failed. The request body is only snapshotted for tool-name extraction
-    and forwarded to the app unchanged; headers, tokens, and argument payloads
-    are never logged. Unhandled exceptions are logged with a traceback.
+    they failed. A unique per-request correlation ID (``req=r-<8 hex>``) is
+    generated for every inbound request and propagated through a ContextVar,
+    so outbound NPG API calls made by the same request share the same
+    ``req=`` prefix in their log lines. The request body is only snapshotted
+    for tool-name extraction and forwarded to the app unchanged; headers,
+    tokens, and argument payloads are never logged. Unhandled exceptions are
+    logged with a traceback.
     """
 
     async def _middleware(scope, receive, send):
@@ -131,22 +154,30 @@ def _access_log_middleware(app):
                 status["code"] = message["status"]
             await send(message)
 
+        # One correlation ID per inbound request, propagated through the
+        # ContextVar so NPGClient per-call logging emits the same req= prefix.
+        request_id = _new_request_id()
+        _request_id.set(request_id)
+        client_mod.set_request_id(request_id)
         try:
             await app(scope, _tee_receive, _send)
         except Exception:
             ms = (time.perf_counter() - start) * 1000
             logger.exception(
-                "MCP request %s %s client=%s -> unhandled error (%d ms)",
-                method, path, client_ip, ms,
+                "MCP request %s %s req=%s client=%s -> unhandled error (%d ms)",
+                method, path, request_id, client_ip, ms,
             )
             raise
         else:
             ms = (time.perf_counter() - start) * 1000
             note = _request_note(b"".join(chunks))
             logger.info(
-                "MCP request %s %s%s client=%s -> %s (%d ms)",
-                method, path, note, client_ip, status["code"] or "?", ms,
+                "MCP request %s %s%s req=%s client=%s -> %s (%d ms)",
+                method, path, note, request_id, client_ip, status["code"] or "?", ms,
             )
+        finally:
+            _request_id.set("")
+            client_mod.set_request_id("")
 
     return _middleware
 

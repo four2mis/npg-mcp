@@ -222,10 +222,12 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 `docker logs npg-mcp -f`로 서버가 받는 요청과 오류를 확인할 수 있습니다. 기본 `INFO` 수준에서 다음이 기록됩니다:
 
-- `MCP request POST /mcp tool=npg_get_proxy_host client=192.168.1.50 -> 200 (12 ms)` — 모든 수신 MCP 요청: HTTP 메서드/경로, JSON-RPC 메서드, 도구 이름, 클라이언트 IP, 응답 상태, 소요 시간.
-- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms)` — 모든 발송 NPG API 호출: HTTP 메서드, 엔드포인트 경로, 상태, 소요 시간.
+- `MCP request POST /mcp tool=npg_get_proxy_host req=r-1a2b3c4d client=192.168.1.50 -> 200 (12 ms)` — 모든 수신 MCP 요청: HTTP 메서드/경로, JSON-RPC 메서드, 도구 이름, 요청별 상관 ID, 클라이언트 IP, 응답 상태, 소요 시간.
+- `NPG GET /api/v1/proxy-hosts/{id} -> 200 (8 ms) req=r-1a2b3c4d` — 모든 발송 NPG API 호출: HTTP 메서드, 엔드포인트 경로, 상태, 소요 시간. `req=` 상관 ID가 위 수신 줄과 일치하므로, 동시 클라이언트가 있어도 어떤 NPG 호출이 어떤 MCP 요청에 속하는지 알 수 있습니다.
 - `NPG GET /api/v1/proxy-hosts/{id} -> HTTP 404 (3 ms)` (ERROR 수준) — NPG API 오류(`4xx`/`5xx`). 실패한 호출 경로로 어떤 도구가 실패했는지 특정할 수 있습니다.
 - 처리되지 않은 MCP 요청 오류 시 ERROR 수준의 트레이스백.
+
+`req=` ID(`r-<8 hex>` 형식)는 수신 요청마다 새로 생성되며, 해당 요청의 수신 줄과 발신 줄에서 공유되고 로그에만 나타납니다(API 응답이나 도구 결과에는 절대 포함되지 않음). 요청 외부(시작, stdio 모드)의 로그 줄에는 `req=` 필드가 없으므로 기존 로그 파서는 계속 동작합니다.
 
 `NPG_LOG_LEVEL=DEBUG`로 더 상세한 출력을 볼 수 있습니다. **토큰은 절대 기록되지 않습니다** — 기본 수준에서는 요청/응답 본문도 기록되지 않습니다(MCP 도구와 1:1로 대응되는 엔드포인트 경로만 기록). DEBUG는 페이로드가 포함될 수 있는 라이브러리 수준의 세부 정보를 표시하므로 디버깅 시에만 사용하십시오.
 
