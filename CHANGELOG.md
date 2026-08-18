@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.4] - 2026-08-19
+
+### What changed
+- Added two targeted bulk tools that loop the existing per-host endpoints in a single MCP call, avoiding N+1 round-trips: `npg_bulk_apply_certificate` (PUT `/api/v1/proxy-hosts/{id}` with the certificate on each host, confirmed via follow-up GET) and `npg_bulk_delete_proxy_hosts` (DELETE `/api/v1/proxy-hosts/{id}` per host). Both are capped at 50 host IDs per call (exceeding the cap is rejected up front), do not abort on a per-host error, and are classified as destructive tools so they are hidden at the `standard` tool level.
+- Added per-request correlation IDs to MCP logging: the access-log middleware generates `req=<8-hex>` per inbound MCP request and propagates it via ContextVars so both the access log and the error log for one request share the same correlation ID.
+- Added ruff linting (E, F, W, I rulesets) and non-strict mypy type-checking to the CI `validate` job in `.github/workflows/publish.yml`, with `ruff` and `mypy` added to the dev optional dependencies and tuned `[tool.ruff]`/`[tool.mypy]` config.
+- Added a real HTTP `/health` endpoint (`_health_app`, Starlette route) so Docker container healthchecks are meaningful: returns `200 {"status":"ok","tools":<exposed count>,"npg_reachable":true}` when healthy and `503` JSON when NPG is unreachable.
+
+### What's new
+- `npg_bulk_apply_certificate` — apply one certificate to multiple proxy hosts in a single MCP call.
+- `npg_bulk_delete_proxy_hosts` — delete multiple proxy hosts in a single MCP call.
+- HTTP `/health` endpoint on the MCP server for real container healthchecks.
+
+### Breaking changes
+- (none)
+
 ## [0.5.3] - 2026-08-18
 
 ### What changed
