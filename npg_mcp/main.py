@@ -23,6 +23,7 @@ warnings.filterwarnings(
 
 from mcp.server import transport_security
 from mcp.server.fastmcp import FastMCP
+import httpx
 import npg_mcp.client as client_mod
 import npg_mcp.toolsets as toolsets
 
@@ -147,6 +148,71 @@ def _access_log_middleware(app):
             )
 
     return _middleware
+
+
+def _probe_npg(timeout: float = 3.0) -> bool:
+    """Return True when the NPG API is reachable with the configured token.
+
+    Uses a short-lived throwaway httpx client (NOT the pooled singleton, whose
+    30s timeout would block health checks) to GET /api/v1/settings — a
+    lightweight, side-effect-free endpoint that proves the NPG base URL is
+    reachable and the API token is accepted. Any transport/HTTP error (NPG
+    down, wrong URL, missing/expired token) is caught and reported as False;
+    this function never raises. The probe path never logs tokens or secrets.
+    """
+    try:
+        client = httpx.Client(
+            base_url=client_mod.get_base_url(),
+            timeout=timeout,
+            follow_redirects=True,
+        )
+        try:
+            token = os.environ.get("NPG_API_TOKEN", "").strip()
+            headers = {"Authorization": f"Bearer {token}"} if token else {}
+            resp = client.get("/api/v1/settings", headers=headers)
+            return resp.status_code < 500
+        finally:
+            client.close()
+    except Exception:
+        return False
+
+
+def _health_app(exposed_tools: int):
+    """Build a minimal Starlette app exposing the unauthenticated /health route.
+
+    The route reports whether the MCP server is initialized (tool count after
+    configure_toolset), whether NPG_API_TOKEN is configured, and whether the
+    NPG API is reachable. It is a plain HTTP route — NOT an MCP tool — and is
+    mounted OUTSIDE the bearer-auth middleware so a healthcheck can call it
+    without carrying MCP_API_TOKEN. stdio transport never builds this app.
+    """
+    from starlette.applications import Starlette
+    from starlette.responses import JSONResponse
+
+    async def _health(request) -> JSONResponse:
+        token_ok = bool(os.environ.get("NPG_API_TOKEN", "").strip())
+        reachable = _probe_npg()
+        if not token_ok or not reachable:
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "tools": exposed_tools,
+                    "npg_reachable": reachable,
+                    "error": (
+                        "NPG_API_TOKEN not configured"
+                        if not token_ok
+                        else "NPG API unreachable"
+                    ),
+                },
+                status_code=503,
+            )
+        return JSONResponse(
+            {"status": "ok", "tools": exposed_tools, "npg_reachable": True}
+        )
+
+    app = Starlette()
+    app.add_route("/health", _health, methods=["GET"])
+    return app
 
 
 def _load_transport_security() -> transport_security.TransportSecuritySettings:
@@ -2721,11 +2787,13 @@ async def npg_get_backup_stats() -> dict:
 
 
 def _bearer_auth_middleware(app, expected_token: str):
-    """Require `Authorization: Bearer <token>` on every request.
+    """Require a bearer Authorization header on every request except /health.
 
     Returns the app unchanged if no MCP_API_TOKEN is configured (open mode,
     for local/LAN-only use). When set, unauthenticated/non-matching requests
-    get a 401 and are never forwarded to MCP.
+    get a 401 and are never forwarded to MCP. The unauthenticated /health
+    route (added by _health_app before this middleware wraps the app) is the
+    single exception — a container healthcheck cannot carry MCP_API_TOKEN.
     """
     if not expected_token:
         return app
@@ -2737,6 +2805,8 @@ def _bearer_auth_middleware(app, expected_token: str):
 
     class _AuthMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
+            if request.url.path == "/health":
+                return await call_next(request)
             auth = request.headers.get("authorization", "")
             if not hmac.compare_digest(auth, expected_bearer):
                 return JSONResponse(
@@ -3908,8 +3978,9 @@ def main() -> None:
     # Apply the layered toolset filter (NPG_TOOL_LEVEL) before the server
     # starts. Hidden tools are removed from the FastMCP tool manager, so they
     # are neither listed in tools/list nor callable via tools/call. Unknown
-    # levels and unset env fall back to "full" (all 274 tools).
-    toolsets.configure_toolset(mcp)
+    # levels and unset env fall back to "full" (all 274 tools). The returned
+    # count is what the HTTP /health route reports as the exposed tool count.
+    exposed_tools = toolsets.configure_toolset(mcp)
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "http":
         transport = "streamable-http"
@@ -3924,9 +3995,16 @@ def main() -> None:
 
     # HTTP transport: build the Starlette app and wrap it with bearer auth
     # plus request logging (outermost, so every request incl. 401s is logged).
+    # The /health route is added to the raw app FIRST (before auth/logging
+    # wrap it) so it bypasses MCP_API_TOKEN — a healthcheck cannot carry the
+    # token. stdio transport never builds this app.
     import uvicorn
 
     app = mcp.streamable_http_app()
+    # Mount the unauthenticated /health route on the raw app BEFORE auth and
+    # logging wrap it, so a healthcheck (which cannot carry MCP_API_TOKEN) is
+    # answered before the bearer middleware sees the request.
+    app.routes.extend(_health_app(exposed_tools).routes)
     token = os.environ.get("MCP_API_TOKEN", "").strip()
     app = _bearer_auth_middleware(app, token)
     app = _access_log_middleware(app)
