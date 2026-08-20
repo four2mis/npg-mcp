@@ -1114,8 +1114,8 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable).")
-async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (comma/newline IPs or CIDRs; omit=keep stored list, \"\"=clear; invalid entry 400).")
+async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None, whitelist_ips: str | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -1129,6 +1129,7 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
                 "limit_by": "limit_by",
                 "limit_response": "limit_response",
                 "disable_global": "disable_global",
+                "whitelist_ips": "whitelist_ips",
             },
         )
         data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
@@ -2930,8 +2931,8 @@ async def npg_get_global_rate_limit() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_global_rate_limit", description="UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response.")
-async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None) -> dict:
+@mcp.tool(name="npg_update_global_rate_limit", description="UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400).")
+async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, whitelist_ips: str | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
@@ -2943,6 +2944,7 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
                 "zone_size": "zone_size",
                 "limit_by": "limit_by",
                 "limit_response": "limit_response",
+                "whitelist_ips": "whitelist_ips",
             },
         )
         data = c.put("/api/v1/settings/global-rate-limit", body)
