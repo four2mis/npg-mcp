@@ -17,19 +17,19 @@ npg_get_proxy_host_by_domain:
       required: true
 
 npg_create_proxy_host:
-  description: "Create a new reverse proxy host. Required: domain_names (array), forward_host, forward_port. Optional: pass only the fields you want to change; omitted fields inherit global defaults or sensible built-in defaults. Fields: proxy_type (default 'http'), forward_scheme (default 'http'), enabled (default True), ssl_enabled, ssl_forced (default True), ssl_http2 (default True), ssl_http3, ssl_cert_id, waf_enabled, waf_use_global (default True), waf_paranoia_level, waf_anomaly_threshold, waf_mode, cache_enabled, cache_static_only, cache_ttl, cache_template, block_normal, block_http, block_exploits (default True), block_exploits_exceptions, allow_websocket_upgrade (default True), enable_proxy_headers, host_header, extra_domains, advanced_config, proxy_buffering (str), proxy_request_buffering (str), client_max_body_size (str), proxy_max_temp_file_size (str), proxy_connect/send/read_timeout, access_list_id, auth_provider_id, auth_bypass_paths, ddns_enabled/provider_id/proxied, forward_container_name/network, stream_* fields."
+  description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
   parameters: []
 
 npg_update_proxy_host:
-  description: "Update an existing proxy host (partial update — pass only the fields you want to change; omitted fields are left as-is). Use `skip_nginx=true` to skip nginx regeneration. Fields: domain_names, forward_host, forward_port, forward_scheme, block_normal, waf_enabled, waf_use_global (bool | None — tri-state: omit=leave unchanged, false=host own WAF config, true=inherit global WAF), waf_paranoia_level, waf_anomaly_threshold, block_http, ssl_forced, ssl_cert_id, cache_enabled, cache_static_only, cache_ttl (str), cache_template, advanced_config, enable_proxy_headers, host_header, extra_domains, enabled, ssl_http2, ssl_http3, block_exploits, block_exploits_exceptions, allow_websocket_upgrade, proxy_connect/send/read_timeout, proxy_buffering (str: 'on'/'off'/''), proxy_request_buffering (str: 'on'/'off'/''), client_max_body_size (str, e.g. '10m'/'off'), proxy_max_temp_file_size (str), access_list_id, auth_provider_id, auth_bypass_paths (list[str]), ddns_enabled/provider_id/proxied, forward_container_name/network. Nullable id fields (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward_container_name/network): empty string clears, omitted leaves unchanged; auth_bypass_paths: [] clears. REQUIRED: host_id."
+  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
   parameters: []
 
 npg_create_proxy_host_simple:
-  description: "Create a proxy host with common settings. REQUIRED: domain_names=['sub.example.com'], forward_host=IP_or_hostname, forward_port=port. Optional: forward_scheme (default 'http'), ssl_enabled (default true), ssl_forced (default true), enabled (default true), block_exploits (default true). For advanced options (WAF, caching, streaming, DDNS), use npg_create_proxy_host instead."
+  description: "CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme, ssl_enabled, ssl_forced, enabled, block_exploits (defaults true except forward_scheme 'http'). For WAF/cache/streaming/DDNS use npg_create_proxy_host."
   parameters: []
 
 npg_update_proxy_host_simple:
-  description: "Update a proxy host with common settings (partial update — pass only the fields you want to change; omitted fields are left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options (WAF, caching, streaming, DDNS), use npg_update_proxy_host instead."
+  description: "UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host."
   parameters: []
 
 npg_delete_proxy_host:
@@ -68,7 +68,7 @@ npg_clone_proxy_host:
       required: true
 
 npg_bulk_apply_certificate:
-  description: "Apply one certificate to multiple proxy hosts in a single call (loops PUT /api/v1/proxy-hosts/{id} per host — the same endpoint/field npg_update_proxy_host uses for ssl_cert_id, mapped to API field certificate_id). REQUIRED: cert_id, host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result (the PUT response), or host_id + success:false + error (why that host failed). Each host is processed independently — one failure does not abort the batch. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Existing single-host tools are unchanged."
+  description: "Apply one certificate to multiple proxy hosts. REQUIRED: cert_id, host_ids (UUID list, max 50). Per-host results: success:true/result or success:false/error - one failure does not abort the batch. ssl_cert_id maps to API certificate_id. Over the 50-host cap raises ValueError; empty rejected."
   parameters:
     - name: cert_id
       type: integer | string
@@ -78,7 +78,7 @@ npg_bulk_apply_certificate:
       required: true
 
 npg_bulk_delete_proxy_hosts:
-  description: "DESTRUCTIVE: delete multiple proxy hosts in a single call (loops DELETE /api/v1/proxy-hosts/{id} per host — the same endpoint npg_delete_proxy_host uses). REQUIRED: host_ids (list of host UUIDs, max 50). Returns a per-host result list, one entry per host: host_id + success:true + result, or host_id + success:false + error (why that host failed). Each host is deleted independently — one failure does not abort the batch. Deletion is permanent: sub-configs (WAF, geo, rate limit, fail2ban, challenge, etc.) cascade-delete with each host. Calls over the 50-host cap raise ValueError before any host is touched; empty host_ids are rejected with a clear error. Hidden from the standard tool tier (destructive). Existing single-host tools are unchanged."
+  description: "DESTRUCTIVE: DELETE multiple proxy hosts in one call. REQUIRED: host_ids (UUID list, max 50). Per-host result: deleted or success:false/error; one failure doesn't abort. Sub-configs (WAF, geo, fail2ban) cascade-delete. Over the 50-host cap raises ValueError; empty rejected."
   parameters:
     - name: host_ids
       type: array<st> | int]
@@ -114,7 +114,7 @@ npg_renew_certificate:
       required: true
 
 npg_bulk_renew_certificates:
-  description: "RENEW multiple certificates by ID in a single call (loops POST /api/v1/certificates/{id}/renew per certificate — the same endpoint npg_renew_certificate uses). REQUIRED: cert_ids (list of certificate UUIDs, max 20). Returns a per-certificate result list, one entry per cert: cert_id + success:true + result, or cert_id + success:false + error (why that cert failed). Each certificate is renewed independently — one failure does not abort the batch. Renewal hits Let's Encrypt/ACME rate limits — keep batches small (max 20) and space out large renewal campaigns. Calls over the 20-cert cap raise ValueError before any certificate is touched; empty cert_ids are rejected with a clear error. Use npg_get_expiring_certificates to find candidates. Existing single-certificate tools are unchanged."
+  description: "RENEW multiple certificates in one call. REQUIRED: cert_ids (UUID list, max 20). Per-cert results: success:true or success:false/error - one failure does not abort the batch. Over the 20-cert cap raises ValueError before any renewal; empty rejected. Watch ACME/Let's Encrypt rate limits."
   parameters:
     - name: cert_ids
       type: array<st> | int]
@@ -166,7 +166,7 @@ npg_get_proxy_host_rate_limit:
       required: true
 
 npg_update_proxy_host_rate_limit:
-  description: "UPDATE rate limit configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), requests_per_second (int), burst_size (int), zone_size (str), limit_by (str: ip/uri/ip_uri), limit_response (int), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id."
+  description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable)."
   parameters:
     - name: host_id
       type: integer | string
@@ -201,7 +201,7 @@ npg_get_proxy_host_bot_filter:
       required: true
 
 npg_update_proxy_host_bot_filter:
-  description: "UPDATE bot filter configuration for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Required: host_id (str|int). Optional: enabled (bool), block_bad_bots (bool), block_ai_bots (bool), allow_search_engines (bool), block_suspicious_clients (bool), challenge_suspicious (bool), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), custom_blocked_agents (str, comma-separated list), custom_allowed_agents (str, comma-separated list)."
+  description: "UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable)."
   parameters:
     - name: host_id
       type: integer | string
@@ -242,7 +242,7 @@ npg_get_proxy_host_security_headers:
       required: true
 
 npg_update_proxy_host_security_headers:
-  description: "UPDATE security headers for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), hsts_enabled (bool), hsts_max_age (int), hsts_include_subdomains (bool), hsts_preload (bool), x_frame_options (str: DENY/SAMEORIGIN/''), x_content_type_options (bool), x_xss_protection (bool), referrer_policy (str), content_security_policy (str), disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global) REQUIRED: host_id."
+  description: "UPDATE security headers for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, hsts_*, x_frame_options (DENY/SAMEORIGIN), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy, disable_global (omit=inherit, false=inherit, true=disable)."
   parameters:
     - name: host_id
       type: integer | string
@@ -299,7 +299,7 @@ npg_get_proxy_host_upstream:
       required: true
 
 npg_update_proxy_host_upstream:
-  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'IP_or_hostname', port: int, weight, is_backup} — address and port are SEPARATE fields; do NOT embed the port in address), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
+  description: "UPDATE upstream/load-balancing for a proxy host. REQUIRED: host_id. Optional: scheme (http/https), servers (list of {address, port, weight, is_backup} - port separate field), load_balance (round_robin/least_conn/ip_hash/random), health_check_*."
   parameters:
     - name: host_id
       type: integer | string
@@ -551,7 +551,7 @@ npg_get_proxy_host_cloud_blocking:
       required: true
 
 npg_update_proxy_host_cloud_blocking:
-  description: "UPDATE per-host cloud provider blocking (the endpoint full-replaces all fields, so the tool reads current settings and merges — omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool), cloud_disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global). REQUIRED: host_id."
+  description: "UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable)."
   parameters:
     - name: host_id
       type: integer | string
@@ -626,7 +626,7 @@ npg_create_proxy_host_geo:
       default: true
 
 npg_update_proxy_host_geo:
-  description: "UPDATE geo restriction for a proxy host (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, challenge_mode, disable_global (bool | None — tri-state: omit=inherit global default, false=inherit, true=disable/opt out of global), allow_private_ips, allow_search_bots REQUIRED: host_id."
+  description: "UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable)."
   parameters:
     - name: host_id
       type: integer | string
@@ -992,7 +992,7 @@ npg_list_notification_channels:
   parameters: []
 
 npg_create_notification_channel:
-  description: "Create a notification channel. REQUIRED: name, channel_type ('webhook'/'discord'/'telegram'). Optional: config (dict, e.g. {'url': '...'} for webhook/discord, {'bot_token': '...', 'chat_id': '...'} for telegram), events (list of event keys, e.g. ['ip.banned', 'cert.renewal_failed'] — at least one event or digest_enabled required), allow_private_target (bool, allow private-network webhook URLs), digest_enabled (bool), digest_hour (int 0-23)."
+  description: "CREATE a notification channel. REQUIRED: name, channel_type (webhook/discord/telegram). Optional: config (dict: url for webhook/discord; bot_token+chat_id for telegram), events (at least one event or digest_enabled), allow_private_target, digest_enabled, digest_hour (0-23)."
   parameters:
     - name: name
       type: string
@@ -1020,7 +1020,7 @@ npg_create_notification_channel:
       default: 9
 
 npg_update_notification_channel:
-  description: "UPDATE a notification channel (full-replace — read-modify-write: omitted fields are preserved by listing channels first and merging). REQUIRED: channel_id. Optional: name, channel_type (webhook/discord/telegram), config (dict with url/bot_token/chat_id), events, enabled, digest_enabled, digest_hour, allow_private_target, rich_format, language, dashboard_url, template. The API validates type+config together, so the current channel is fetched from the list endpoint first to merge existing values with provided ones."
+  description: "UPDATE a notification channel (read-modify-write; current channel fetched and merged before PUT). REQUIRED: channel_id. Optional: name, channel_type, config (url/bot_token/chat_id), events, enabled, digest_enabled, digest_hour, allow_private_target, rich_format, language, dashboard_url, template."
   parameters:
     - name: channel_id
       type: integer | string
@@ -1194,7 +1194,7 @@ npg_list_sso_providers:
   parameters: []
 
 npg_create_sso_provider:
-  description: "CREATE a new SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. OPTIONAL: client_secret (defaults to placeholder), scopes, trust_provider_email (bool, default false — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; only enable if you control the provider AND its user enrollment). After creation, call npg_list_sso_providers to verify."
+  description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. Optional: client_secret (placeholder), scopes, trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id. Verify via npg_list_sso_providers."
   parameters:
     - name: slug
       type: string
@@ -1220,7 +1220,7 @@ npg_create_sso_provider:
       default: false
 
 npg_update_sso_provider:
-  description: "UPDATE an SSO provider (read-modify-write — API is full-replace, so the current provider is fetched from the list endpoint and merged with provided fields before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (omit to leave unchanged — masked '********' is sent automatically), scopes, callback_base_url, enabled, allow_jit, trust_provider_email (bool — set true to accept the provider's email addresses without email_verified claim, e.g. Authentik 2025.10+; omit to leave unchanged), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
+  description: "UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -1279,7 +1279,7 @@ npg_delete_sso_provider:
       required: true
 
 npg_test_sso_provider:
-  description: "Probe an OIDC issuer's discovery document without saving a provider. REQUIRED: issuer_url (e.g. 'https://accounts.google.com'). Optional: scopes (space-separated, defaults to 'openid profile email', must contain 'openid'). Returns issuer, authorization_endpoint, token_endpoint, scopes_supported, supports_pkce, missing_scopes."
+  description: "Probe an OIDC issuer's discovery document without creating a provider. REQUIRED: issuer_url. Optional: scopes (space-separated, must contain 'openid', default 'openid profile email'). Returns endpoints, scopes_supported, supports_pkce, missing_scopes."
   parameters:
     - name: issuer_url
       type: string
@@ -1477,7 +1477,7 @@ npg_get_global_security_headers:
   parameters: []
 
 npg_update_global_security_headers:
-  description: "UPDATE global security headers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy."
+  description: "UPDATE global security headers configuration (partial update). Optional: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy."
   parameters:
     - name: enabled
       type: boolean
@@ -1564,7 +1564,7 @@ npg_get_global_geo:
   parameters: []
 
 npg_update_global_geo:
-  description: "UPDATE global GeoIP restriction configuration (partial update — only provided fields are changed; omitted fields are left as-is. The global default is inherited by hosts without their own override). Body: enabled (bool), mode (whitelist/blacklist), countries (list of ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode"
+  description: "UPDATE global GeoIP restriction (partial update; global default inherited by hosts without their own override). Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode."
   parameters:
     - name: enabled
       type: boolean
@@ -1619,7 +1619,7 @@ npg_get_global_waf:
   parameters: []
 
 npg_update_global_waf:
-  description: "UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_nginx; WAF/ModSecurity changes take effect after a proxy container restart."
+  description: "UPDATE global WAF configuration (partial update). Optional: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_nginx; WAF changes take effect after a proxy container restart."
   parameters:
     - name: enabled
       type: boolean
@@ -1676,7 +1676,7 @@ npg_list_auth_providers:
   parameters: []
 
 npg_create_auth_provider:
-  description: "CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL, e.g. http://127.0.0.1:9091). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (for Docker-backed providers, provider_url is resolved from container)."
+  description: "CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (Docker-backed: provider_url resolved from container)."
   parameters:
     - name: name
       type: string
