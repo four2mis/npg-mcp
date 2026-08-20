@@ -395,13 +395,50 @@ def _validate_required(name: str, value) -> None:
         raise ValueError(f"{name} is required (got: empty string)")
 
 
+def _validate_query_int(name: str, value: int | None) -> None:
+    """Validate an optional pagination/filter integer query param.
+
+    None is allowed (param omitted from the query string); a value must be
+    a non-negative integer (negative limits/offsets/pages are invalid and
+    would otherwise surface as an opaque HTTP 400/500 from the API).
+    """
+    if value is None:
+        return
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be a non-negative integer (got: {value!r})")
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative integer (got: {value!r})")
+
+
+def _list_params(limit: int | None, offset: int | None = None, page: int | None = None) -> dict:
+    """Build a GET query-params dict from provided pagination values only."""
+    params: dict = {}
+    if page is not None:
+        _validate_query_int("page", page)
+        params["page"] = page
+    if limit is not None:
+        _validate_query_int("limit", limit)
+        params["limit"] = limit
+    if offset is not None:
+        _validate_query_int("offset", offset)
+        params["offset"] = offset
+    return params
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="List all proxy hosts. Returns a list of proxy host objects.")
-async def npg_list_proxy_hosts() -> dict:
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit, search (search matches domain/forward host text). Paginated responses carry {\"data\": [...], \"total\": N, \"page\": N, \"limit\": N}. REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
+async def npg_list_proxy_hosts(
+    page: int | None = None,
+    limit: int | None = None,
+    search: str | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/proxy-hosts")
+        params = _list_params(limit=limit, page=page)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        data = c.get("/api/v1/proxy-hosts", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1869,11 +1906,25 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="Get access logs.")
-async def npg_get_logs() -> dict:
+@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit, offset. REQUIRED: none — zero-arg call returns the full default log set.")
+async def npg_get_logs(
+    host: str | None = None,
+    status: int | None = None,
+    method: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs")
+        params = _list_params(limit=limit, offset=offset)
+        if host is not None and str(host).strip():
+            params["host"] = str(host)
+        if status is not None:
+            _validate_query_int("status", status)
+            params["status"] = status
+        if method is not None and str(method).strip():
+            params["method"] = str(method)
+        data = c.get("/api/v1/logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1905,20 +1956,39 @@ async def npg_get_log_stats() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_list_audit_logs", description="List audit log entries.")
-async def npg_list_audit_logs() -> dict:
+@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit, action, resource_type. REQUIRED: none — zero-arg call returns the full audit log set.")
+async def npg_list_audit_logs(
+    page: int | None = None,
+    limit: int | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/audit-logs")
+        params = _list_params(limit=limit, page=page)
+        if action is not None and str(action).strip():
+            params["action"] = str(action)
+        if resource_type is not None and str(resource_type).strip():
+            params["resource_type"] = str(resource_type)
+        data = c.get("/api/v1/audit-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_list_system_logs", description="List system logs.")
-async def npg_list_system_logs() -> dict:
+@mcp.tool(name="npg_list_system_logs", description="LIST system logs. Optional filters: source, level, limit. REQUIRED: none — zero-arg call returns the full system log set.")
+async def npg_list_system_logs(
+    source: str | None = None,
+    level: str | None = None,
+    limit: int | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-logs")
+        params = _list_params(limit=limit)
+        if source is not None and str(source).strip():
+            params["source"] = str(source)
+        if level is not None and str(level).strip():
+            params["level"] = str(level)
+        data = c.get("/api/v1/system-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
