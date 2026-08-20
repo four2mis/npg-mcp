@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.7] - 2026-08-20
+
+### What changed
+- Trimmed 22 oversized tool descriptions (>300 chars) to <=299 chars so every tool description fits the MCP description field limit and stays useful to agents. Longest went from 1235 chars (npg_update_proxy_host) and 1029 (npg_create_proxy_host) down to ~285-291. Description-only edits — no signature or behavior changes (verified backward compatible).
+- Fixed the `limit`/`offset` query-parameter mapping on the proxy-hosts and logs list tools: the NPG API binds `per_page`/`page`, so the previously sent `limit`/`offset` were silently ignored. The list tools now translate to the API's native parameters (verified against the running fork).
+- Added pagination and filter query parameters to 4 list tools with conditional parameter building and non-negative-integer validation: `npg_list_proxy_hosts`, `npg_get_logs`, `npg_list_audit_logs`, `npg_list_system_logs`. Callers can now pass `limit`/`offset` (mapped to `per_page`/`page`) plus per-tool filters instead of fetching full unpaginated result sets.
+- Added `npg_bulk_renew_certificates` with a 20-certificate batch cap (`_BULK_CERT_LIMIT`) and per-certificate error isolation, mirroring `npg_bulk_delete_proxy_hosts`: one failing certificate does not abort the batch, and each result reports success/error individually.
+
+### What's new
+- `npg_bulk_renew_certificates` — renew many certificates in a single MCP call (batch cap 20, per-cert error isolation).
+- Pagination/filter support on list tools: `npg_list_proxy_hosts`, `npg_get_logs`, `npg_list_audit_logs`, `npg_list_system_logs` now accept `limit`/`offset` (mapped to `per_page`/`page`) and relevant filter parameters.
+
+### Breaking changes
+- (none)
+
 ## [0.5.6] - 2026-08-20
 
 ### What changed
