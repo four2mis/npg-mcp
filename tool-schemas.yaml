@@ -1,5 +1,5 @@
 npg_list_proxy_hosts:
-  description: "LIST proxy hosts. Optional: page, limit, search (search matches domain/forward host text). Paginated responses carry {\"data\": [...], \"total\": N, \"page\": N, \"limit\": N}. REQUIRED: none — zero-arg call returns the full (unpaginated) list."
+  description: "LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list."
   parameters: []
 
 npg_get_proxy_host:
@@ -884,7 +884,7 @@ npg_disable_waf_rule:
       required: true
 
 npg_get_logs:
-  description: "GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit, offset. REQUIRED: none — zero-arg call returns the full default log set."
+  description: "GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set."
   parameters: []
 
 npg_get_log_settings:

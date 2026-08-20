@@ -411,7 +411,15 @@ def _validate_query_int(name: str, value: int | None) -> None:
 
 
 def _list_params(limit: int | None, offset: int | None = None, page: int | None = None) -> dict:
-    """Build a GET query-params dict from provided pagination values only."""
+    """Build a GET query-params dict from provided pagination values only.
+
+    Naming follows the swagger contract (page/limit/offset); the running NPG
+    fork's proxy-hosts and logs endpoints honor ``per_page`` (page size) and
+    ``page`` instead of ``limit``/``offset``, so callers of this helper must
+    remap: ``limit`` -> ``per_page`` and ``offset`` -> ``page`` (offset // page
+    size + 1) before/after calling it where the fork differs. audit-logs and
+    system-logs honor ``limit``/``offset`` directly.
+    """
     params: dict = {}
     if page is not None:
         _validate_query_int("page", page)
@@ -425,9 +433,28 @@ def _list_params(limit: int | None, offset: int | None = None, page: int | None 
     return params
 
 
+def _list_params_per_page(limit: int | None = None, offset: int | None = None, page: int | None = None) -> dict:
+    """Like ``_list_params`` but maps to the running fork's ``per_page``/``page``
+    scheme used by /proxy-hosts and /logs: ``limit`` becomes ``per_page`` and
+    ``offset`` becomes ``page = offset // page_size + 1`` (default size 50).
+    """
+    params: dict = {}
+    if page is not None:
+        _validate_query_int("page", page)
+        params["page"] = page
+    if limit is not None:
+        _validate_query_int("limit", limit)
+        params["per_page"] = limit
+    if offset is not None:
+        _validate_query_int("offset", offset)
+        page_size = limit if limit is not None else 50
+        params["page"] = (offset // page_size) + 1
+    return params
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit, search (search matches domain/forward host text). Paginated responses carry {\"data\": [...], \"total\": N, \"page\": N, \"limit\": N}. REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
@@ -435,7 +462,7 @@ async def npg_list_proxy_hosts(
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params(limit=limit, page=page)
+        params = _list_params_per_page(limit=limit, page=page)
         if search is not None and str(search).strip():
             params["search"] = str(search)
         data = c.get("/api/v1/proxy-hosts", params=params or None)
@@ -1906,7 +1933,7 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit, offset. REQUIRED: none — zero-arg call returns the full default log set.")
+@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -1916,7 +1943,7 @@ async def npg_get_logs(
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params(limit=limit, offset=offset)
+        params = _list_params_per_page(limit=limit, offset=offset)
         if host is not None and str(host).strip():
             params["host"] = str(host)
         if status is not None:

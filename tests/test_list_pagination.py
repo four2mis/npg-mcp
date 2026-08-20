@@ -21,7 +21,7 @@ import asyncio
 import pytest
 
 import npg_mcp.main as main_mod
-from npg_mcp.main import _list_params, _validate_query_int
+from npg_mcp.main import _list_params, _list_params_per_page, _validate_query_int
 
 
 class _RecordingClient:
@@ -67,6 +67,24 @@ class TestListParamsHelper:
             _validate_query_int("status", -1)
 
 
+class TestListParamsPerPageHelper:
+    def test_maps_limit_to_per_page(self):
+        assert _list_params_per_page(limit=1) == {"per_page": 1}
+        assert _list_params_per_page(limit=5, page=2) == {"per_page": 5, "page": 2}
+
+    def test_offset_to_page(self):
+        # offset 10 with page size 5 -> page 3
+        assert _list_params_per_page(limit=5, offset=10) == {"per_page": 5, "page": 3}
+        # default page size 50 when limit omitted
+        assert _list_params_per_page(offset=50) == {"page": 2}
+
+    def test_negative_rejected(self):
+        with pytest.raises(ValueError):
+            _list_params_per_page(limit=-1)
+        with pytest.raises(ValueError):
+            _list_params_per_page(offset=-3)
+
+
 class TestListProxyHosts:
     def test_zero_arg_sends_no_params(self, recording):
         result = _run(main_mod.npg_list_proxy_hosts())
@@ -75,7 +93,7 @@ class TestListProxyHosts:
 
     def test_limit_and_page_sent(self, recording):
         _run(main_mod.npg_list_proxy_hosts(page=2, limit=10))
-        assert recording.calls == [("GET", "/api/v1/proxy-hosts", {"page": 2, "limit": 10})]
+        assert recording.calls == [("GET", "/api/v1/proxy-hosts", {"page": 2, "per_page": 10})]
 
     def test_search_sent_only_when_nonempty(self, recording):
         _run(main_mod.npg_list_proxy_hosts(search="mcp-test-"))
@@ -98,13 +116,14 @@ class TestGetLogs:
 
     def test_all_filters_sent(self, recording):
         _run(main_mod.npg_get_logs(host="foo.example.com", status=404, method="GET", limit=50, offset=10))
+        # limit -> per_page; offset 10 with page size 50 -> page 1
         assert recording.calls == [
-            ("GET", "/api/v1/logs", {"host": "foo.example.com", "status": 404, "method": "GET", "limit": 50, "offset": 10})
+            ("GET", "/api/v1/logs", {"per_page": 50, "page": 1, "host": "foo.example.com", "status": 404, "method": "GET"})
         ]
 
     def test_partial_filters(self, recording):
         _run(main_mod.npg_get_logs(status=404, limit=50))
-        assert recording.calls == [("GET", "/api/v1/logs", {"status": 404, "limit": 50})]
+        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 50, "status": 404})]
 
     def test_negative_status_clean_error(self, recording):
         result = _run(main_mod.npg_get_logs(status=-1))
