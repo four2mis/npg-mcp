@@ -329,6 +329,11 @@ _INTERNAL_BODY_KEYS = frozenset({"self", "c", "body"})
 # being partially executed.
 _BULK_HOST_LIMIT = 50
 
+# Hard cap on cert_ids per bulk renewal call. Renewals hit Let's Encrypt/ACME
+# rate limits, so batches stay far below the 50-host bulk cap to avoid
+# exhausting quotas for the whole deployment.
+_BULK_CERT_LIMIT = 20
+
 
 def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) -> dict:
     """Build an API request body dict from local variables, keeping only non-None values.
@@ -884,6 +889,32 @@ async def npg_renew_certificate(cert_id: str | int) -> dict:
         c = _get_client()
         data = c.post(f"/api/v1/certificates/{_id_path(cert_id)}/renew")
         return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_bulk_renew_certificates", description="RENEW multiple certificates by ID in a single call (loops POST /api/v1/certificates/{id}/renew per certificate — the same endpoint npg_renew_certificate uses). REQUIRED: cert_ids (list of certificate UUIDs, max 20). Returns a per-certificate result list, one entry per cert: cert_id + success:true + result, or cert_id + success:false + error (why that cert failed). Each certificate is renewed independently — one failure does not abort the batch. Renewal hits Let's Encrypt/ACME rate limits — keep batches small (max 20) and space out large renewal campaigns. Calls over the 20-cert cap raise ValueError before any certificate is touched; empty cert_ids are rejected with a clear error. Use npg_get_expiring_certificates to find candidates. Existing single-certificate tools are unchanged.")
+async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
+    try:
+        _validate_required("cert_ids", cert_ids)
+        if len(cert_ids) > _BULK_CERT_LIMIT:
+            raise ValueError(
+                f"cert_ids exceeds the limit of {_BULK_CERT_LIMIT} certificates per bulk call "
+                f"(got {len(cert_ids)})"
+            )
+        c = _get_client()
+        results: list[dict] = []
+        for cert_id in cert_ids:
+            entry: dict = {"cert_id": _id_path(cert_id)}
+            try:
+                _validate_id("cert_id", cert_id)
+                data = c.post(f"/api/v1/certificates/{_id_path(cert_id)}/renew")
+                entry["success"] = True
+                entry["result"] = data
+            except Exception as e:
+                entry["success"] = False
+                entry["error"] = str(e)
+            results.append(entry)
+        return {"success": True, "data": results}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

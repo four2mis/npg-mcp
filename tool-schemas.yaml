@@ -113,6 +113,13 @@ npg_renew_certificate:
       type: integer | string
       required: true
 
+npg_bulk_renew_certificates:
+  description: "RENEW multiple certificates by ID in a single call (loops POST /api/v1/certificates/{id}/renew per certificate — the same endpoint npg_renew_certificate uses). REQUIRED: cert_ids (list of certificate UUIDs, max 20). Returns a per-certificate result list, one entry per cert: cert_id + success:true + result, or cert_id + success:false + error (why that cert failed). Each certificate is renewed independently — one failure does not abort the batch. Renewal hits Let's Encrypt/ACME rate limits — keep batches small (max 20) and space out large renewal campaigns. Calls over the 20-cert cap raise ValueError before any certificate is touched; empty cert_ids are rejected with a clear error. Use npg_get_expiring_certificates to find candidates. Existing single-certificate tools are unchanged."
+  parameters:
+    - name: cert_ids
+      type: array<st> | int]
+      required: true
+
 npg_reload_nginx:
   description: "Reload nginx configuration without full restart."
   parameters: []

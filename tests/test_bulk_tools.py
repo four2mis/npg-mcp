@@ -1,13 +1,15 @@
-"""Unit tests for npg_bulk_apply_certificate / npg_bulk_delete_proxy_hosts.
+"""Unit tests for npg_bulk_apply_certificate / npg_bulk_delete_proxy_hosts /
+npg_bulk_renew_certificates.
 
 Verifies, without any network access (recording fake client):
-* each bulk tool loops the existing per-host endpoint once per host_id,
-* the exact per-host request shape (PUT body {"certificate_id": ...} for the
-  cert apply; DELETE for the delete),
-* per-host aggregation: one failing host does not abort the batch,
-* the 50-host hard cap raises ValueError (surfaced as success:false),
-* empty host_ids are rejected with a clear error,
-* results carry host_id + success + result|error per entry.
+* each bulk tool loops the existing per-item endpoint once per id,
+* the exact per-item request shape (PUT body {"certificate_id": ...} for the
+  cert apply; DELETE for the delete; POST /certificates/{id}/renew for the
+  bulk renew),
+* per-item aggregation: one failing item does not abort the batch,
+* the batch hard caps raise ValueError (surfaced as success:false),
+* empty id lists are rejected with a clear error,
+* results carry id + success + result|error per entry.
 
 Monkeypatches npg_mcp.main._get_client with a recording fake so the tools'
 real code paths run end to end (validation -> loop -> HTTP call shape).
@@ -20,7 +22,7 @@ import asyncio
 import pytest
 
 import npg_mcp.main as main_mod
-from npg_mcp.main import _BULK_HOST_LIMIT
+from npg_mcp.main import _BULK_CERT_LIMIT, _BULK_HOST_LIMIT
 
 
 class _RecordingClient:
@@ -40,6 +42,15 @@ class _RecordingClient:
 
             raise NPGError("NPG API returned HTTP 404", "proxy host not found")
         return {"id": path.rsplit("/", 1)[-1], "updated": True}
+
+    def post(self, path, body=None, params=None):
+        self.calls.append(("POST", path, body, params))
+        if "fail-" in path:
+            from npg_mcp.client import NPGError
+
+            raise NPGError("NPG API returned HTTP 404", "certificate not found")
+        # /api/v1/certificates/{id}/renew — id is the segment before the verb
+        return {"id": path.rsplit("/", 2)[-2], "renewed": True}
 
     def delete(self, path, params=None):
         self.calls.append(("DELETE", path, params))
@@ -206,4 +217,87 @@ class TestBulkDeleteProxyHosts:
         assert result["data"][0]["success"] is True
         assert result["data"][1]["success"] is False
         assert "host_id is required" in result["data"][1]["error"]
+        assert result["data"][2]["success"] is True
+
+
+class TestBulkRenewCertificates:
+    def test_renews_each_cert_via_post(self, recording):
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(
+                cert_ids=["55555555-5555-5555-5555-555555555555",
+                          "66666666-6666-6666-6666-666666666666"],
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == 2
+        assert all(method == "POST" for method, _, _, _ in recording.calls)
+        assert recording.calls[0][1] == (
+            "/api/v1/certificates/55555555-5555-5555-5555-555555555555/renew"
+        )
+        assert recording.calls[1][1] == (
+            "/api/v1/certificates/66666666-6666-6666-6666-666666666666/renew"
+        )
+        assert recording.calls[0][2] is None  # no body is sent
+        assert result["data"] == [
+            {"cert_id": "55555555-5555-5555-5555-555555555555", "success": True,
+             "result": {"id": "55555555-5555-5555-5555-555555555555", "renewed": True}},
+            {"cert_id": "66666666-6666-6666-6666-666666666666", "success": True,
+             "result": {"id": "66666666-6666-6666-6666-666666666666", "renewed": True}},
+        ]
+
+    def test_one_bad_cert_does_not_abort_batch(self, recording):
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(
+                cert_ids=["ok-cert", "fail-cert", "ok-2"],
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == 3  # every cert was attempted
+        assert result["data"][0]["success"] is True
+        assert result["data"][1]["success"] is False
+        assert "404" in result["data"][1]["error"]
+        assert result["data"][2]["success"] is True
+
+    def test_int_cert_ids_coerced_to_string_paths(self, recording):
+        result = _run(main_mod.npg_bulk_renew_certificates(cert_ids=[1, 2]))
+        assert result["success"] is True
+        assert recording.calls[0][1] == "/api/v1/certificates/1/renew"
+        assert recording.calls[1][1] == "/api/v1/certificates/2/renew"
+        assert result["data"][0]["cert_id"] == "1"
+
+    def test_empty_cert_ids_rejected(self):
+        result = _run(main_mod.npg_bulk_renew_certificates(cert_ids=[]))
+        assert result["success"] is False
+        assert "cert_ids is required" in result["error"]
+
+    def test_cap_raises_value_error_before_any_call(self, recording):
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(
+                cert_ids=_many_ids(_BULK_CERT_LIMIT + 1)
+            )
+        )
+        assert result["success"] is False
+        assert f"exceeds the limit of {_BULK_CERT_LIMIT}" in result["error"]
+        assert recording.calls == []  # nothing was sent
+
+    def test_at_cap_is_allowed(self, recording):
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(
+                cert_ids=_many_ids(_BULK_CERT_LIMIT)
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == _BULK_CERT_LIMIT
+
+    def test_invalid_individual_cert_id_reported_per_cert(self, recording):
+        # A blank/None cert_id in the middle must be reported as a per-cert
+        # error while the valid entries still run (never aborts the batch).
+        from typing import cast
+
+        bad_ids: list[str | int] = cast(list[str | int], ["ok-cert", None, "ok-2"])
+        result = _run(main_mod.npg_bulk_renew_certificates(cert_ids=bad_ids))
+        assert result["success"] is True
+        assert result["data"][0]["success"] is True
+        assert result["data"][1]["success"] is False
+        assert "cert_id is required" in result["data"][1]["error"]
         assert result["data"][2]["success"] is True
