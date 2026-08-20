@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.6] - 2026-08-20
+
+### What changed
+- Fixed `npg_upload_certificate_pem`: the request body sent the key `pem`, which the NPG API ignores; it now sends the correct `certificate_pem` + `private_key_pem` fields. The `private_key_pem` parameter is now required and validated.
+- Fixed `npg_add_filter_subscription_entry_exclusion` / `npg_remove_filter_subscription_entry_exclusion`: the body sent `entry_value` but the NPG API binds `value` (request-body field on add, query parameter on remove), so exclusions were silently not applied. Both now send `value`.
+- Fixed `npg_update_global_waf`: removed the phantom `rules` field (ignored by the upstream request model) and added the `mode` parameter (`detection|blocking`) that the API actually accepts; `paranoia_level` (1-4) is now documented.
+- Fixed `npg_update_proxy_host_upstream` description to match the real API contract: each server entry has separate `address` and `port` fields plus `weight` and `is_backup` — the port must no longer be embedded in the address string.
+- Fixed `npg_auth_sso_start`: the SSO start endpoint answers with a 302 redirect to the identity provider, which previously surfaced as an error. `NPGClient.get()` now supports `redirect_ok=True` and returns the `Location` header as `{"redirect_url": ...}`. Redirects are never followed, so the API token is never forwarded to an external IdP.
+
+### What's new
+- (none)
+
+### Breaking changes
+- `npg_upload_certificate_pem` now requires `private_key_pem` — callers passing only `pem_content` will get a validation error; pass both the certificate and private key PEM strings.
+- `npg_update_global_waf` no longer accepts the `rules` parameter (it was silently ignored by the API) and gains `mode`; callers passing `rules` will get a validation error.
+
 ## [0.5.5] - 2026-08-19
 
 ### What changed
