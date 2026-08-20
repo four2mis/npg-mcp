@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.8] - 2026-08-20
+
+### What changed
+- Synced the MCP wrapper with upstream NPG v2.46.0: the rate-limit exception list became a real nullable field upstream, so `npg_update_proxy_host_rate_limit` and `npg_update_global_rate_limit` now expose a `whitelist_ips` parameter (`str | None`). Semantics: omit = keep the stored list, `""` = clear it, otherwise comma/newline-separated IPs or CIDRs (an invalid entry is rejected with HTTP 400). Tool descriptions updated to match.
+- Committed the upstream v2.46.0 swagger.yaml so the API reference tracks the synced version.
+
+### What's new
+- `whitelist_ips` parameter added to `npg_update_proxy_host_rate_limit` and `npg_update_global_rate_limit`.
+
+### Breaking changes
+- (none)
+
 ## [0.5.7] - 2026-08-20
 
 ### What changed
