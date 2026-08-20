@@ -26,7 +26,7 @@ _current_base_url: str = ""
 
 # Module-level singleton client for connection pooling. The env-var token
 # path creates a single NPGClient with a persistent httpx.Client connection
-# pool, reused across all 274 tool calls instead of opening a new TCP
+# pool, reused across all tool calls instead of opening a new TCP
 # connection per request.
 _singleton_client: "NPGClient | None" = None
 

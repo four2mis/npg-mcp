@@ -4217,7 +4217,7 @@ def main() -> None:
     # Apply the layered toolset filter (NPG_TOOL_LEVEL) before the server
     # starts. Hidden tools are removed from the FastMCP tool manager, so they
     # are neither listed in tools/list nor callable via tools/call. Unknown
-    # levels and unset env fall back to "full" (all 274 tools). The returned
+    # levels and unset env fall back to "full" (all tools). The returned
     # count is what the HTTP /health route reports as the exposed tool count.
     exposed_tools = toolsets.configure_toolset(mcp)
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
