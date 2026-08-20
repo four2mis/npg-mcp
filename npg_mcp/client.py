@@ -211,12 +211,31 @@ class NPGClient:
         """Exponential backoff: 0.5s, 1.0s, ..."""
         return _RETRY_BASE_DELAY * (2 ** attempt)
 
-    def get(self, path: str, params: dict | None = None) -> dict | None:
+    def get(
+        self,
+        path: str,
+        params: dict | None = None,
+        redirect_ok: bool = False,
+    ) -> dict | None:
+        """GET returning parsed JSON (or None on 204/empty body).
+
+        ``redirect_ok=True`` treats 3xx responses as a normal outcome: the
+        Location header is returned as ``{"redirect_url": ...}`` instead of
+        raising (used by npg_auth_sso_start, whose endpoint answers with a
+        302 to the identity provider). Redirects are never followed so the
+        API token is never forwarded to an external IdP.
+        """
         url = urljoin(self.base_url + "/", path.lstrip("/"))
         for attempt in range(_MAX_RETRIES + 1):
             start = time.perf_counter()
             try:
                 resp = self._client.get(url, params=params, headers=self._headers())
+                if resp.status_code in (301, 302, 303, 307, 308) and redirect_ok:
+                    self._log_ok("GET", path, resp.status_code, start)
+                    location = resp.headers.get("location")
+                    return (
+                        {"redirect_url": location} if location else None
+                    )
                 resp.raise_for_status()
                 self._log_ok("GET", path, resp.status_code, start)
                 if resp.status_code == 204 or not resp.content:

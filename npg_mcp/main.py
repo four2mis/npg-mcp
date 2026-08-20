@@ -1132,7 +1132,7 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'host:port', weight, backup}), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
+@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'IP_or_hostname', port: int, weight, is_backup} — address and port are SEPARATE fields; do NOT embed the port in address), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id.")
 async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2834,17 +2834,17 @@ async def npg_get_global_waf() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_global_waf", description="UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled}).")
-async def npg_update_global_waf(enabled: bool | None = None, paranoia_level: int | None = None, anomaly_threshold: int | None = None, rules: list[dict] | None = None) -> dict:
+@mcp.tool(name="npg_update_global_waf", description="UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_nginx; WAF/ModSecurity changes take effect after a proxy container restart.")
+async def npg_update_global_waf(enabled: bool | None = None, mode: str | None = None, paranoia_level: int | None = None, anomaly_threshold: int | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
             locals(),
             {
                 "enabled": "enabled",
+                "mode": "mode",
                 "paranoia_level": "paranoia_level",
                 "anomaly_threshold": "anomaly_threshold",
-                "rules": "rules",
             },
         )
         data = c.put("/api/v1/settings/global-waf", body)
@@ -2954,12 +2954,14 @@ async def npg_get_auth_sso_providers() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_auth_sso_start", description="Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns a redirect URL.")
+@mcp.tool(name="npg_auth_sso_start", description="Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}.")
 async def npg_auth_sso_start(slug: str) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        data = c.get(f"/api/v1/auth/sso/{quote(slug, safe='')}/start")
+        data = c.get(f"/api/v1/auth/sso/{quote(slug, safe='')}/start", redirect_ok=True)
+        if data is not None and "redirect_url" in data:
+            return {"success": True, "redirect_url": data["redirect_url"]}
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3258,24 +3260,24 @@ async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | in
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_add_filter_subscription_entry_exclusion", description="Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value.")
+@mcp.tool(name="npg_add_filter_subscription_entry_exclusion", description="Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value (the entry value to exclude; sent as 'value' to the NPG API).")
 async def npg_add_filter_subscription_entry_exclusion(subscription_id: str | int, entry_value: str) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         _validate_required("entry_value", entry_value)
         c = _get_client()
-        data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"entry_value": entry_value})
+        data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_remove_filter_subscription_entry_exclusion", description="Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value.")
+@mcp.tool(name="npg_remove_filter_subscription_entry_exclusion", description="Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value (the excluded entry value; sent as the 'value' query parameter to the NPG API).")
 async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | int, entry_value: str) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         _validate_required("entry_value", entry_value)
         c = _get_client()
-        c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"entry_value": entry_value})
+        c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
         return {"success": True, "message": f"Entry exclusion removed: {entry_value}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3366,13 +3368,15 @@ async def npg_clear_certificate_error(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_upload_certificate_pem", description="Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM string).")
-async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str) -> dict:
+@mcp.tool(name="npg_upload_certificate_pem", description="Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM certificate string), private_key_pem (full PEM private key string). Sends certificate_pem + private_key_pem to the NPG API. After upload, verify with npg_get_certificate.")
+async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str, private_key_pem: str) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         _validate_required("pem_content", pem_content)
+        _validate_required("private_key_pem", private_key_pem)
         c = _get_client()
-        data = c.put(f"/api/v1/certificates/{_id_path(cert_id)}/upload", {"pem": pem_content})
+        body = {"certificate_pem": pem_content, "private_key_pem": private_key_pem}
+        data = c.put(f"/api/v1/certificates/{_id_path(cert_id)}/upload", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
