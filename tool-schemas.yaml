@@ -292,7 +292,7 @@ npg_get_proxy_host_upstream:
       required: true
 
 npg_update_proxy_host_upstream:
-  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'host:port', weight, backup}), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
+  description: "UPDATE upstream/load balancing configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: scheme (http/https), servers (list of {address: 'IP_or_hostname', port: int, weight, is_backup} — address and port are SEPARATE fields; do NOT embed the port in address), load_balance (round_robin|least_conn|ip_hash|random), health_check_enabled, health_check_path, health_check_interval. REQUIRED: host_id."
   parameters:
     - name: host_id
       type: integer | string
@@ -1612,19 +1612,19 @@ npg_get_global_waf:
   parameters: []
 
 npg_update_global_waf:
-  description: "UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, paranoia_level, anomaly_threshold, rules (list of {id, enabled})."
+  description: "UPDATE global WAF configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_nginx; WAF/ModSecurity changes take effect after a proxy container restart."
   parameters:
     - name: enabled
       type: boolean
+      required: false
+    - name: mode
+      type: string
       required: false
     - name: paranoia_level
       type: integer
       required: false
     - name: anomaly_threshold
       type: integer
-      required: false
-    - name: rules
-      type: array<object>
       required: false
 
 npg_download_backup:
@@ -1658,7 +1658,7 @@ npg_get_auth_sso_providers:
   parameters: []
 
 npg_auth_sso_start:
-  description: "Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns a redirect URL."
+  description: "Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}."
   parameters:
     - name: slug
       type: string
@@ -1926,7 +1926,7 @@ npg_get_filter_subscription_entry_exclusions:
       required: true
 
 npg_add_filter_subscription_entry_exclusion:
-  description: "Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value."
+  description: "Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value (the entry value to exclude; sent as 'value' to the NPG API)."
   parameters:
     - name: subscription_id
       type: integer | string
@@ -1936,7 +1936,7 @@ npg_add_filter_subscription_entry_exclusion:
       required: true
 
 npg_remove_filter_subscription_entry_exclusion:
-  description: "Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value."
+  description: "Remove an entry exclusion from a filter subscription. REQUIRED: subscription_id, entry_value (the excluded entry value; sent as the 'value' query parameter to the NPG API)."
   parameters:
     - name: subscription_id
       type: integer | string
@@ -2002,12 +2002,15 @@ npg_clear_certificate_error:
       required: true
 
 npg_upload_certificate_pem:
-  description: "Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM string)."
+  description: "Replace the PEM material of a custom certificate. REQUIRED: cert_id, pem_content (full PEM certificate string), private_key_pem (full PEM private key string). Sends certificate_pem + private_key_pem to the NPG API. After upload, verify with npg_get_certificate."
   parameters:
     - name: cert_id
       type: integer | string
       required: true
     - name: pem_content
+      type: string
+      required: true
+    - name: private_key_pem
       type: string
       required: true
 
