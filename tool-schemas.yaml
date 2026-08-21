@@ -25,7 +25,7 @@ npg_update_proxy_host:
   parameters: []
 
 npg_create_proxy_host_simple:
-  description: "CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme, ssl_enabled, ssl_forced, enabled, block_exploits (defaults true except forward_scheme 'http'). For WAF/cache/streaming/DDNS use npg_create_proxy_host."
+  description: "CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme (default 'http'), ssl_enabled, ssl_forced, enabled, block_exploits, waf_enabled, waf_use_global (all default true). For cache/streaming/DDNS use npg_create_proxy_host."
   parameters: []
 
 npg_update_proxy_host_simple:
@@ -166,7 +166,7 @@ npg_get_proxy_host_rate_limit:
       required: true
 
 npg_update_proxy_host_rate_limit:
-  description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable)."
+  description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (comma/newline IPs or CIDRs; omit=keep stored list, \"\"=clear; invalid entry 400)."
   parameters:
     - name: host_id
       type: integer | string
@@ -191,6 +191,9 @@ npg_update_proxy_host_rate_limit:
       required: false
     - name: disable_global
       type: boolean
+      required: false
+    - name: whitelist_ips
+      type: string
       required: false
 
 npg_get_proxy_host_bot_filter:
@@ -1593,7 +1596,7 @@ npg_get_global_rate_limit:
   parameters: []
 
 npg_update_global_rate_limit:
-  description: "UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response."
+  description: "UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400)."
   parameters:
     - name: enabled
       type: boolean
@@ -1612,6 +1615,9 @@ npg_update_global_rate_limit:
       required: false
     - name: limit_response
       type: integer
+      required: false
+    - name: whitelist_ips
+      type: string
       required: false
 
 npg_get_global_waf:

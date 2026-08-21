@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.9] - 2026-08-21
+
+### What changed
+- `npg_create_proxy_host_simple` now enables the WAF by default: new `waf_enabled` and `waf_use_global` parameters (both default `true`), matching the security posture of the full `npg_create_proxy_host` tool and every other host in a default stack. Previously the simple tool never sent WAF fields, so new hosts silently shipped with `waf_enabled: false` while the rest of the setup ran with WAF on. Both fields are sent to the NPG API only when a value is provided; the hardcoded default `true` means callers who omit them get WAF-on with global inherit. Callers who explicitly want WAF off can pass `waf_enabled=false` (the existing `false`-flow is preserved by `_build_body` skipping only `None`, not `False`).
+
+### What's new
+- `waf_enabled` (default `true`) — toggle NPG WAF on the new host.
+- `waf_use_global` (default `true`) — inherit the global WAF settings block.
+
+### Breaking changes
+- (none) — additive, backward compatible. Only effect on existing behavior: new hosts created via the simple tool now inherit global WAF instead of shipping WAF-disabled.
+
 ## [0.5.8] - 2026-08-20
 
 ### What changed

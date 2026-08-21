@@ -718,7 +718,7 @@ async def npg_update_proxy_host(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_proxy_host_simple", description="CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme, ssl_enabled, ssl_forced, enabled, block_exploits (defaults true except forward_scheme 'http'). For WAF/cache/streaming/DDNS use npg_create_proxy_host.")
+@mcp.tool(name="npg_create_proxy_host_simple", description="CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme (default 'http'), ssl_enabled, ssl_forced, enabled, block_exploits, waf_enabled, waf_use_global (all default true). For cache/streaming/DDNS use npg_create_proxy_host.")
 async def npg_create_proxy_host_simple(
     domain_names: list[str],
     forward_host: str,
@@ -728,6 +728,8 @@ async def npg_create_proxy_host_simple(
     ssl_forced: bool = True,
     enabled: bool = True,
     block_exploits: bool = True,
+    waf_enabled: bool = True,
+    waf_use_global: bool = True,
 ) -> dict:
     try:
         _validate_required("domain_names", domain_names)
@@ -745,6 +747,8 @@ async def npg_create_proxy_host_simple(
                 "ssl_forced": "ssl_force_https",
                 "enabled": "enabled",
                 "block_exploits": "block_exploits",
+                "waf_enabled": "waf_enabled",
+                "waf_use_global": "waf_use_global",
             },
         )
 

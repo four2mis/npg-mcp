@@ -56,6 +56,8 @@ class TestCreateProxyHostSimple:
                 ssl_forced=True,
                 enabled=True,
                 block_exploits=True,
+                waf_enabled=True,
+                waf_use_global=True,
             )
         )
         assert result == {"success": True, "data": {"id": "created"}}
@@ -72,6 +74,8 @@ class TestCreateProxyHostSimple:
             "ssl_force_https": True,
             "enabled": True,
             "block_exploits": True,
+            "waf_enabled": True,
+            "waf_use_global": True,
         }
 
     def test_defaults_applied_when_omitted(self, recording):
@@ -89,6 +93,21 @@ class TestCreateProxyHostSimple:
         assert body["ssl_force_https"] is True
         assert body["enabled"] is True
         assert body["block_exploits"] is True
+        assert body["waf_enabled"] is True
+        assert body["waf_use_global"] is True
+
+    def test_waf_can_be_disabled_explicitly(self, recording):
+        _run(
+            main_mod.npg_create_proxy_host_simple(
+                domain_names=["simple-test.four2mis.com"],
+                forward_host="127.0.0.1",
+                forward_port=8080,
+                waf_enabled=False,
+            )
+        )
+        _, _, body = recording.calls[0]
+        assert body["waf_enabled"] is False
+        assert body["waf_use_global"] is True  # still defaults to True
 
     def test_validation_errors_flow_through(self):
         result = _run(
