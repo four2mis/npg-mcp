@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.11] - 2026-08-23
+
+### What changed
+- `npg_upload_restore_backup` now takes an explicit `encoding` parameter (`base64` | `raw`, default `base64`) instead of trial-decoding the payload as base64. Decoding uses `validate=True`, so invalid base64 is rejected with a clear error instead of being silently misinterpreted, and `encoding="raw"` passes the bytes through byte-for-byte — fixing restores of binary (true gzip) backup payloads that previously got mangled by ambiguous auto-detection. Verified live on the test stack: default and explicit `base64` restores succeed against a true gzip backup, raw mode is a byte-for-byte passthrough, invalid encoding values and invalid base64 are rejected explicitly.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.10] - 2026-08-23
 
 ### What changed
