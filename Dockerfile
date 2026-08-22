@@ -12,7 +12,7 @@ FROM python:3.11-slim
 RUN useradd -m -s /bin/bash appuser
 WORKDIR /app
 COPY --from=builder /wheelhouse /wheelhouse
-RUN pip install --no-cache-dir --no-index --find-links /wheelhouse "mcp>=1.0.0,<2.0.0" httpx npg-mcp
+RUN pip install --no-cache-dir --no-index --find-links /wheelhouse "mcp>=1.29.0,<2.0.0" httpx npg-mcp
 USER appuser
 ENV MCP_TRANSPORT=http
 EXPOSE 8081
