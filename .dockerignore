@@ -1,0 +1,41 @@
+# ── Secrets — never ship credentials to the build daemon ──
+.env*
+npg-mcp-config.env
+
+# ── Git ──
+.git
+.gitignore
+.github
+
+# ── Python artifacts ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
+
+# ── Tests & tooling (not needed inside the image) ──
+tests/
+scripts/
+swagger.yaml
+
+# ── Kanban pipeline working files ──
+.kanban-*
+
+# ── Hermes agent state ──
+.hermes/
+
+# ── Docs & project rules (not needed for the wheel) ──
+README.md
+README.ko.md
+CHANGELOG.md
+AGENTS.md
+tool-schemas.yaml
+docker-compose.yml
+
+# ── OS ──
+.DS_Store
+Thumbs.db
