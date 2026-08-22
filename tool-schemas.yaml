@@ -132,6 +132,10 @@ npg_test_nginx:
   description: "TEST nginx configuration validity (runs `nginx -t` in the proxy container). Diagnostic only — does NOT regenerate host configs or reload nginx. Use npg_sync_nginx to apply changes. On invalid config returns success=false with the raw `nginx -t` error output."
   parameters: []
 
+npg_validate_nginx_config:
+  description: "VALIDATE the running nginx config via a dry-run `nginx -t` — NO reload, no config changes (POST /test/nginx-config). The correct read-only check for 'is my config valid?'. Returns status=ok on valid; on invalid config returns success=false with the raw `nginx -t` error output. Use npg_sync_nginx to apply/regenerate configs first if you just edited hosts."
+  parameters: []
+
 npg_list_redirect_hosts:
   description: "List all redirect hosts."
   parameters: []

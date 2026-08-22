@@ -1019,6 +1019,16 @@ async def npg_test_nginx() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_validate_nginx_config", description="VALIDATE the running nginx config via a dry-run `nginx -t` — NO reload, no config changes (POST /test/nginx-config). The correct read-only check for 'is my config valid?'. Returns status=ok on valid; on invalid config returns success=false with the raw `nginx -t` error output. Use npg_sync_nginx to apply/regenerate configs first if you just edited hosts.")
+async def npg_validate_nginx_config() -> dict:
+    """Dry-run validate nginx config — never reloads."""
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/test/nginx-config") or {}
+        return {"success": True, "data": {"valid": True, "status": data.get("status", "ok"), "message": data.get("message")}}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": {"valid": False}}
+
 
 # ── Redirect Hosts ────────────────────────────────────────────────────
 
