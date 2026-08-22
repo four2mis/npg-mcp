@@ -1,6 +1,6 @@
 [project]
 name = "npg-mcp"
-version = "0.5.9"
+version = "0.5.10"
 description = "MCP server for NginxProxyGuard API management"
 requires-python = ">=3.11"
 dependencies = [
