@@ -164,7 +164,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **280개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **278개의 MCP 도구**를 27개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
 | 카테고리 | 도구 |
 |----------|-------|
@@ -184,14 +184,14 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **SSO 제공자(SSO Providers)** | 8 tools |
 | **대시보드(Dashboard)** | 3 tools |
 | **IP 관리(IP Management)** | 4 tools |
-| **알림 채널(Notification Channels)** | 8 tools |
+| **알림 채널(Notification Channels)** | 7 tools |
 | **리다이렉트 호스트(Redirect Hosts)** | 6 tools |
 | **액세스 목록(Access Lists)** | 5 tools |
 | **지역(Geo)** | 10 tools |
 | **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3 tools |
 | **차단 IP 및 봇(Banned IPs & Bots)** | 7 tools |
 | **역할(Roles)** | 4 tools |
-| **시스템(System)** | 12 tools |
+| **시스템(System)** | 11 tools |
 | **SSL / Nginx** | 3 tools |
 | **시스템 및 상태(System & Health)** | 1 tool |
 | **Docker** | 1 tool |
@@ -247,14 +247,14 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 ```
 npg_mcp/
-  main.py       # 280개의 모든 MCP 도구
+  main.py       # 278개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   toolsets.py   # 계층형 도구 노출(NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml
 pyproject.toml  # 의존성: mcp>=1.0, httpx>=0.27
-tool-schemas.yaml  # 280개 도구의 전체 입력 매개변수 스키마
+tool-schemas.yaml  # 278개 도구의 전체 입력 매개변수 스키마
 ```
 
 ## 라이선스

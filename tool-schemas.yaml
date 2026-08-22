@@ -129,7 +129,7 @@ npg_sync_nginx:
   parameters: []
 
 npg_test_nginx:
-  description: "Test nginx configuration for validity."
+  description: "TEST nginx configuration validity (runs `nginx -t` in the proxy container). Diagnostic only — does NOT regenerate host configs or reload nginx. Use npg_sync_nginx to apply changes. On invalid config returns success=false with the raw `nginx -t` error output."
   parameters: []
 
 npg_list_redirect_hosts:
@@ -2205,13 +2205,6 @@ npg_get_audit_log_api_tokens:
   description: "List recent API token usage across all tokens."
   parameters: []
 
-npg_get_notification_channel_deliveries:
-  description: "List recent deliveries for a notification channel. REQUIRED: channel_id."
-  parameters:
-    - name: channel_id
-      type: integer | string
-      required: true
-
 npg_set_proxy_host_favorite:
   description: "Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool)."
   parameters:
@@ -2348,10 +2341,6 @@ npg_get_health_detailed:
 
 npg_get_status:
   description: "GET component status — health of all NPG subsystems (API, database, nginx)."
-  parameters: []
-
-npg_check_npg_update:
-  description: "Check for a newer NPG release version."
   parameters: []
 
 npg_get_permission_areas:

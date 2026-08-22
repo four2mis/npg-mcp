@@ -3801,18 +3801,6 @@ async def npg_get_audit_log_api_tokens() -> dict:
         return {"success": False, "error": str(e)}
 
 
-# ── Notification Channels Extras ───────────────────────────────────────
-@mcp.tool(name="npg_get_notification_channel_deliveries", description="List recent deliveries for a notification channel. REQUIRED: channel_id.")
-async def npg_get_notification_channel_deliveries(channel_id: str | int) -> dict:
-    try:
-        _validate_id("channel_id", channel_id)
-        c = _get_client()
-        data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
 # ── Proxy Host Extras ──────────────────────────────────────────────────
 
 @mcp.tool(name="npg_set_proxy_host_favorite", description="Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool).")
@@ -4026,16 +4014,6 @@ async def npg_get_status() -> dict:
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-@mcp.tool(name="npg_check_npg_update", description="Check for a newer NPG release version.")
-async def npg_check_npg_update() -> dict:
-    c = _get_client()
-    try:
-        data = c.get("/api/v1/system-settings/update/check")
-        return {"success": True, "data": data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 
 @mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
