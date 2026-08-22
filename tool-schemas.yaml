@@ -1648,11 +1648,15 @@ npg_download_backup:
       required: true
 
 npg_upload_restore_backup:
-  description: "UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (base64 or raw bytes of the .tar.gz backup file). The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first."
+  description: "UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (.tar.gz backup file content) and encoding ('base64' or 'raw', default 'base64') telling how file_content is encoded. With encoding='raw', file_content is sent byte-for-byte as UTF-8. The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first."
   parameters:
     - name: file_content
       type: string
       required: true
+    - name: encoding
+      type: string
+      required: false
+      default: "base64"
 
 npg_get_backup_stats:
   description: "Get backup statistics."

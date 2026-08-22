@@ -2999,16 +2999,22 @@ async def npg_download_backup(backup_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (base64 or raw bytes of the .tar.gz backup file). The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first.")
-async def npg_upload_restore_backup(file_content: str) -> dict:
+@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (.tar.gz backup file content) and encoding ('base64' or 'raw', default 'base64') telling how file_content is encoded. With encoding='raw', file_content is sent byte-for-byte as UTF-8. The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first.")
+async def npg_upload_restore_backup(file_content: str, encoding: str = "base64") -> dict:
     try:
         _validate_required("file_content", file_content)
+        if encoding not in ("base64", "raw"):
+            return {"success": False, "error": f"Invalid encoding '{encoding}': must be 'base64' or 'raw'"}
         c = _get_client()
         import base64
-        # Try base64 decode first; if it fails, treat as raw bytes
-        try:
-            raw = base64.b64decode(file_content)
-        except Exception:
+        # Explicit encoding — no trial decode. base64.b64decode accepts most
+        # byte sequences, so trial-decoding raw backups silently corrupts them.
+        if encoding == "base64":
+            try:
+                raw = base64.b64decode(file_content, validate=True)
+            except Exception as e:
+                return {"success": False, "error": f"file_content is not valid base64 (encoding='base64'): {e}"}
+        else:
             raw = file_content.encode("utf-8")
         data = c.post_file("/api/v1/backups/upload-restore", "backup", raw, "restore.tar.gz")
         return {"success": True, "data": data}
