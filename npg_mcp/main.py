@@ -1009,13 +1009,13 @@ async def npg_sync_nginx() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_nginx", description="Test nginx configuration for validity.")
+@mcp.tool(name="npg_test_nginx", description="TEST nginx configuration validity (runs `nginx -t` in the proxy container). Diagnostic only — does NOT regenerate host configs or reload nginx. Use npg_sync_nginx to apply changes. On invalid config returns success=false with the raw `nginx -t` error output.")
 async def npg_test_nginx() -> dict:
-    """Test nginx configuration for validity."""
+    """Validate the running nginx configuration without reloading."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/proxy-hosts/sync") or {}
-        return {"success": True, "data": {"test_success": data.get("test_success", True), "reload_success": data.get("reload_success", True)}}
+        data = c.post("/api/v1/test/nginx-config") or {}
+        return {"success": True, "data": {"status": data.get("status", "ok"), "message": data.get("message")}}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
