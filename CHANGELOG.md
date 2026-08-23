@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.14] - 2026-08-24
+
+### What changed
+- `npg_get_proxy_host_full` now accepts an optional `sections` filter so agents can fetch only the per-host sub-configs they actually need (e.g. just `waf` + `rate_limit`) instead of every sub-resource GET on each call. Entries are validated (unknown names raise a clear error listing valid values) and de-duplicated preserving order; failed sections are reported individually instead of failing the whole call. Verified end-to-end on the isolated test stack against a HEAD-pinned local build: 16/16 live MCP checks including zero-arg, filtered, dedupe, invalid-section, and failed-section behavior plus a 4-tool regression sample; 175 pytest pass; docs in sync.
+- Added `npg_enable_waf_rule` to complete the enable/disable pair for per-host WAF rules — enabling is a `DELETE /waf/hosts/{id}/rules/{rid}/disable` (removing the exclusion), mirroring the existing global-rule tool. Enabling a rule that was never disabled surfaces upstream HTTP 500, which the tool description documents.
+
+### What's new
+- `npg_get_proxy_host_full(sections=[...])` optional filter parameter (tool count 285 → 286 with npg_enable_waf_rule).
+- `npg_enable_waf_rule` — re-enable a per-host disabled WAF rule via DELETE /waf/hosts/{id}/rules/{rid}/disable.
+
+### Breaking changes
+- (none)
+
 ## [0.5.13] - 2026-08-23
 
 ### What changed
