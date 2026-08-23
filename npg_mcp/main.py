@@ -2171,6 +2171,17 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_enable_waf_rule", description="RE-ENABLE a per-host WAF rule that was disabled with npg_disable_waf_rule — issues DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable (enable = removing the disable exclusion). REQUIRED: host_id, rule_id (real id from npg_list_waf_rules). Enabling a rule that was never disabled returns an upstream HTTP 500 error — check current state with npg_get_waf_host_config first.")
+async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        _validate_id("rule_id", rule_id)
+        c = _get_client()
+        data = c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # ── Logs ──────────────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set.")
