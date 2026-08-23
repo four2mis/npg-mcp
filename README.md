@@ -217,6 +217,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
 | `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (130 read-only tools), `standard` (236 tools, no destructive ops), `full` (all 284 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 
 ### Container Logs
 

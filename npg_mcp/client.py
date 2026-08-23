@@ -38,6 +38,49 @@ _MAX_RETRIES = 2
 _RETRY_BASE_DELAY = 0.5
 
 
+# ── Dry-run mode ──────────────────────────────────────────────────────
+# When NPG_DRY_RUN is set to a truthy value, every mutating call (POST/PUT/
+# DELETE/file upload) is intercepted BEFORE it reaches the network: the exact
+# request that WOULD have been sent (method, path, JSON body, query params,
+# multipart file metadata) is returned as a structured payload and nothing is
+# executed. This makes first deployment against a live instance safe by
+# construction — run the server with NPG_DRY_RUN=1, exercise the tools, and
+# inspect the payloads before switching it off.
+#
+# Read once at process start so the mode cannot change mid-run. Truthy values
+# are the same set as Python's bool() on the stripped string (except literal
+# "0"/"false"/"no" which read as False for shell ergonomics).
+_DRY_RUN: bool = os.environ.get("NPG_DRY_RUN", "").strip().lower() not in (
+    "", "0", "false", "no",
+)
+
+# Marker key carried in every dry-run payload so clients can detect the mode
+# without pattern-matching on tool names.
+DRY_RUN_KEY = "dry_run"
+
+
+def dry_run_enabled() -> bool:
+    """Return True when NPG_DRY_RUN is enabled for this process."""
+    return _DRY_RUN
+
+
+def _dry_run_payload(method: str, path: str, body=None, params=None) -> dict:
+    """Build the structured payload returned instead of a real mutation.
+
+    Body and query params are passed through exactly as the tool built them
+    (including ``None`` when the call had no body), so a caller can inspect
+    the precise request that WOULD have been sent. PII-sensitive bodies
+    (file uploads) are summarized rather than echoed: only the multipart
+    field name, file name, and byte size are reported, never the bytes.
+    """
+    payload: dict = {DRY_RUN_KEY: True, "method": method, "path": path}
+    if body is not None:
+        payload["body"] = body
+    if params:
+        payload["params"] = params
+    return payload
+
+
 def set_token(token: str) -> None:
     """Set the token for the *current* request context (not process-wide)."""
     _request_token.set(token)
@@ -284,6 +327,8 @@ class NPGClient:
     def post(
         self, path: str, body: dict | None = None, params: dict | None = None
     ) -> dict | None:
+        if _DRY_RUN:
+            return _dry_run_payload("POST", path, body, params)
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -303,6 +348,8 @@ class NPGClient:
     def put(
         self, path: str, body: dict | None = None, params: dict | None = None
     ) -> dict | None:
+        if _DRY_RUN:
+            return _dry_run_payload("PUT", path, body, params)
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -320,6 +367,8 @@ class NPGClient:
             raise self._log_err("PUT", path, e, start) from e
 
     def delete(self, path: str, params: dict | None = None) -> dict | None:
+        if _DRY_RUN:
+            return _dry_run_payload("DELETE", path, None, params)
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -344,6 +393,16 @@ class NPGClient:
     ) -> dict | None:
         """POST a multipart file upload (for backup restore, certificate
         upload, etc.)."""
+        if _DRY_RUN:
+            payload = _dry_run_payload("POST", path, None, None)
+            payload["multipart"] = {
+                "field": file_field,
+                "filename": filename,
+                "size_bytes": len(file_content),
+            }
+            if extra_fields:
+                payload["multipart"]["extra_fields"] = extra_fields
+            return payload
         start = time.perf_counter()
         try:
             url = urljoin(self.base_url + "/", path.lstrip("/"))

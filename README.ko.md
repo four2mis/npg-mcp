@@ -217,6 +217,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | `MCP_TRANSPORT` | `http` | 전송 모드: 네트워크 배포는 `http`, 직접 파이프는 `stdio`. Docker 이미지 기본값 `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
 | `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 129개), `standard`(파괴적 작업 제외 233개), `full`(전체 280개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가집니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
+| `NPG_DRY_RUN` | `off` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 
 ### 컨테이너 로그
 

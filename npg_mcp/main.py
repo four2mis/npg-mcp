@@ -280,7 +280,12 @@ def _load_transport_security() -> transport_security.TransportSecuritySettings:
 
 mcp = FastMCP(
     name="npg-mcp",
-    instructions="Manage NginxProxyGuard reverse proxy hosts, certificates, and nginx configuration.",
+    instructions=(
+        "Manage NginxProxyGuard reverse proxy hosts, certificates, and nginx configuration. "
+        "When the server runs with NPG_DRY_RUN=1, mutating tools return the exact request "
+        "they WOULD send ({\"dry_run\": true, \"method\", \"path\", \"body\", ...}) instead of "
+        "executing — no changes are applied."
+    ),
     stateless_http=True,
     host=os.environ.get("MCP_HOST", "0.0.0.0"),
     port=int(os.environ.get("MCP_PORT", "8081")),
@@ -318,6 +323,22 @@ def _get_client() -> client_mod.NPGClient:
 def _id_path(id_val) -> str:
     """Convert an ID (int or str) to a string for URL path interpolation."""
     return str(id_val)
+
+
+def _mutate_result(data, message: str | None = None) -> dict:
+    """Normalize a mutating tool's result shape.
+
+    Normal mode: returns ``message`` when given (deletes, bare sync calls —
+    matching the pre-feature shape), otherwise the API's ``data``.
+    Dry-run mode (NPG_DRY_RUN=1): the client returns a structured payload
+    instead of executing; surface it as ``data`` so callers can inspect the
+    exact request that WOULD have been sent.
+    """
+    if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
+        return {"success": True, "data": data}
+    if message is not None:
+        return {"success": True, "message": message}
+    return {"success": True, "data": data}
 
 
 # Local-variable names that must never leak into an API request body.
@@ -826,8 +847,8 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
-        return {"success": True, "message": f"Proxy host {_id_path(host_id)} deleted"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+        return _mutate_result(data, f"Proxy host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -916,9 +937,11 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
-                c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+                data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
                 entry["success"] = True
                 entry["result"] = {"deleted": True}
+                if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
+                    entry["result"] = {"deleted": True, "dry_run": data}
             except Exception as e:
                 entry["success"] = False
                 entry["error"] = str(e)
@@ -976,8 +999,8 @@ async def npg_delete_certificate(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        c.delete(f"/api/v1/certificates/{_id_path(cert_id)}")
-        return {"success": True, "message": f"Certificate {_id_path(cert_id)} deleted"}
+        data = c.delete(f"/api/v1/certificates/{_id_path(cert_id)}")
+        return _mutate_result(data, f"Certificate {_id_path(cert_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1025,8 +1048,8 @@ async def npg_reload_nginx() -> dict:
     """Reload nginx configuration."""
     c = _get_client()
     try:
-        c.post("/api/v1/proxy-hosts/sync")
-        return {"success": True, "message": "Nginx reloaded"}
+        data = c.post("/api/v1/proxy-hosts/sync")
+        return _mutate_result(data, "Nginx reloaded")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1046,6 +1069,8 @@ async def npg_test_nginx() -> dict:
     c = _get_client()
     try:
         data = c.post("/api/v1/test/nginx-config") or {}
+        if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
+            return _mutate_result(data)
         return {"success": True, "data": {"status": data.get("status", "ok"), "message": data.get("message")}}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1056,6 +1081,8 @@ async def npg_validate_nginx_config() -> dict:
     c = _get_client()
     try:
         data = c.post("/api/v1/test/nginx-config") or {}
+        if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
+            return _mutate_result(data)
         return {"success": True, "data": {"valid": True, "status": data.get("status", "ok"), "message": data.get("message")}}
     except Exception as e:
         return {"success": False, "error": str(e), "data": {"valid": False}}
@@ -1141,8 +1168,8 @@ async def npg_delete_redirect_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
-        return {"success": True, "message": f"Redirect host {_id_path(host_id)} deleted"}
+        data = c.delete(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
+        return _mutate_result(data, f"Redirect host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1452,8 +1479,8 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
     try:
         _validate_id("list_id", list_id)
         c = _get_client()
-        c.delete(f"/api/v1/access-lists/{_id_path(list_id)}")
-        return {"success": True, "message": f"Access list {_id_path(list_id)} deleted"}
+        data = c.delete(f"/api/v1/access-lists/{_id_path(list_id)}")
+        return _mutate_result(data, f"Access list {_id_path(list_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1510,8 +1537,8 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        c.delete(f"/api/v1/dns-providers/{_id_path(provider_id)}")
-        return {"success": True, "message": f"DNS provider {_id_path(provider_id)} deleted"}
+        data = c.delete(f"/api/v1/dns-providers/{_id_path(provider_id)}")
+        return _mutate_result(data, f"DNS provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1581,8 +1608,8 @@ async def npg_delete_cloud_provider(slug: str) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        c.delete(f"/api/v1/cloud-providers/{slug}")
-        return {"success": True, "message": f"Cloud provider {slug} deleted"}
+        data = c.delete(f"/api/v1/cloud-providers/{slug}")
+        return _mutate_result(data, f"Cloud provider {slug} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1696,8 +1723,8 @@ async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
-        return {"success": True, "message": f"Geo restriction for host {_id_path(host_id)} deleted"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
+        return _mutate_result(data, f"Geo restriction for host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1775,8 +1802,8 @@ async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
-        return {"success": True, "message": f"Challenge configuration for host {_id_path(host_id)} deleted"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
+        return _mutate_result(data, f"Challenge configuration for host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1819,8 +1846,8 @@ async def npg_unban_ip(ip_id: str | int) -> dict:
     try:
         _validate_id("ip_id", ip_id)
         c = _get_client()
-        c.delete(f"/api/v1/banned-ips/{_id_path(ip_id)}")
-        return {"success": True, "message": f"IP ban {_id_path(ip_id)} removed"}
+        data = c.delete(f"/api/v1/banned-ips/{_id_path(ip_id)}")
+        return _mutate_result(data, f"IP ban {_id_path(ip_id)} removed")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1829,8 +1856,8 @@ async def npg_unban_ip_by_address(ip: str) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
-        c.delete("/api/v1/banned-ips", params={"ip": ip})
-        return {"success": True, "message": f"IP {ip} unbanned"}
+        data = c.delete("/api/v1/banned-ips", params={"ip": ip})
+        return _mutate_result(data, f"IP {ip} unbanned")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1920,8 +1947,8 @@ async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
-        return {"success": True, "message": f"Exploit rule {_id_path(rule_id)} deleted"}
+        data = c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
+        return _mutate_result(data, f"Exploit rule {_id_path(rule_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2102,8 +2129,8 @@ async def npg_delete_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        c.delete(f"/api/v1/backups/{_id_path(backup_id)}")
-        return {"success": True, "message": f"Backup {_id_path(backup_id)} deleted"}
+        data = c.delete(f"/api/v1/backups/{_id_path(backup_id)}")
+        return _mutate_result(data, f"Backup {_id_path(backup_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2176,8 +2203,8 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        c.delete(f"/api/v1/api-tokens/{_id_path(token_id)}")
-        return {"success": True, "message": f"API token {_id_path(token_id)} deleted"}
+        data = c.delete(f"/api/v1/api-tokens/{_id_path(token_id)}")
+        return _mutate_result(data, f"API token {_id_path(token_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2260,8 +2287,8 @@ async def npg_delete_notification_channel(channel_id: str | int) -> dict:
     try:
         _validate_id("channel_id", channel_id)
         c = _get_client()
-        c.delete(f"/api/v1/notification-channels/{_id_path(channel_id)}")
-        return {"success": True, "message": f"Notification channel {_id_path(channel_id)} deleted"}
+        data = c.delete(f"/api/v1/notification-channels/{_id_path(channel_id)}")
+        return _mutate_result(data, f"Notification channel {_id_path(channel_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2360,8 +2387,8 @@ async def npg_delete_user(user_id: str | int) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
-        c.delete(f"/api/v1/users/{_id_path(user_id)}")
-        return {"success": True, "message": f"User {_id_path(user_id)} deleted"}
+        data = c.delete(f"/api/v1/users/{_id_path(user_id)}")
+        return _mutate_result(data, f"User {_id_path(user_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2407,8 +2434,8 @@ async def npg_delete_role(role_id: str | int) -> dict:
     try:
         _validate_id("role_id", role_id)
         c = _get_client()
-        c.delete(f"/api/v1/roles/{_id_path(role_id)}")
-        return {"success": True, "message": f"Role {_id_path(role_id)} deleted"}
+        data = c.delete(f"/api/v1/roles/{_id_path(role_id)}")
+        return _mutate_result(data, f"Role {_id_path(role_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2497,8 +2524,8 @@ async def npg_delete_sso_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        c.delete(f"/api/v1/sso-providers/{_id_path(provider_id)}")
-        return {"success": True, "message": f"SSO provider {_id_path(provider_id)} deleted"}
+        data = c.delete(f"/api/v1/sso-providers/{_id_path(provider_id)}")
+        return _mutate_result(data, f"SSO provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2564,8 +2591,8 @@ async def npg_delete_log_file(filename: str) -> dict:
         _validate_required("filename", filename)
         c = _get_client()
         encoded = quote(filename, safe="")
-        c.delete(f"/api/v1/system-settings/log-files/{encoded}")
-        return {"success": True, "message": f"Log file {filename} deleted"}
+        data = c.delete(f"/api/v1/system-settings/log-files/{encoded}")
+        return _mutate_result(data, f"Log file {filename} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2680,8 +2707,8 @@ async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
-        return {"success": True, "message": f"Global URI block rule {_id_path(rule_id)} deleted"}
+        data = c.delete(f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
+        return _mutate_result(data, f"Global URI block rule {_id_path(rule_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3219,8 +3246,8 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        c.delete(f"/api/v1/auth-providers/{_id_path(provider_id)}")
-        return {"success": True, "message": f"Auth provider {_id_path(provider_id)} deleted"}
+        data = c.delete(f"/api/v1/auth-providers/{_id_path(provider_id)}")
+        return _mutate_result(data, f"Auth provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3284,8 +3311,8 @@ async def npg_delete_ddns_record(record_id: str | int) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
-        c.delete(f"/api/v1/ddns-records/{_id_path(record_id)}")
-        return {"success": True, "message": f"DDNS record {_id_path(record_id)} deleted"}
+        data = c.delete(f"/api/v1/ddns-records/{_id_path(record_id)}")
+        return _mutate_result(data, f"DDNS record {_id_path(record_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3384,8 +3411,8 @@ async def npg_delete_filter_subscription(subscription_id: str | int) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
-        return {"success": True, "message": f"Filter subscription {_id_path(subscription_id)} deleted"}
+        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
+        return _mutate_result(data, f"Filter subscription {_id_path(subscription_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3426,8 +3453,8 @@ async def npg_remove_filter_subscription_exclusion(subscription_id: str | int, h
         _validate_id("subscription_id", subscription_id)
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
-        return {"success": True, "message": f"Exclusion removed for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
+        return _mutate_result(data, f"Exclusion removed for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3458,8 +3485,8 @@ async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | 
         _validate_id("subscription_id", subscription_id)
         _validate_required("entry_value", entry_value)
         c = _get_client()
-        c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
-        return {"success": True, "message": f"Entry exclusion removed: {entry_value}"}
+        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
+        return _mutate_result(data, f"Entry exclusion removed: {entry_value}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3502,8 +3529,8 @@ async def npg_remove_exploit_rule_exclusion_from_host(host_id: str | int, rule_i
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
-        return {"success": True, "message": f"Rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
+        return _mutate_result(data, f"Rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3522,8 +3549,8 @@ async def npg_remove_exploit_rule_global_exclusion(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
-        return {"success": True, "message": f"Rule {_id_path(rule_id)} re-enabled globally"}
+        data = c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
+        return _mutate_result(data, f"Rule {_id_path(rule_id)} re-enabled globally")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3534,8 +3561,8 @@ async def npg_remove_exploit_rule_global_exclusion(rule_id: str | int) -> dict:
 async def npg_delete_certificate_errors() -> dict:
     c = _get_client()
     try:
-        c.delete("/api/v1/certificates/errors")
-        return {"success": True, "message": "All error certificates deleted"}
+        data = c.delete("/api/v1/certificates/errors")
+        return _mutate_result(data, "All error certificates deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3544,8 +3571,8 @@ async def npg_clear_certificate_error(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        c.delete(f"/api/v1/certificates/{_id_path(cert_id)}/error")
-        return {"success": True, "message": f"Certificate {_id_path(cert_id)} error cleared"}
+        data = c.delete(f"/api/v1/certificates/{_id_path(cert_id)}/error")
+        return _mutate_result(data, f"Certificate {_id_path(cert_id)} error cleared")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3757,8 +3784,8 @@ async def npg_delete_log_filter_preset(preset_id: str | int) -> dict:
     try:
         _validate_id("preset_id", preset_id)
         c = _get_client()
-        c.delete(f"/api/v1/log-filter-presets/{_id_path(preset_id)}")
-        return {"success": True, "message": f"Log filter preset {_id_path(preset_id)} deleted"}
+        data = c.delete(f"/api/v1/log-filter-presets/{_id_path(preset_id)}")
+        return _mutate_result(data, f"Log filter preset {_id_path(preset_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3878,8 +3905,8 @@ async def npg_delete_proxy_host_rate_limit(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
-        return {"success": True, "message": f"Rate limit deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
+        return _mutate_result(data, f"Rate limit deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3888,8 +3915,8 @@ async def npg_delete_proxy_host_bot_filter(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
-        return {"success": True, "message": f"Bot filter deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
+        return _mutate_result(data, f"Bot filter deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3898,8 +3925,8 @@ async def npg_delete_proxy_host_security_headers(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
-        return {"success": True, "message": f"Security headers deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
+        return _mutate_result(data, f"Security headers deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3908,8 +3935,8 @@ async def npg_delete_proxy_host_upstream(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
-        return {"success": True, "message": f"Upstream config deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
+        return _mutate_result(data, f"Upstream config deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3918,8 +3945,8 @@ async def npg_delete_proxy_host_uri_block(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
-        return {"success": True, "message": f"URI block deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
+        return _mutate_result(data, f"URI block deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3928,8 +3955,8 @@ async def npg_delete_proxy_host_fail2ban(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
-        return {"success": True, "message": f"Fail2ban config deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
+        return _mutate_result(data, f"Fail2ban config deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -4005,8 +4032,8 @@ async def npg_delete_proxy_host_uri_block_rule(host_id: str | int, rule_id: str 
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules/{_id_path(rule_id)}")
-        return {"success": True, "message": f"URI block rule {_id_path(rule_id)} deleted for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules/{_id_path(rule_id)}")
+        return _mutate_result(data, f"URI block rule {_id_path(rule_id)} deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -4153,8 +4180,8 @@ async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
-        return {"success": True, "message": f"WAF rule {_id_path(rule_id)} re-enabled globally"}
+        data = c.delete(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
+        return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled globally")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -4185,8 +4212,8 @@ async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) ->
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
-        return {"success": True, "message": f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}"}
+        data = c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -4276,8 +4303,8 @@ async def npg_set_user_email(user_id: str | int, email: str) -> dict:
         _validate_id("user_id", user_id)
         _validate_required("email", email)
         c = _get_client()
-        c.put(f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
-        return {"success": True, "message": f"Email updated for user {_id_path(user_id)}"}
+        data = c.put(f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
+        return _mutate_result(data, f"Email updated for user {_id_path(user_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
 
