@@ -4296,6 +4296,16 @@ async def npg_check_dashboard_queries() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_check_log_canary", description="TEST the log pipeline end-to-end (POST /health/canary): forces one synchronous canary run — writes a /__npg_canary request through nginx and waits for the log row to land. Bounded to 20 seconds. Returns ok=true when the row landed (pipeline healthy), ok=false when broken, HTTP 503 when the canary feature is disabled in settings. Use when access logs stop appearing or the log collector looks stuck; for component health use npg_get_status, for DB/nginx checks use npg_system_self_check.")
+async def npg_check_log_canary() -> dict:
+    """Force one synchronous log-pipeline canary run upstream."""
+    c = _get_client()
+    try:
+        data = c.post("/api/v1/health/canary", {}) or {}
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
     c = _get_client()
