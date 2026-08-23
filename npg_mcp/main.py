@@ -4041,6 +4041,16 @@ async def npg_system_self_check() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_check_backup_restore", description="TEST the backup create/list/delete round-trip (GET /test/backup-restore): upstream creates a throwaway backup row (backup_type='test'), lists it, and deletes it again. NO archive is written and NOTHING is restored — safe to run anytime. Returns test name, status=passed/failed, and a details map. Use when backup creation or deletion seems broken; for full backups use npg_create_backup / npg_list_backups.")
+async def npg_check_backup_restore() -> dict:
+    """Run the upstream backup create/list/delete round-trip self-test."""
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/test/backup-restore") or {}
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
     c = _get_client()

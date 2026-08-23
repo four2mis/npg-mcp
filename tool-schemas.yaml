@@ -2355,6 +2355,10 @@ npg_system_self_check:
   description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies the database, runs `nginx -t` in the proxy container, and checks the backup directory (created if missing). Returns status=healthy or degraded (degraded ONLY when the nginx component fails), checked_at timestamp, and a per-component map (database, nginx with error detail, backup_storage with path). Best single first diagnostic for 'what's wrong with NPG?' — use npg_validate_nginx_config for nginx-only detail."
   parameters: []
 
+npg_check_backup_restore:
+  description: "TEST the backup create/list/delete round-trip (GET /test/backup-restore): upstream creates a throwaway backup row (backup_type='test'), lists it, and deletes it again. NO archive is written and NOTHING is restored — safe to run anytime. Returns test name, status=passed/failed, and a details map. Use when backup creation or deletion seems broken; for full backups use npg_create_backup / npg_list_backups."
+  parameters: []
+
 npg_get_permission_areas:
   description: "Get the permission area/verb matrix — all available permission scopes."
   parameters: []
