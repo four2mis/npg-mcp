@@ -4051,6 +4051,16 @@ async def npg_check_backup_restore() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query and reports per-query status/timings — read-only diagnostics, safe to run anytime. Returns test name, status=passed/failed, and a per-query results map. Use when the dashboard/charts load slowly or return errors; for component health use npg_get_status or npg_system_self_check.")
+async def npg_check_dashboard_queries() -> dict:
+    """Run the upstream dashboard aggregation-query self-test."""
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/test/dashboard/queries") or {}
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
     c = _get_client()
