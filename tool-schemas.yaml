@@ -2351,6 +2351,10 @@ npg_get_status:
   description: "GET component status — health of all NPG subsystems (API, database, nginx)."
   parameters: []
 
+npg_system_self_check:
+  description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies the database, runs `nginx -t` in the proxy container, and checks the backup directory (created if missing). Returns status=healthy or degraded (degraded ONLY when the nginx component fails), checked_at timestamp, and a per-component map (database, nginx with error detail, backup_storage with path). Best single first diagnostic for 'what's wrong with NPG?' — use npg_validate_nginx_config for nginx-only detail."
+  parameters: []
+
 npg_get_permission_areas:
   description: "Get the permission area/verb matrix — all available permission scopes."
   parameters: []

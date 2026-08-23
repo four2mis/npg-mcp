@@ -4031,6 +4031,16 @@ async def npg_get_status() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies the database, runs `nginx -t` in the proxy container, and checks the backup directory (created if missing). Returns status=healthy or degraded (degraded ONLY when the nginx component fails), checked_at timestamp, and a per-component map (database, nginx with error detail, backup_storage with path). Best single first diagnostic for 'what's wrong with NPG?' — use npg_validate_nginx_config for nginx-only detail.")
+async def npg_system_self_check() -> dict:
+    """Run the upstream system self-check (DB + nginx -t + backup dir)."""
+    c = _get_client()
+    try:
+        data = c.get("/api/v1/test/system/self-check") or {}
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
 async def npg_get_permission_areas() -> dict:
     c = _get_client()
