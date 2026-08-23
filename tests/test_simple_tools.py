@@ -166,3 +166,88 @@ class TestUpdateProxyHostSimple:
         result = _run(main_mod.npg_update_proxy_host_simple(host_id=""))
         assert result["success"] is False
         assert "host_id is required" in result["error"]
+
+
+class _GetRecordingClient:
+    """Fake NPGClient that records every GET and returns a stub payload."""
+
+    def __init__(self):
+        self.calls = []
+
+    def get(self, path, params=None):
+        self.calls.append(("GET", path))
+        return {"stub": path}
+
+
+class TestGetProxyHostFullSections:
+    def _client(self, monkeypatch):
+        client = _GetRecordingClient()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        return client
+
+    def test_no_filter_fetches_all_11_sections(self, monkeypatch):
+        client = self._client(monkeypatch)
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123"))
+        assert result["success"] is True
+        assert result["sections_failed"] == []
+        assert set(result["data"]) == {
+            "host", "rate_limit", "bot_filter", "security_headers", "upstream",
+            "geo", "challenge", "fail2ban", "cloud_blocking", "waf", "uri_block",
+        }
+        assert len(client.calls) == 11
+        assert client.calls[0] == ("GET", "/api/v1/proxy-hosts/abc-123")
+        assert ("GET", "/api/v1/waf/hosts/abc-123/config") in client.calls
+
+    def test_sections_filter_only_fetches_selected(self, monkeypatch):
+        client = self._client(monkeypatch)
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123", sections=["geo", "fail2ban"]))
+        assert result["success"] is True
+        assert result["sections_failed"] == []
+        assert set(result["data"]) == {"geo", "fail2ban"}
+        assert len(client.calls) == 2
+        assert client.calls == [
+            ("GET", "/api/v1/proxy-hosts/abc-123/geo"),
+            ("GET", "/api/v1/proxy-hosts/abc-123/fail2ban"),
+        ]
+
+    def test_invalid_section_lists_valid_names(self, monkeypatch):
+        self._client(monkeypatch)
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123", sections=["bogus"]))
+        assert result["success"] is False
+        assert "bogus" in result["error"]
+        for name in ["host", "geo", "fail2ban", "uri_block"]:
+            assert name in result["error"]
+
+    def test_duplicates_are_deduped_preserving_order(self, monkeypatch):
+        client = self._client(monkeypatch)
+        result = _run(
+            main_mod.npg_get_proxy_host_full("abc-123", sections=["waf", "geo", "waf"])
+        )
+        assert result["success"] is True
+        assert set(result["data"]) == {"waf", "geo"}
+        assert len(client.calls) == 2
+        assert client.calls == [
+            ("GET", "/api/v1/waf/hosts/abc-123/config"),
+            ("GET", "/api/v1/proxy-hosts/abc-123/geo"),
+        ]
+
+    def test_section_failure_recorded_not_raised(self, monkeypatch):
+        class _FailingGeo(_GetRecordingClient):
+            def get(self, path, params=None):
+                if path.endswith("/geo"):
+                    raise RuntimeError("NPG API returned HTTP 404")
+                return super().get(path, params=params)
+
+        client = _FailingGeo()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123", sections=["host", "geo"]))
+        assert result["success"] is True
+        assert result["sections_failed"] == ["geo"]
+        assert result["data"]["geo"]["success"] is False
+        assert result["data"]["host"]["success"] is True
+
+    def test_int_host_id_coerced_to_str(self, monkeypatch):
+        client = self._client(monkeypatch)
+        result = _run(main_mod.npg_get_proxy_host_full(42, sections=["host"]))
+        assert result["success"] is True
+        assert client.calls == [("GET", "/api/v1/proxy-hosts/42")]
