@@ -4051,6 +4051,16 @@ async def npg_check_backup_restore() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_get_metrics", description="GET Prometheus metrics (GET /metrics): returns the raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics (log-collector buffer/fallback/watchdog counters and more). Unauthenticated endpoint served at the origin root (outside /api/v1); intended for internal scraping, safe read-only. Use for capacity/performance monitoring or when an external Prometheus scrape target needs to be understood; for health status use npg_get_status or npg_get_health_detailed.")
+async def npg_get_metrics() -> dict:
+    """Fetch the upstream Prometheus metrics exposition text."""
+    c = _get_client()
+    try:
+        data = c.get_text("/metrics")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query and reports per-query status/timings — read-only diagnostics, safe to run anytime. Returns test name, status=passed/failed, and a per-query results map. Use when the dashboard/charts load slowly or return errors; for component health use npg_get_status or npg_system_self_check.")
 async def npg_check_dashboard_queries() -> dict:
     """Run the upstream dashboard aggregation-query self-test."""

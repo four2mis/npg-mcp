@@ -164,7 +164,7 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 ## Tools Reference
 
-This server exposes **282 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **283 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
@@ -191,7 +191,7 @@ This server exposes **282 MCP tools** across 27 categories. Tool names, descript
 | **Fail2ban & Challenge** | 3 tools |
 | **Banned IPs & Bots** | 7 tools |
 | **Roles** | 4 tools |
-| **System** | 14 tools |
+| **System** | 15 tools |
 | **SSL / Nginx** | 4 tools |
 | **System & Health** | 1 tool |
 | **Docker** | 1 tool |
@@ -216,7 +216,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
-| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (129 read-only tools), `standard` (233 tools, no destructive ops), `full` (all 282 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (130 read-only tools), `standard` (236 tools, no destructive ops), `full` (all 283 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 
 ### Container Logs
 
@@ -237,24 +237,24 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 
 | Level | Tools | Scope |
 |-------|-------|-------|
-| `read` | 129 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
-| `standard` | 230 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
-| `full` | 276 | All tools. Default; behavior without the variable is unchanged. |
+| `read` | 130 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
+| `standard` | 236 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
+| `full` | 283 | All tools. Default; behavior without the variable is unchanged. |
 
-Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 276-tool reference regardless of the selected level.
+Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 283-tool reference regardless of the selected level.
 
 ## Project Structure
 
 ```
 npg_mcp/
-  main.py       # All 282 MCP tools
+  main.py       # All 283 MCP tools
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Layered toolset exposure (NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
 pyproject.toml  # Dependencies: mcp>=1.0, httpx>=0.27
-tool-schemas.yaml  # Full input parameter schemas for all 282 tools
+tool-schemas.yaml  # Full input parameter schemas for all 283 tools
 ```
 
 ## License
