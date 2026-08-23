@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.12] - 2026-08-23
+
+### What changed
+- Four new read-only self-test tools wrap the upstream NPG v2.46.0 `test/*` endpoints, letting an MCP agent run the same health diagnostics the NPG UI exposes without raw HTTP access. All four are GET-style/read-only (the backup round-trip test creates and deletes only a throwaway row; the nginx-config test is a dry-run `nginx -t` with no reload). Each tool's description documents its side-effect profile and next-step tools. Verified on the isolated test stack: live positive paths pass, regression tools pass, pytest suite green, docs regenerated in sync.
+
+### What's new
+- `npg_validate_nginx_config` — POST /api/v1/test/nginx-config dry-run `nginx -t`; validates config validity with NO reload.
+- `npg_system_self_check` — GET /api/v1/test/system/self-check one-shot diagnostic (DB + nginx -t + backup dir).
+- `npg_check_backup_restore` — GET /api/v1/test/backup-restore backup create/list/delete round-trip self-test (throwaway row only, no archive/restore).
+- `npg_check_dashboard_queries` — GET /api/v1/test/dashboard/queries dashboard aggregation-query self-test. Tool count 278 → 282.
+
+### Breaking changes
+- (none)
+
 ## [0.5.11] - 2026-08-23
 
 ### What changed
