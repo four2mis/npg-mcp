@@ -16,6 +16,13 @@ npg_get_proxy_host_by_domain:
       type: string
       required: true
 
+npg_get_proxy_host_full:
+  description: "GET the COMPLETE configuration of one proxy host in a single call — composes 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking (blocked-cloud-providers), waf (/waf/hosts/{id}/config), uri_block. REQUIRED: host_id. Returns {data: {<section>: {success, data|error}}, sections_failed: [...]}; a section that fails (e.g. 404 because geo/challenge was never created) appears in data with success:false + error and is listed in sections_failed instead of failing the whole call."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
 npg_create_proxy_host:
   description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
   parameters: []
