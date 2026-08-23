@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.13] - 2026-08-23
+
+### What changed
+- New `npg_bulk_import_proxy_hosts` tool creates many proxy hosts from one CSV payload in a single call: per-row failure isolation (one bad row doesn't abort the batch), strict header validation before any API call, 50-row cap, and per-row result entries with created/failed summary. Boolean columns accept true/false/1/0/yes/no/on/off (typos fail only their row); empty optional cells inherit global defaults; `skip_nginx=true` (default) leaves nginx unsynced until an explicit `npg_sync_nginx` call. Verified on the isolated test stack against a local build pinned to the workspace commit: 8/8 E2E checks (CSV create, per-row failure isolation, header validation, 50-row limit), 8/8 unrelated-tool regression sample, 169 pytest pass, docs in sync.
+
+### What's new
+- `npg_bulk_import_proxy_hosts` — bulk-create proxy hosts from CSV text (tool count 284 → 285).
+
+### Breaking changes
+- (none)
+
 ## [0.5.12] - 2026-08-23
 
 ### What changed
