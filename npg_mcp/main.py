@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import hmac
+import io
 import json
 import logging
 import os
@@ -947,6 +949,171 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
                 entry["error"] = str(e)
             results.append(entry)
         return {"success": True, "data": results}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# Columns accepted by npg_bulk_import_proxy_hosts beyond the required three.
+# Keys are CSV column names; values are the kwargs of npg_create_proxy_host
+# they map to (identity mapping kept explicit so renames are caught here).
+_BULK_IMPORT_OPTIONAL_COLUMNS: dict[str, str] = {
+    "forward_scheme": "forward_scheme",
+    "ssl_enabled": "ssl_enabled",
+    "ssl_forced": "ssl_forced",
+    "ssl_http2": "ssl_http2",
+    "ssl_http3": "ssl_http3",
+    "ssl_cert_id": "ssl_cert_id",
+    "cache_enabled": "cache_enabled",
+    "cache_ttl": "cache_ttl",
+    "block_exploits": "block_exploits",
+    "block_normal": "block_normal",
+    "waf_enabled": "waf_enabled",
+    "waf_use_global": "waf_use_global",
+    "waf_paranoia_level": "waf_paranoia_level",
+    "waf_mode": "waf_mode",
+    "client_max_body_size": "client_max_body_size",
+    "advanced_config": "advanced_config",
+    "extra_domains": "extra_domains",
+    "access_list_id": "access_list_id",
+    "auth_provider_id": "auth_provider_id",
+    "proxy_type": "proxy_type",
+    "enabled": "enabled",
+}
+
+_TRUTHY = frozenset({"true", "1", "yes", "on"})
+_FALSY = frozenset({"false", "0", "no", "off"})
+
+
+def _parse_csv_cell(name: str, value) -> Any:
+    """Convert one CSV cell to the Python value npg_create_proxy_host expects.
+
+    Empty/whitespace cells -> None (field omitted; global defaults inherit).
+    Comma-separated cells (domain_names, extra_domains) -> list[str].
+    true/false/1/0/yes/no/on/off (case-insensitive) -> bool for bool columns;
+    anything else on a known-bool column raises ValueError so a typo like
+    'ture' fails that row instead of being sent as a bogus string.
+    """
+    text = (value or "").strip()
+    if not text:
+        return None
+    if name in ("domain_names", "extra_domains"):
+        items = [part.strip() for part in text.split(",") if part.strip()]
+        if not items:
+            return None
+        return items
+    if name in (
+        "ssl_enabled", "ssl_forced", "ssl_http2", "ssl_http3", "cache_enabled",
+        "block_exploits", "block_normal", "waf_enabled", "waf_use_global", "enabled",
+    ):
+        lowered = text.lower()
+        if lowered in _TRUTHY:
+            return True
+        if lowered in _FALSY:
+            return False
+        raise ValueError(f"column {name}: expected true/false, got {value!r}")
+    if name == "waf_paranoia_level":
+        try:
+            return int(text)
+        except ValueError:
+            raise ValueError(f"column {name}: expected an integer, got {value!r}") from None
+    return value
+
+
+def _parse_import_csv(csv_data: str) -> tuple[list[str], list[dict]]:
+    """Parse bulk-import CSV into (header, rows-as-dicts).
+
+    Raises ValueError with a clear message when the payload has no header or
+    is missing any required column — before any API call is attempted.
+    """
+    reader = csv.DictReader(io.StringIO(csv_data))
+    fieldnames = [fn.strip() for fn in (reader.fieldnames or [])]
+    if not fieldnames:
+        raise ValueError(
+            "csv_data must be CSV with a header row containing at least "
+            "domain_names, forward_host, forward_port"
+        )
+    missing = [
+        col for col in ("domain_names", "forward_host", "forward_port")
+        if col not in fieldnames
+    ]
+    if missing:
+        raise ValueError(
+            f"csv_data header is missing required column(s): {', '.join(missing)}"
+        )
+    rows: list[dict] = []
+    # Normalize keys/values: strip whitespace around header names and cells.
+    for raw in reader:
+        row = {
+            (k or "").strip(): v for k, v in raw.items() if k is not None
+        }
+        row.pop(None, None)  # extra unnamed cells from ragged lines
+        rows.append(row)
+    return fieldnames, rows
+
+
+@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE multiple proxy hosts from a CSV template in ONE call. REQUIRED: csv_data — CSV text whose header includes domain_names, forward_host, forward_port; optional columns: forward_scheme, ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, cache_enabled, cache_ttl, block_exploits, block_normal, waf_enabled, waf_use_global, waf_paranoia_level, waf_mode, client_max_body_size, advanced_config, extra_domains, access_list_id, auth_provider_id, proxy_type, enabled. Multi-domain cells are comma-separated inside quotes; empty optional cells inherit global defaults. Max 50 rows; per-row result entries (one bad row doesn't abort the batch); unknown columns fail only their row. skip_nginx=true (default) leaves nginx unsynced — call npg_sync_nginx after; false runs one sync at the end. Verify with npg_list_proxy_hosts.")
+async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) -> dict:
+    try:
+        _validate_required("csv_data", csv_data)
+        _, rows = _parse_import_csv(csv_data)
+        if len(rows) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"csv_data exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(rows)} data rows)"
+            )
+        results: list[dict] = []
+        created_any = False
+        for idx, row in enumerate(rows, start=1):
+            entry: dict = {"row": idx}
+            try:
+                create_kwargs: dict = {}
+                for column, kwarg in _BULK_IMPORT_OPTIONAL_COLUMNS.items():
+                    if column in row and row.get(column) is not None:
+                        parsed = _parse_csv_cell(column, row[column])
+                        if parsed is not None:
+                            create_kwargs[kwarg] = parsed
+                domain_cell = _parse_csv_cell("domain_names", row.get("domain_names"))
+                if not domain_cell:
+                    raise ValueError("column domain_names is required (got: empty string)")
+                assert isinstance(domain_cell, list)  # narrow Any for type checkers
+                result = await npg_create_proxy_host(
+                    domain_names=domain_cell,
+                    forward_host=(row.get("forward_host") or "").strip(),
+                    forward_port=int(str(row.get("forward_port") or "").strip()),
+                    **create_kwargs,
+                )
+                # The create tool wraps the client return as
+                # {"success": True, "data": <client payload>} — in dry-run
+                # mode that inner payload is the would-be-request structure.
+                payload = result.get("data") if isinstance(result, dict) else None
+                if isinstance(payload, dict) and payload.get(client_mod.DRY_RUN_KEY):
+                    entry["success"] = True
+                    entry["result"] = {"dry_run": payload}
+                elif isinstance(result, dict) and result.get("success"):
+                    created_any = True
+                    entry["success"] = True
+                    entry["result"] = result.get("data")
+                else:
+                    entry["success"] = False
+                    entry["error"] = str(
+                        (result or {}).get("error", "unknown error") if isinstance(result, dict)
+                        else "unknown error"
+                    )
+            except Exception as rexc:
+                entry["success"] = False
+                entry["error"] = str(rexc)
+            results.append(entry)
+        summary: dict = {
+            "rows": len(results),
+            "created": sum(1 for r in results if r.get("success")),
+            "failed": sum(1 for r in results if not r.get("success")),
+        }
+        sync_result = None
+        if created_any and not skip_nginx:
+            c = _get_client()
+            sync_result = c.post("/api/v1/proxy-hosts/sync")
+        return {"success": True, "summary": summary, "data": results,
+                "sync": sync_result}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

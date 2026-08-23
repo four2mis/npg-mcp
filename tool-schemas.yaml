@@ -91,6 +91,17 @@ npg_bulk_delete_proxy_hosts:
       type: array<st> | int]
       required: true
 
+npg_bulk_import_proxy_hosts:
+  description: "BULK CREATE multiple proxy hosts from a CSV template in ONE call. REQUIRED: csv_data — CSV text whose header includes domain_names, forward_host, forward_port; optional columns: forward_scheme, ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, cache_enabled, cache_ttl, block_exploits, block_normal, waf_enabled, waf_use_global, waf_paranoia_level, waf_mode, client_max_body_size, advanced_config, extra_domains, access_list_id, auth_provider_id, proxy_type, enabled. Multi-domain cells are comma-separated inside quotes; empty optional cells inherit global defaults. Max 50 rows; per-row result entries (one bad row doesn't abort the batch); unknown columns fail only their row. skip_nginx=true (default) leaves nginx unsynced — call npg_sync_nginx after; false runs one sync at the end. Verify with npg_list_proxy_hosts."
+  parameters:
+    - name: csv_data
+      type: string
+      required: true
+    - name: skip_nginx
+      type: boolean
+      required: false
+      default: true
+
 npg_list_certificates:
   description: "List all SSL/TLS certificates."
   parameters: []
