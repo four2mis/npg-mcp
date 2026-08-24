@@ -514,7 +514,7 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE configuration of one proxy host in a single call — composes 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking (blocked-cloud-providers), waf (/waf/hosts/{id}/config), uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset of [host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block] to fetch only those (e.g. [\"geo\", \"rate_limit\"] does 2 GETs instead of 11) — omit for all 11; invalid names raise ValueError listing valid sections; duplicates are de-duped preserving order. Returns {data: {<section>: {success, data|error}}, sections_failed: [...]}; a section that fails (e.g. 404 because geo/challenge was never created) appears in data with success:false + error and is listed in sections_failed instead of failing the whole call.")
+@mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE config of one proxy host in one call — composes 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed")
 async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -1062,7 +1062,7 @@ def _parse_import_csv(csv_data: str) -> tuple[list[str], list[dict]]:
     return fieldnames, rows
 
 
-@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE multiple proxy hosts from a CSV template in ONE call. REQUIRED: csv_data — CSV text whose header includes domain_names, forward_host, forward_port; optional columns: forward_scheme, ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, cache_enabled, cache_ttl, block_exploits, block_normal, waf_enabled, waf_use_global, waf_paranoia_level, waf_mode, client_max_body_size, advanced_config, extra_domains, access_list_id, auth_provider_id, proxy_type, enabled. Multi-domain cells are comma-separated inside quotes; empty optional cells inherit global defaults. Max 50 rows; per-row result entries (one bad row doesn't abort the batch); unknown columns fail only their row. skip_nginx=true (default) leaves nginx unsynced — call npg_sync_nginx after; false runs one sync at the end. Verify with npg_list_proxy_hosts.")
+@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; other columns optional, inherit global defaults when empty. Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually.")
 async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("csv_data", csv_data)
@@ -1253,7 +1253,7 @@ async def npg_test_nginx() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_validate_nginx_config", description="VALIDATE the running nginx config via a dry-run `nginx -t` — NO reload, no config changes (POST /test/nginx-config). The correct read-only check for 'is my config valid?'. Returns status=ok on valid; on invalid config returns success=false with the raw `nginx -t` error output. Use npg_sync_nginx to apply/regenerate configs first if you just edited hosts.")
+@mcp.tool(name="npg_validate_nginx_config", description="VALIDATE the running nginx config via dry-run `nginx -t` — NO reload, no changes (POST /test/nginx-config). Read-only. Returns status=ok on valid, or success=false with the raw error output. Use npg_sync_nginx first if you just edited hosts.")
 async def npg_validate_nginx_config() -> dict:
     """Dry-run validate nginx config — never reloads."""
     c = _get_client()
@@ -1364,7 +1364,7 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (comma/newline IPs or CIDRs; omit=keep stored list, \"\"=clear; invalid entry 400).")
+@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list).")
 async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None, whitelist_ips: str | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2182,7 +2182,7 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_enable_waf_rule", description="RE-ENABLE a per-host WAF rule that was disabled with npg_disable_waf_rule — issues DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable (enable = removing the disable exclusion). REQUIRED: host_id, rule_id (real id from npg_list_waf_rules). Enabling a rule that was never disabled returns an upstream HTTP 500 error — check current state with npg_get_waf_host_config first.")
+@mcp.tool(name="npg_enable_waf_rule", description="RE-ENABLE a per-host WAF rule disabled with npg_disable_waf_rule (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable). REQUIRED: host_id, rule_id from npg_list_waf_rules. Enabling a never-disabled rule returns upstream HTTP 500 — check npg_get_waf_host_config first.")
 async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -3256,7 +3256,7 @@ async def npg_download_backup(backup_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore from a backup file (multipart form upload). REQUIRED: file_content (.tar.gz backup file content) and encoding ('base64' or 'raw', default 'base64') telling how file_content is encoded. With encoding='raw', file_content is sent byte-for-byte as UTF-8. The API expects a multipart 'backup' field with a .tar.gz file. Use npg_create_backup + npg_download_backup to get a backup file first.")
+@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore a backup (multipart). REQUIRED: file_content (.tar.gz backup) and encoding ('base64' default or 'raw'). Use npg_create_backup + npg_download_backup to get a backup file first. DESTRUCTIVE: replaces current NPG configuration.")
 async def npg_upload_restore_backup(file_content: str, encoding: str = "base64") -> dict:
     try:
         _validate_required("file_content", file_content)
@@ -4278,7 +4278,7 @@ async def npg_get_status() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies the database, runs `nginx -t` in the proxy container, and checks the backup directory (created if missing). Returns status=healthy or degraded (degraded ONLY when the nginx component fails), checked_at timestamp, and a per-component map (database, nginx with error detail, backup_storage with path). Best single first diagnostic for 'what's wrong with NPG?' — use npg_validate_nginx_config for nginx-only detail.")
+@mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'.")
 async def npg_system_self_check() -> dict:
     """Run the upstream system self-check (DB + nginx -t + backup dir)."""
     c = _get_client()
@@ -4288,7 +4288,7 @@ async def npg_system_self_check() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_check_backup_restore", description="TEST the backup create/list/delete round-trip (GET /test/backup-restore): upstream creates a throwaway backup row (backup_type='test'), lists it, and deletes it again. NO archive is written and NOTHING is restored — safe to run anytime. Returns test name, status=passed/failed, and a details map. Use when backup creation or deletion seems broken; for full backups use npg_create_backup / npg_list_backups.")
+@mcp.tool(name="npg_check_backup_restore", description="TEST the backup create/list/delete round-trip (GET /test/backup-restore): creates a throwaway backup row, lists it, deletes it. NO archive written, NOTHING restored — safe anytime. Returns status=passed/failed with details. For real backups use npg_create_backup / npg_list_backups.")
 async def npg_check_backup_restore() -> dict:
     """Run the upstream backup create/list/delete round-trip self-test."""
     c = _get_client()
@@ -4298,7 +4298,7 @@ async def npg_check_backup_restore() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_metrics", description="GET Prometheus metrics (GET /metrics): returns the raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics (log-collector buffer/fallback/watchdog counters and more). Unauthenticated endpoint served at the origin root (outside /api/v1); intended for internal scraping, safe read-only. Use for capacity/performance monitoring or when an external Prometheus scrape target needs to be understood; for health status use npg_get_status or npg_get_health_detailed.")
+@mcp.tool(name="npg_get_metrics", description="GET Prometheus metrics (GET /metrics): raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics. Unauthenticated origin-root endpoint, safe read-only. For health status use npg_get_status or npg_get_health_detailed.")
 async def npg_get_metrics() -> dict:
     """Fetch the upstream Prometheus metrics exposition text."""
     c = _get_client()
@@ -4308,7 +4308,7 @@ async def npg_get_metrics() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query and reports per-query status/timings — read-only diagnostics, safe to run anytime. Returns test name, status=passed/failed, and a per-query results map. Use when the dashboard/charts load slowly or return errors; for component health use npg_get_status or npg_system_self_check.")
+@mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query, reports per-query status/timings — read-only, safe anytime. Use when the dashboard/charts load slowly or error. For component health use npg_get_status or npg_system_self_check.")
 async def npg_check_dashboard_queries() -> dict:
     """Run the upstream dashboard aggregation-query self-test."""
     c = _get_client()
