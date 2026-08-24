@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.16] - 2026-08-25
+
+### What changed
+- Blocking `NPGClient` HTTP calls are now offloaded to worker threads via `asyncio.to_thread`, so slow upstream responses no longer freeze the MCP server's asyncio event loop (other tool calls and health checks stay responsive).
+- Binary download tools are now binary-safe: `NPGClient.get_bytes()` returns raw bytes plus content-type, and `npg_download_backup` / `npg_get_certificate_download` return gzip/zip payloads base64-encoded (`encoding=base64`) instead of crashing on non-JSON bodies.
+- kwargs dicts passed to the 11 pass-through update/create tools are now whitelist-validated against the upstream v2.48.0 Go request structs before any API call: a misspelled or phantom field raises immediately with the accepted-field list instead of being silently ignored by the API (the classic silent-noop bug class). A `strict=false` escape hatch allows bypassing validation when needed.
+
+### What's new
+- `strict` escape-hatch parameter on kwargs-whitelisted tools to skip validation for forward-compatibility.
+- New `NPGClient.get_bytes()` method for binary-safe HTTP downloads.
+
+### Breaking changes
+- kwargs-based tools now reject unknown field names with an error listing accepted fields; callers passing previously-silently-ignored typos must fix the field names or set `strict=false`.
+- (none)
+
 ## [0.5.15] - 2026-08-24
 
 ### What changed
