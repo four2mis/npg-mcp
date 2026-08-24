@@ -218,6 +218,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
 | `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (130 read-only tools), `standard` (238 tools, no destructive ops), `full` (all 286 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
+| `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
 
 ### Container Logs
 

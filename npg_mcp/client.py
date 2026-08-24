@@ -59,6 +59,43 @@ _DRY_RUN: bool = os.environ.get("NPG_DRY_RUN", "").strip().lower() not in (
 DRY_RUN_KEY = "dry_run"
 
 
+# ── HTTP timeout ────────────────────────────────────────────────────
+# Outbound NPG API request timeout in seconds, configurable per deployment
+# via NPG_HTTP_TIMEOUT. Several endpoints legitimately take longer than the
+# 30s default — large access-log downloads, backup export/restore,
+# certificate upload, and full proxy-host syncs — and a deployment may need
+# to raise the limit without editing source. Read once at process start so
+# the value cannot change mid-run. Invalid values fall back to 30 (with a
+# warning); values outside [1, 600] are clamped into range.
+_HTTP_TIMEOUT_DEFAULT = 30.0
+_HTTP_TIMEOUT_MIN = 1.0
+_HTTP_TIMEOUT_MAX = 600.0
+
+
+def _load_http_timeout() -> float:
+    raw = os.environ.get("NPG_HTTP_TIMEOUT", "").strip()
+    if not raw:
+        return _HTTP_TIMEOUT_DEFAULT
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "NPG_HTTP_TIMEOUT=%r is not a number, falling back to %ss",
+            raw, _HTTP_TIMEOUT_DEFAULT,
+        )
+        return _HTTP_TIMEOUT_DEFAULT
+    if not _HTTP_TIMEOUT_MIN <= value <= _HTTP_TIMEOUT_MAX:
+        logger.warning(
+            "NPG_HTTP_TIMEOUT=%r is outside [%s, %s], clamping",
+            raw, _HTTP_TIMEOUT_MIN, _HTTP_TIMEOUT_MAX,
+        )
+        return min(_HTTP_TIMEOUT_MAX, max(_HTTP_TIMEOUT_MIN, value))
+    return value
+
+
+_HTTP_TIMEOUT: float = _load_http_timeout()
+
+
 def dry_run_enabled() -> bool:
     """Return True when NPG_DRY_RUN is enabled for this process."""
     return _DRY_RUN
@@ -178,7 +215,7 @@ class NPGClient:
         self._client = httpx.Client(
             base_url=self.base_url,
             headers=headers,
-            timeout=30,
+            timeout=_HTTP_TIMEOUT,
         )
 
     def _sanitize(self, exc: Exception) -> NPGError:

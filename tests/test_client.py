@@ -303,3 +303,47 @@ class TestSingletonLifecycle:
         second = client_mod.get_singleton("ng_tok")
         assert second is not first
         assert isinstance(second, NPGClient)
+
+
+class TestHttpTimeout:
+    """NPG_HTTP_TIMEOUT configures the outbound httpx request timeout.
+
+    The value is read once at module import (mirroring the NPG_DRY_RUN
+    pattern) and applied to every NPGClient instance. Invalid values fall
+    back to 30 with a warning; values outside [1, 600] are clamped.
+    """
+
+    def test_client_uses_module_timeout(self, monkeypatch):
+        monkeypatch.setattr(client_mod, "_HTTP_TIMEOUT", 60.0)
+        c = NPGClient(base_url=BASE, token="t")
+        assert c._client.timeout == httpx.Timeout(60.0)
+
+    def test_default_30_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("NPG_HTTP_TIMEOUT", raising=False)
+        assert client_mod._load_http_timeout() == 30.0
+
+    def test_env_value_parsed(self, monkeypatch):
+        monkeypatch.setenv("NPG_HTTP_TIMEOUT", "60")
+        assert client_mod._load_http_timeout() == 60.0
+
+    def test_float_env_value_parsed(self, monkeypatch):
+        monkeypatch.setenv("NPG_HTTP_TIMEOUT", "45.5")
+        assert client_mod._load_http_timeout() == 45.5
+
+    def test_invalid_value_falls_back_to_default(self, monkeypatch, caplog):
+        monkeypatch.setenv("NPG_HTTP_TIMEOUT", "not-a-number")
+        with caplog.at_level(logging.WARNING, logger="npg_mcp.client"):
+            assert client_mod._load_http_timeout() == 30.0
+        assert any("NPG_HTTP_TIMEOUT" in r.getMessage() for r in caplog.records)
+
+    def test_below_min_clamped(self, monkeypatch, caplog):
+        monkeypatch.setenv("NPG_HTTP_TIMEOUT", "0.1")
+        with caplog.at_level(logging.WARNING, logger="npg_mcp.client"):
+            assert client_mod._load_http_timeout() == 1.0
+        assert any("clamping" in r.getMessage() for r in caplog.records)
+
+    def test_above_max_clamped(self, monkeypatch, caplog):
+        monkeypatch.setenv("NPG_HTTP_TIMEOUT", "9000")
+        with caplog.at_level(logging.WARNING, logger="npg_mcp.client"):
+            assert client_mod._load_http_timeout() == 600.0
+        assert any("clamping" in r.getMessage() for r in caplog.records)
