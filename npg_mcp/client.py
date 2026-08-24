@@ -32,10 +32,16 @@ _singleton_client: "NPGClient | None" = None
 
 # HTTP status codes eligible for retry (transient server-side failures).
 _RETRYABLE_STATUS = frozenset({502, 503, 504})
+# Rate-limit responses are also retried (GET-only loop — no mutation replay),
+# honoring the server's Retry-After hint when present.
+_RATE_LIMIT_STATUS = 429
 # Maximum retry attempts for idempotent GET requests.
 _MAX_RETRIES = 2
 # Base delay in seconds for exponential backoff between retries.
 _RETRY_BASE_DELAY = 0.5
+# Upper bound on a server-provided Retry-After delay, so a long rate-limit
+# window cannot stall the MCP worker for minutes.
+_RETRY_AFTER_CAP = 10.0
 
 
 # ── Dry-run mode ──────────────────────────────────────────────────────
@@ -116,6 +122,14 @@ def _dry_run_payload(method: str, path: str, body=None, params=None) -> dict:
     if params:
         payload["params"] = params
     return payload
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """Return True if the exception is an HTTP 429 rate-limit response."""
+    return (
+        isinstance(exc, httpx.HTTPStatusError)
+        and exc.response.status_code == _RATE_LIMIT_STATUS
+    )
 
 
 def set_token(token: str) -> None:
@@ -281,14 +295,32 @@ class NPGClient:
     def _should_retry(self, exc: Exception) -> bool:
         """Return True if a transient error is eligible for retry."""
         if isinstance(exc, httpx.HTTPStatusError):
-            return exc.response.status_code in _RETRYABLE_STATUS
+            status = exc.response.status_code
+            return (
+                status in _RETRYABLE_STATUS or status == _RATE_LIMIT_STATUS
+            )
         # Transport-level errors (connect, read, timeout) are also retryable
         return isinstance(
             exc, (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout)
         )
 
-    def _retry_delay(self, attempt: int) -> float:
-        """Exponential backoff: 0.5s, 1.0s, ..."""
+    def _retry_delay(self, attempt: int, exc: Exception | None = None) -> float:
+        """Delay before the next retry attempt.
+
+        For 429 rate-limit responses with a numeric ``Retry-After`` header,
+        use that value (clamped to _RETRY_AFTER_CAP). Otherwise fall back to
+        exponential backoff: 0.5s, 1.0s, ...
+        """
+        if (
+            exc is not None
+            and isinstance(exc, httpx.HTTPStatusError)
+            and exc.response.status_code == _RATE_LIMIT_STATUS
+        ):
+            raw = exc.response.headers.get("retry-after", "")
+            try:
+                return min(float(raw.strip()), _RETRY_AFTER_CAP)
+            except (TypeError, ValueError):
+                pass  # missing / non-numeric Retry-After — use backoff
         return _RETRY_BASE_DELAY * (2 ** attempt)
 
     def get(
@@ -325,10 +357,14 @@ class NPGClient:
                 raise
             except Exception as e:
                 if attempt < _MAX_RETRIES and self._should_retry(e):
-                    delay = self._retry_delay(attempt)
+                    delay = self._retry_delay(attempt, e)
+                    reason = (
+                        "rate-limited" if _is_rate_limited(e) else "transient error"
+                    )
                     logger.warning(
-                        "NPG GET %s -> transient error (%s), retry %d/%d in %.1fs",
-                        path, type(e).__name__, attempt + 1, _MAX_RETRIES, delay,
+                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
+                        path, reason, type(e).__name__,
+                        attempt + 1, _MAX_RETRIES, delay,
                     )
                     time.sleep(delay)
                     continue
@@ -351,10 +387,14 @@ class NPGClient:
                 raise
             except Exception as e:
                 if attempt < _MAX_RETRIES and self._should_retry(e):
-                    delay = self._retry_delay(attempt)
+                    delay = self._retry_delay(attempt, e)
+                    reason = (
+                        "rate-limited" if _is_rate_limited(e) else "transient error"
+                    )
                     logger.warning(
-                        "NPG GET %s -> transient error (%s), retry %d/%d in %.1fs",
-                        path, type(e).__name__, attempt + 1, _MAX_RETRIES, delay,
+                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
+                        path, reason, type(e).__name__,
+                        attempt + 1, _MAX_RETRIES, delay,
                     )
                     time.sleep(delay)
                     continue

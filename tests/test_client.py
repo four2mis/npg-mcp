@@ -53,6 +53,12 @@ def _status_error(status: int, json_body: dict | None = None, content: bytes | N
     return httpx.HTTPStatusError(f"HTTP {status}", request=request, response=response)
 
 
+def _status_error_with_headers(status: int, headers: dict) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", f"{BASE}/api/v1/hosts")
+    response = httpx.Response(status, request=request, headers=headers, json={"message": "rl"})
+    return httpx.HTTPStatusError(f"HTTP {status}", request=request, response=response)
+
+
 class TestNPGErrorSanitization:
     """HTTP/transport errors must become sanitized NPGErrors — no URLs,
     hostnames, or raw internals leak into the message."""
@@ -207,6 +213,100 @@ class TestRetryLogic:
                 client.delete("/api/v1/hosts/1")
             assert route.call_count == 1
         assert ei.value.message == "NPG API returned HTTP 503"
+
+
+class TestRateLimit429Retry:
+    """GET retries HTTP 429 rate-limit responses, honoring Retry-After."""
+
+    def test_429_is_retryable(self, client):
+        route = respx.get(f"{BASE}/api/v1/hosts")
+        route.mock(
+            side_effect=[
+                httpx.Response(429, json={"message": "rate limited"}),
+                httpx.Response(200, json={"data": "ok"}),
+            ]
+        )
+        with respx.mock:
+            data = client.get("/api/v1/hosts")
+            assert route.call_count == 2
+        assert data == {"data": "ok"}
+
+    def test_429_exhausts_retries_then_sanitized_error(self, client):
+        route = respx.get(f"{BASE}/api/v1/hosts")
+        route.mock(return_value=httpx.Response(429, json={"message": "rl"}))
+        with respx.mock:
+            with pytest.raises(NPGError) as ei:
+                client.get("/api/v1/hosts")
+            # initial attempt + 2 retries (monkeypatched _MAX_RETRIES=2)
+            assert route.call_count == 3
+        assert ei.value.message == "NPG API returned HTTP 429"
+
+    def test_400_still_not_retryable(self, client):
+        route = respx.get(f"{BASE}/api/v1/hosts")
+        route.mock(return_value=httpx.Response(400, json={"message": "nope"}))
+        with respx.mock:
+            with pytest.raises(NPGError):
+                client.get("/api/v1/hosts")
+            assert route.call_count == 1
+
+    def test_retry_delay_uses_numeric_retry_after(self, client):
+        exc = _status_error_with_headers(429, {"retry-after": "7"})
+        delay = client._retry_delay(0, exc)
+        assert delay == 7.0
+
+    def test_retry_delay_clamps_retry_after_to_cap(self, client):
+        exc = _status_error_with_headers(429, {"retry-after": "300"})
+        delay = client._retry_delay(0, exc)
+        assert delay == 10.0  # _RETRY_AFTER_CAP
+
+    def test_retry_delay_falls_back_without_retry_after(self, client, monkeypatch):
+        monkeypatch.setattr(client_mod, "_RETRY_BASE_DELAY", 0.5)
+        exc = _status_error(429)
+        # no header → exponential backoff
+        assert client._retry_delay(0, exc) == 0.5
+        assert client._retry_delay(1, exc) == 1.0
+
+    def test_retry_delay_non_numeric_retry_after_falls_back(self, client, monkeypatch):
+        monkeypatch.setattr(client_mod, "_RETRY_BASE_DELAY", 0.5)
+        # HTTP-date form of Retry-After is not supported — use backoff.
+        exc = _status_error_with_headers(
+            429, {"retry-after": "Wed, 21 Oct 2026 07:28:00 GMT"}
+        )
+        assert client._retry_delay(0, exc) == 0.5
+
+    def test_should_retry_429_true_400_false(self, client):
+        assert client._should_retry(_status_error(429)) is True
+        assert client._should_retry(_status_error(400)) is False
+        assert client._should_retry(_status_error(503)) is True
+
+    def test_get_retries_429_honoring_retry_after_header(self, client, caplog):
+        # End-to-end: a 429 carrying Retry-After: 0 retries and succeeds;
+        # the warning log line notes the rate-limited reason.
+        route = respx.get(f"{BASE}/api/v1/hosts")
+        route.mock(
+            side_effect=[
+                httpx.Response(
+                    429, headers={"Retry-After": "0"}, json={"message": "slow down"}
+                ),
+                httpx.Response(200, json={"data": ["host"]}),
+            ]
+        )
+        with caplog.at_level(logging.WARNING, logger="npg_mcp.client"):
+            with respx.mock:
+                data = client.get("/api/v1/hosts")
+                assert route.call_count == 2
+        assert data == {"data": ["host"]}
+        warn_lines = [r.getMessage() for r in caplog.records if "rate-limited" in r.getMessage()]
+        assert warn_lines, "expected a 'rate-limited' retry warning log line"
+
+    def test_post_never_retries_on_429(self, client):
+        route = respx.post(f"{BASE}/api/v1/hosts")
+        route.mock(return_value=httpx.Response(429, json={"message": "rl"}))
+        with respx.mock:
+            with pytest.raises(NPGError) as ei:
+                client.post("/api/v1/hosts", {"a": 1})
+            assert route.call_count == 1
+        assert ei.value.message == "NPG API returned HTTP 429"
 
 
 class TestRequestIdCorrelation:
