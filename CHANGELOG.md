@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.15] - 2026-08-24
+
+### What changed
+- HTTP GET requests now automatically retry on 429 Too Many Requests, honoring the upstream `Retry-After` header (capped at 10s) with exponential backoff as fallback. This makes bulk tool sweeps and busy-period calls resilient to NPG API rate limiting instead of failing outright.
+- The httpx request timeout is now configurable via `NPG_HTTP_TIMEOUT` (seconds, default 30, clamped to [1,600]; invalid values fall back to 30 with a warning). Documented in `.env.example` and both READMEs.
+- Trimmed 10 oversized MCP tool descriptions toward the ~250-char guideline (largest was 882 chars). No signatures or behavior changed; `tool-schemas.yaml`, `README.md`, and `README.ko.md` regenerated in sync.
+- Repo hygiene: removed kanban scratch scripts from the repo and added `.kanban-tmp/` to `.gitignore`.
+
+### What's new
+- `NPG_HTTP_TIMEOUT` environment variable for tuning per-request timeout.
+- Automatic 429 retry with Retry-After awareness on all GET/get_text calls.
+
+### Breaking changes
+- (none)
+
 ## [0.5.14] - 2026-08-24
 
 ### What changed
