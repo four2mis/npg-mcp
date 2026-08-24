@@ -30,8 +30,8 @@ from mcp.server import transport_security  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 import npg_mcp.client as client_mod  # noqa: E402
-from npg_mcp.upstream_models import _validate_kwargs  # noqa: E402
 import npg_mcp.toolsets as toolsets  # noqa: E402
+from npg_mcp.upstream_models import _validate_kwargs  # noqa: E402
 
 logger = logging.getLogger("npg_mcp.main")
 
@@ -935,7 +935,7 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
-                data = await _api(c.put, 
+                data = await _api(c.put,
                     f"/api/v1/proxy-hosts/{_id_path(host_id)}",
                     {"certificate_id": _id_path(cert_id)},
                 )
