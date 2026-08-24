@@ -382,22 +382,30 @@ npg_get_settings:
   parameters: []
 
 npg_update_settings:
-  description: "Update global NPG settings. Pass only fields to change (dict)."
+  description: "Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false. See npg_get_settings for current values."
   parameters:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_get_system_settings:
   description: "Get system settings (server name, timezone, locale)."
   parameters: []
 
 npg_update_system_settings:
-  description: "Update system settings. Pass only fields to change (dict)."
+  description: "Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_get_dashboard:
   description: "Get dashboard data (summary of proxy hosts, certificates, etc.)."
@@ -482,7 +490,7 @@ npg_get_dns_provider:
       required: true
 
 npg_create_dns_provider:
-  description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'})."
+  description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/manual), credentials (dict, e.g. {'api_token': '...'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false)."
   parameters:
     - name: name
       type: string
@@ -496,9 +504,13 @@ npg_create_dns_provider:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_update_dns_provider:
-  description: "Update a DNS provider. Pass only fields to change (dict). REQUIRED: provider_id."
+  description: "Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. Unknown fields rejected unless strict=false. REQUIRED: provider_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -506,6 +518,10 @@ npg_update_dns_provider:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_delete_dns_provider:
   description: "Delete a DNS provider by its ID. REQUIRED: provider_id."
@@ -533,7 +549,7 @@ npg_get_cloud_provider:
       required: true
 
 npg_create_cloud_provider:
-  description: "Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description."
+  description: "Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region (us/eu/cn/kr/other), description, ip_ranges_url (kwargs extras rejected unless strict=false)."
   parameters:
     - name: name
       type: string
@@ -553,9 +569,13 @@ npg_create_cloud_provider:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_update_cloud_provider:
-  description: "Update a cloud provider by its slug. Pass only fields to change (dict)."
+  description: "Update a cloud provider by its slug. Pass only fields to change in kwargs: name, description, ip_ranges, ip_ranges_url, enabled. Unknown fields rejected unless strict=false."
   parameters:
     - name: slug
       type: string
@@ -563,6 +583,10 @@ npg_update_cloud_provider:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_delete_cloud_provider:
   description: "Delete a cloud provider by its slug."
@@ -838,7 +862,7 @@ npg_get_exploit_rule:
       required: true
 
 npg_create_exploit_rule:
-  description: "Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description."
+  description: "Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name, pattern, pattern_type (query_string/request_uri/user_agent/request_method). Optional: severity, description (kwargs extras rejected unless strict=false)."
   parameters:
     - name: category
       type: string
@@ -861,9 +885,13 @@ npg_create_exploit_rule:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_update_exploit_rule:
-  description: "Update an exploit rule. Pass only fields to change (dict). REQUIRED: rule_id."
+  description: "Update an exploit rule. Pass only fields to change in kwargs: name, pattern, pattern_type, description, severity, enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -871,6 +899,10 @@ npg_update_exploit_rule:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_delete_exploit_rule:
   description: "Delete an exploit rule by its ID. REQUIRED: rule_id."
@@ -930,11 +962,15 @@ npg_get_log_settings:
   parameters: []
 
 npg_update_log_settings:
-  description: "Update log settings. Pass only fields to change (dict)."
+  description: "Update log settings. Pass only fields to change in kwargs: retention_days, max_logs_per_type, auto_cleanup_enabled. Unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_get_log_stats:
   description: "Get log statistics."
@@ -1002,7 +1038,7 @@ npg_create_api_token:
       required: false
 
 npg_update_api_token:
-  description: "Update an API token. Pass only fields to change (dict). REQUIRED: token_id."
+  description: "Update an API token. Pass only fields to change in kwargs: name, permissions, allowed_ips, rate_limit, is_active. Unknown fields rejected unless strict=false. REQUIRED: token_id."
   parameters:
     - name: token_id
       type: integer | string
@@ -1010,6 +1046,10 @@ npg_update_api_token:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_revoke_api_token:
   description: "Revoke an API token by its ID. REQUIRED: token_id."
@@ -1500,11 +1540,15 @@ npg_get_cloudflare_tunnel:
   parameters: []
 
 npg_update_cloudflare_tunnel:
-  description: "Update Cloudflare Tunnel configuration. Pass only fields to change."
+  description: "Update Cloudflare Tunnel configuration. Pass only fields to change in kwargs: enabled, token, mode (token/managed), api_token, catchall_enabled. Unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
       required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_get_cloudflare_tunnel_status:
   description: "Get Cloudflare Tunnel status."

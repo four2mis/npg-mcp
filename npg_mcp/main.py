@@ -30,6 +30,7 @@ from mcp.server import transport_security  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 import npg_mcp.client as client_mod  # noqa: E402
+from npg_mcp.upstream_models import _validate_kwargs  # noqa: E402
 import npg_mcp.toolsets as toolsets  # noqa: E402
 
 logger = logging.getLogger("npg_mcp.main")
@@ -1553,8 +1554,9 @@ async def npg_get_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_settings", description="Update global NPG settings. Pass only fields to change (dict).")
-async def npg_update_settings(kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_settings", description="Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false. See npg_get_settings for current values.")
+async def npg_update_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
+    _validate_kwargs("npg_update_settings", kwargs, strict)
     c = _get_client()
     try:
         data = await _api(c.put, "/api/v1/settings", kwargs or {})
@@ -1571,8 +1573,9 @@ async def npg_get_system_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_system_settings", description="Update system settings. Pass only fields to change (dict).")
-async def npg_update_system_settings(kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_system_settings", description="Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false.")
+async def npg_update_system_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
+    _validate_kwargs("npg_update_system_settings", kwargs, strict)
     c = _get_client()
     try:
         data = await _api(c.put, "/api/v1/system-settings", kwargs or {})
@@ -1697,11 +1700,12 @@ async def npg_get_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (e.g. 'cloudflare'), credentials (dict, e.g. {'api_token': '...'}).")
-async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/manual), credentials (dict, e.g. {'api_token': '...'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false).")
+async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
         _validate_required("provider_type", provider_type)
+        _validate_kwargs("npg_create_dns_provider", kwargs, strict)
         c = _get_client()
         body: dict[str, Any] = {"name": name, "provider_type": provider_type}
         if credentials:
@@ -1713,10 +1717,11 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change (dict). REQUIRED: provider_id.")
-async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. Unknown fields rejected unless strict=false. REQUIRED: provider_id.")
+async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("provider_id", provider_id)
+        _validate_kwargs("npg_update_dns_provider", kwargs, strict)
         c = _get_client()
         data = await _api(c.put, f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs or {})
         return {"success": True, "data": data}
@@ -1765,12 +1770,13 @@ async def npg_get_cloud_provider(slug: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_cloud_provider", description="Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region, description.")
-async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], region: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_create_cloud_provider", description="Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region (us/eu/cn/kr/other), description, ip_ranges_url (kwargs extras rejected unless strict=false).")
+async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], region: str | None = None, description: str | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
         _validate_id("slug", slug)
         _validate_required("ip_ranges", ip_ranges)
+        _validate_kwargs("npg_create_cloud_provider", kwargs, strict)
         c = _get_client()
         body = {"name": name, "slug": slug, "ip_ranges": ip_ranges}
         if region:
@@ -1784,10 +1790,11 @@ async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change (dict).")
-async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change in kwargs: name, description, ip_ranges, ip_ranges_url, enabled. Unknown fields rejected unless strict=false.")
+async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("slug", slug)
+        _validate_kwargs("npg_update_cloud_provider", kwargs, strict)
         c = _get_client()
         data = await _api(c.put, f"/api/v1/cloud-providers/{slug}", kwargs or {})
         return {"success": True, "data": data}
@@ -2103,13 +2110,14 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category, name, pattern, pattern_type (e.g. 'query_string'). Optional: severity, description.")
-async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name, pattern, pattern_type (query_string/request_uri/user_agent/request_method). Optional: severity, description (kwargs extras rejected unless strict=false).")
+async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("category", category)
         _validate_required("name", name)
         _validate_required("pattern", pattern)
         _validate_required("pattern_type", pattern_type)
+        _validate_kwargs("npg_create_exploit_rule", kwargs, strict)
         c = _get_client()
         body = {"category": category, "name": name, "pattern": pattern, "pattern_type": pattern_type}
         if severity:
@@ -2123,10 +2131,11 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change (dict). REQUIRED: rule_id.")
-async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change in kwargs: name, pattern, pattern_type, description, severity, enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id.")
+async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("rule_id", rule_id)
+        _validate_kwargs("npg_update_exploit_rule", kwargs, strict)
         c = _get_client()
         data = await _api(c.put, f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs or {})
         return {"success": True, "data": data}
@@ -2240,8 +2249,9 @@ async def npg_get_log_settings() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change (dict).")
-async def npg_update_log_settings(kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change in kwargs: retention_days, max_logs_per_type, auto_cleanup_enabled. Unknown fields rejected unless strict=false.")
+async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
+    _validate_kwargs("npg_update_log_settings", kwargs, strict)
     c = _get_client()
     try:
         data = await _api(c.put, "/api/v1/logs/settings", kwargs or {})
@@ -2380,10 +2390,11 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_at: st
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change (dict). REQUIRED: token_id.")
-async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change in kwargs: name, permissions, allowed_ips, rate_limit, is_active. Unknown fields rejected unless strict=false. REQUIRED: token_id.")
+async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("token_id", token_id)
+        _validate_kwargs("npg_update_api_token", kwargs, strict)
         c = _get_client()
         data = await _api(c.put, f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs or {})
         return {"success": True, "data": data}
@@ -3043,8 +3054,9 @@ async def npg_get_cloudflare_tunnel() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_cloudflare_tunnel", description="Update Cloudflare Tunnel configuration. Pass only fields to change.")
-async def npg_update_cloudflare_tunnel(kwargs: dict | None = None) -> dict:
+@mcp.tool(name="npg_update_cloudflare_tunnel", description="Update Cloudflare Tunnel configuration. Pass only fields to change in kwargs: enabled, token, mode (token/managed), api_token, catchall_enabled. Unknown fields rejected unless strict=false.")
+async def npg_update_cloudflare_tunnel(kwargs: dict | None = None, strict: bool = True) -> dict:
+    _validate_kwargs("npg_update_cloudflare_tunnel", kwargs, strict)
     c = _get_client()
     try:
         data = await _api(c.put, "/api/v1/settings/cloudflare-tunnel", kwargs or {})
