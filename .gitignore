@@ -34,3 +34,5 @@ AGENTS.md
 .kanban-upstream-issues/
 .kanban-feature-plans/
 .kanban-pipeline.lock
+# Kanban scratch space
+.kanban-tmp/
