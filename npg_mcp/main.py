@@ -3259,13 +3259,18 @@ async def npg_update_global_waf(enabled: bool | None = None, mode: str | None = 
 
 # ── Backups ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns the raw backup content (gzip binary). Use npg_list_backups to find the ID.")
+@mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID.")
 async def npg_download_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        data = await _api(c.get_text, f"/api/v1/backups/{_id_path(backup_id)}/download")
-        return {"success": True, "data": data}
+        content, content_type = await _api(
+            c.get_bytes, f"/api/v1/backups/{_id_path(backup_id)}/download"
+        )
+        if content_type.startswith("text/"):
+            return {"success": True, "data": content.decode("utf-8", "replace")}
+        import base64
+        return {"success": True, "data": base64.b64encode(content).decode("ascii"), "encoding": "base64", "content_type": content_type}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3801,13 +3806,18 @@ async def npg_get_certificate_logs(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns the raw content.")
+@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data.")
 async def npg_get_certificate_download(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = await _api(c.get_text, f"/api/v1/certificates/{_id_path(cert_id)}/download")
-        return {"success": True, "data": data}
+        content, content_type = await _api(
+            c.get_bytes, f"/api/v1/certificates/{_id_path(cert_id)}/download"
+        )
+        if content_type.startswith("text/"):
+            return {"success": True, "data": content.decode("utf-8", "replace")}
+        import base64
+        return {"success": True, "data": base64.b64encode(content).decode("ascii"), "encoding": "base64", "content_type": content_type}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

@@ -401,6 +401,43 @@ class NPGClient:
                 raise self._log_err("GET", path, e, start) from e
         raise NPGError("NPG API request failed after retries")
 
+    def get_bytes(self, path: str, params: dict | None = None) -> tuple[bytes, str]:
+        """GET returning raw response bytes and the content-type header.
+
+        For non-JSON endpoints that serve binary payloads (backup .tar.gz,
+        certificate zip) — ``resp.text`` would lossily decode bytes as UTF-8.
+        Returns ``(content, content_type)`` so callers can decide between
+        text passthrough and base64 encoding.
+        """
+        url = urljoin(self.base_url + "/", path.lstrip("/"))
+        for attempt in range(_MAX_RETRIES + 1):
+            start = time.perf_counter()
+            try:
+                resp = self._client.get(url, params=params, headers=self._headers())
+                resp.raise_for_status()
+                self._log_ok("GET", path, resp.status_code, start)
+                return (
+                    resp.content,
+                    resp.headers.get("content-type", ""),
+                )
+            except NPGError:
+                raise
+            except Exception as e:
+                if attempt < _MAX_RETRIES and self._should_retry(e):
+                    delay = self._retry_delay(attempt, e)
+                    reason = (
+                        "rate-limited" if _is_rate_limited(e) else "transient error"
+                    )
+                    logger.warning(
+                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
+                        path, reason, type(e).__name__,
+                        attempt + 1, _MAX_RETRIES, delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise self._log_err("GET", path, e, start) from e
+        raise NPGError("NPG API request failed after retries")
+
     def post(
         self, path: str, body: dict | None = None, params: dict | None = None
     ) -> dict | None:

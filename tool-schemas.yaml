@@ -1676,7 +1676,7 @@ npg_update_global_waf:
       required: false
 
 npg_download_backup:
-  description: "DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns the raw backup content (gzip binary). Use npg_list_backups to find the ID."
+  description: "DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID."
   parameters:
     - name: backup_id
       type: integer | string
@@ -2074,7 +2074,7 @@ npg_get_certificate_logs:
       required: true
 
 npg_get_certificate_download:
-  description: "Download certificate material (PEM/zip). REQUIRED: cert_id. Returns the raw content."
+  description: "Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data."
   parameters:
     - name: cert_id
       type: integer | string
