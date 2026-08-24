@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import hmac
 import io
@@ -322,6 +323,18 @@ def _get_client() -> client_mod.NPGClient:
     )
 
 
+async def _api(callable_, *args, **kwargs):
+    """Run a blocking NPGClient HTTP call in a worker thread.
+
+    Every outbound NPG API call goes through here so a slow endpoint
+    (long timeout, log/backup download, full sync) cannot stall the single
+    asyncio event loop while other MCP requests are in flight.
+    ContextVars propagate into the thread automatically, so per-request
+    token/request-id correlation keeps working unchanged.
+    """
+    return await asyncio.to_thread(callable_, *args, **kwargs)
+
+
 def _id_path(id_val) -> str:
     """Convert an ID (int or str) to a string for URL path interpolation."""
     return str(id_val)
@@ -488,7 +501,7 @@ async def npg_list_proxy_hosts(
         params = _list_params_per_page(limit=limit, page=page)
         if search is not None and str(search).strip():
             params["search"] = str(search)
-        data = c.get("/api/v1/proxy-hosts", params=params or None)
+        data = await _api(c.get, "/api/v1/proxy-hosts", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -498,7 +511,7 @@ async def npg_get_proxy_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -509,7 +522,7 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
         _validate_required("domain", domain)
         c = _get_client()
         encoded = quote(domain, safe="")
-        data = c.get(f"/api/v1/proxy-hosts/by-domain/{encoded}")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/by-domain/{encoded}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -548,7 +561,7 @@ async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None
         failed: list[str] = []
         for section, path in section_paths.items():
             try:
-                data[section] = {"success": True, "data": c.get(path)}
+                data[section] = {"success": True, "data": await _api(c.get, path)}
             except Exception as se:
                 failed.append(section)
                 data[section] = {"success": False, "error": str(se)}
@@ -675,7 +688,7 @@ async def npg_create_proxy_host(
             id_fields={"access_list_id", "auth_provider_id", "ddns_provider_id"},
         )
 
-        data = c.post("/api/v1/proxy-hosts", body)
+        data = await _api(c.post, "/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -778,7 +791,7 @@ async def npg_update_proxy_host(
         )
 
         params = {"skip_nginx": "true"} if skip_nginx else None
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}", body, params=params)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -817,7 +830,7 @@ async def npg_create_proxy_host_simple(
             },
         )
 
-        data = c.post("/api/v1/proxy-hosts", body)
+        data = await _api(c.post, "/api/v1/proxy-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -850,7 +863,7 @@ async def npg_update_proxy_host_simple(
             id_fields={"ssl_cert_id"},
         )
 
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -860,7 +873,7 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}")
         return _mutate_result(data, f"Proxy host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -870,7 +883,7 @@ async def npg_test_proxy_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/test")
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/test")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -880,7 +893,7 @@ async def npg_regenerate_config(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/regenerate")
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/regenerate")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -889,7 +902,7 @@ async def npg_regenerate_config(host_id: str | int) -> dict:
 async def npg_sync_proxy_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/proxy-hosts/sync")
+        data = await _api(c.post, "/api/v1/proxy-hosts/sync")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -900,7 +913,7 @@ async def npg_clone_proxy_host(host_id: str | int, domain_names: list[str]) -> d
         _validate_id("host_id", host_id)
         _validate_required("domain_names", domain_names)
         c = _get_client()
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/clone", {"domain_names": domain_names})
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/clone", {"domain_names": domain_names})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -921,7 +934,7 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
-                data = c.put(
+                data = await _api(c.put, 
                     f"/api/v1/proxy-hosts/{_id_path(host_id)}",
                     {"certificate_id": _id_path(cert_id)},
                 )
@@ -950,7 +963,7 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
-                data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}")
+                data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}")
                 entry["success"] = True
                 entry["result"] = {"deleted": True}
                 if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
@@ -1122,7 +1135,7 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
         sync_result = None
         if created_any and not skip_nginx:
             c = _get_client()
-            sync_result = c.post("/api/v1/proxy-hosts/sync")
+            sync_result = await _api(c.post, "/api/v1/proxy-hosts/sync")
         return {"success": True, "summary": summary, "data": results,
                 "sync": sync_result}
     except Exception as e:
@@ -1135,7 +1148,7 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
 async def npg_list_certificates() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/certificates")
+        data = await _api(c.get, "/api/v1/certificates")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1145,7 +1158,7 @@ async def npg_get_certificate(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.get(f"/api/v1/certificates/{_id_path(cert_id)}")
+        data = await _api(c.get, f"/api/v1/certificates/{_id_path(cert_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1167,7 +1180,7 @@ async def npg_create_certificate(
             "provider": provider,
             "dns_provider_id": dns_provider_id,
         }
-        data = c.post("/api/v1/certificates", body)
+        data = await _api(c.post, "/api/v1/certificates", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1177,7 +1190,7 @@ async def npg_delete_certificate(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/certificates/{_id_path(cert_id)}")
+        data = await _api(c.delete, f"/api/v1/certificates/{_id_path(cert_id)}")
         return _mutate_result(data, f"Certificate {_id_path(cert_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1187,7 +1200,7 @@ async def npg_renew_certificate(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.post(f"/api/v1/certificates/{_id_path(cert_id)}/renew")
+        data = await _api(c.post, f"/api/v1/certificates/{_id_path(cert_id)}/renew")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1207,7 +1220,7 @@ async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
             entry: dict = {"cert_id": _id_path(cert_id)}
             try:
                 _validate_id("cert_id", cert_id)
-                data = c.post(f"/api/v1/certificates/{_id_path(cert_id)}/renew")
+                data = await _api(c.post, f"/api/v1/certificates/{_id_path(cert_id)}/renew")
                 entry["success"] = True
                 entry["result"] = data
             except Exception as e:
@@ -1226,7 +1239,7 @@ async def npg_reload_nginx() -> dict:
     """Reload nginx configuration."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/proxy-hosts/sync")
+        data = await _api(c.post, "/api/v1/proxy-hosts/sync")
         return _mutate_result(data, "Nginx reloaded")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1236,7 +1249,7 @@ async def npg_sync_nginx() -> dict:
     """Sync all proxy hosts. Equivalent to nginx reload — tests config then reloads nginx."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/proxy-hosts/sync")
+        data = await _api(c.post, "/api/v1/proxy-hosts/sync")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1246,7 +1259,7 @@ async def npg_test_nginx() -> dict:
     """Validate the running nginx configuration without reloading."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/test/nginx-config") or {}
+        data = await _api(c.post, "/api/v1/test/nginx-config") or {}
         if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
             return _mutate_result(data)
         return {"success": True, "data": {"status": data.get("status", "ok"), "message": data.get("message")}}
@@ -1258,7 +1271,7 @@ async def npg_validate_nginx_config() -> dict:
     """Dry-run validate nginx config — never reloads."""
     c = _get_client()
     try:
-        data = c.post("/api/v1/test/nginx-config") or {}
+        data = await _api(c.post, "/api/v1/test/nginx-config") or {}
         if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
             return _mutate_result(data)
         return {"success": True, "data": {"valid": True, "status": data.get("status", "ok"), "message": data.get("message")}}
@@ -1272,7 +1285,7 @@ async def npg_validate_nginx_config() -> dict:
 async def npg_list_redirect_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/redirect-hosts")
+        data = await _api(c.get, "/api/v1/redirect-hosts")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1282,7 +1295,7 @@ async def npg_get_redirect_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
+        data = await _api(c.get, f"/api/v1/redirect-hosts/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1309,7 +1322,7 @@ async def npg_create_redirect_host(
                 "redirect_code": "redirect_code",
             },
         )
-        data = c.post("/api/v1/redirect-hosts", body)
+        data = await _api(c.post, "/api/v1/redirect-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1336,7 +1349,7 @@ async def npg_update_redirect_host(
                 "redirect_code": "redirect_code",
             },
         )
-        data = c.put(f"/api/v1/redirect-hosts/{_id_path(host_id)}", body)
+        data = await _api(c.put, f"/api/v1/redirect-hosts/{_id_path(host_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1346,7 +1359,7 @@ async def npg_delete_redirect_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/redirect-hosts/{_id_path(host_id)}")
+        data = await _api(c.delete, f"/api/v1/redirect-hosts/{_id_path(host_id)}")
         return _mutate_result(data, f"Redirect host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1359,7 +1372,7 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1382,7 +1395,7 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
                 "whitelist_ips": "whitelist_ips",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1392,7 +1405,7 @@ async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1416,7 +1429,7 @@ async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | N
                 "custom_allowed_agents": "custom_allowed_agents",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1426,7 +1439,7 @@ async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1452,7 +1465,7 @@ async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bo
                 "disable_global": "disable_global",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1463,7 +1476,7 @@ async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["
         _validate_id("host_id", host_id)
         _validate_required("preset", preset)
         c = _get_client()
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers/preset/{preset}")
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers/preset/{preset}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1473,7 +1486,7 @@ async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1494,7 +1507,7 @@ async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None 
                 "health_check_interval": "health_check_interval",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1504,7 +1517,7 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1523,7 +1536,7 @@ async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | No
                 "allow_private_ips": "allow_private_ips",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1535,7 +1548,7 @@ async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | No
 async def npg_get_settings() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings")
+        data = await _api(c.get, "/api/v1/settings")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1544,7 +1557,7 @@ async def npg_get_settings() -> dict:
 async def npg_update_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/settings", kwargs or {})
+        data = await _api(c.put, "/api/v1/settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1553,7 +1566,7 @@ async def npg_update_settings(kwargs: dict | None = None) -> dict:
 async def npg_get_system_settings() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings")
+        data = await _api(c.get, "/api/v1/system-settings")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1562,7 +1575,7 @@ async def npg_get_system_settings() -> dict:
 async def npg_update_system_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/system-settings", kwargs or {})
+        data = await _api(c.put, "/api/v1/system-settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1571,7 +1584,7 @@ async def npg_update_system_settings(kwargs: dict | None = None) -> dict:
 async def npg_get_dashboard() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard")
+        data = await _api(c.get, "/api/v1/dashboard")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1580,7 +1593,7 @@ async def npg_get_dashboard() -> dict:
 async def npg_get_dashboard_health() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard/health")
+        data = await _api(c.get, "/api/v1/dashboard/health")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1589,7 +1602,7 @@ async def npg_get_dashboard_health() -> dict:
 async def npg_get_dashboard_geoip_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard/geoip-stats")
+        data = await _api(c.get, "/api/v1/dashboard/geoip-stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1601,7 +1614,7 @@ async def npg_get_dashboard_geoip_stats() -> dict:
 async def npg_list_access_lists() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/access-lists")
+        data = await _api(c.get, "/api/v1/access-lists")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1611,7 +1624,7 @@ async def npg_get_access_list(list_id: str | int) -> dict:
     try:
         _validate_id("list_id", list_id)
         c = _get_client()
-        data = c.get(f"/api/v1/access-lists/{_id_path(list_id)}")
+        data = await _api(c.get, f"/api/v1/access-lists/{_id_path(list_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1627,7 +1640,7 @@ async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pas
         if pass_auth is not None: body["pass_auth"] = pass_auth
         if description is not None: body["description"] = description
         if items is not None: body["items"] = items
-        data = c.post("/api/v1/access-lists", body)
+        data = await _api(c.post, "/api/v1/access-lists", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1647,7 +1660,7 @@ async def npg_update_access_list(list_id: str | int, name: str | None = None, sa
                 "items": "items",
             },
         )
-        data = c.put(f"/api/v1/access-lists/{_id_path(list_id)}", body)
+        data = await _api(c.put, f"/api/v1/access-lists/{_id_path(list_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1657,7 +1670,7 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
     try:
         _validate_id("list_id", list_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/access-lists/{_id_path(list_id)}")
+        data = await _api(c.delete, f"/api/v1/access-lists/{_id_path(list_id)}")
         return _mutate_result(data, f"Access list {_id_path(list_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1669,7 +1682,7 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
 async def npg_list_dns_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dns-providers")
+        data = await _api(c.get, "/api/v1/dns-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1679,7 +1692,7 @@ async def npg_get_dns_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.get(f"/api/v1/dns-providers/{_id_path(provider_id)}")
+        data = await _api(c.get, f"/api/v1/dns-providers/{_id_path(provider_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1695,7 +1708,7 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
             body["credentials"] = credentials
         if kwargs:
             body.update(kwargs)
-        data = c.post("/api/v1/dns-providers", body)
+        data = await _api(c.post, "/api/v1/dns-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1705,7 +1718,7 @@ async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = 
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.put(f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs or {})
+        data = await _api(c.put, f"/api/v1/dns-providers/{_id_path(provider_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1715,7 +1728,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/dns-providers/{_id_path(provider_id)}")
+        data = await _api(c.delete, f"/api/v1/dns-providers/{_id_path(provider_id)}")
         return _mutate_result(data, f"DNS provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1725,7 +1738,7 @@ async def npg_test_dns_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.post("/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
+        data = await _api(c.post, "/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1737,7 +1750,7 @@ async def npg_test_dns_provider(provider_id: str | int) -> dict:
 async def npg_list_cloud_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/cloud-providers")
+        data = await _api(c.get, "/api/v1/cloud-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1747,7 +1760,7 @@ async def npg_get_cloud_provider(slug: str) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        data = c.get(f"/api/v1/cloud-providers/{slug}")
+        data = await _api(c.get, f"/api/v1/cloud-providers/{slug}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1766,7 +1779,7 @@ async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], 
             body["description"] = description
         if kwargs:
             body.update(kwargs)
-        data = c.post("/api/v1/cloud-providers", body)
+        data = await _api(c.post, "/api/v1/cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1776,7 +1789,7 @@ async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None) -> di
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        data = c.put(f"/api/v1/cloud-providers/{slug}", kwargs or {})
+        data = await _api(c.put, f"/api/v1/cloud-providers/{slug}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1786,7 +1799,7 @@ async def npg_delete_cloud_provider(slug: str) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        data = c.delete(f"/api/v1/cloud-providers/{slug}")
+        data = await _api(c.delete, f"/api/v1/cloud-providers/{slug}")
         return _mutate_result(data, f"Cloud provider {slug} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1796,7 +1809,7 @@ async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1807,14 +1820,14 @@ async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_provi
         _validate_id("host_id", host_id)
         c = _get_client()
         # Read-modify-write: upstream SetBlockedProviders full-replaces all 4 fields.
-        current = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers") or {}
+        current = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers") or {}
         body = {
             "blocked_providers": blocked_providers if blocked_providers is not None else (current.get("blocked_providers") or []),
             "challenge_mode": challenge_mode if challenge_mode is not None else bool(current.get("challenge_mode", False)),
             "allow_search_bots": allow_search_bots if allow_search_bots is not None else bool(current.get("allow_search_bots", False)),
             "cloud_disable_global": cloud_disable_global if cloud_disable_global is not None else bool(current.get("cloud_disable_global", False)),
         }
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1826,7 +1839,7 @@ async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_provi
 async def npg_get_geoip_status() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings/geoip/status")
+        data = await _api(c.get, "/api/v1/system-settings/geoip/status")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1835,7 +1848,7 @@ async def npg_get_geoip_status() -> dict:
 async def npg_update_geoip() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/system-settings/geoip/update")
+        data = await _api(c.post, "/api/v1/system-settings/geoip/update")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1844,7 +1857,7 @@ async def npg_update_geoip() -> dict:
 async def npg_list_countries() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/geo/countries")
+        data = await _api(c.get, "/api/v1/geo/countries")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1854,7 +1867,7 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1868,7 +1881,7 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
         # Non-standard: pre-seeded defaults dict (create semantics) + conditional — kept as-is (not _build_body).
         body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
         if allowed_ips is not None: body["allowed_ips"] = allowed_ips
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1891,7 +1904,7 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
                 "allow_search_bots": "allow_search_bots",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1901,7 +1914,7 @@ async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
         return _mutate_result(data, f"Geo restriction for host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1914,7 +1927,7 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1935,7 +1948,7 @@ async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | Non
                 "action": "action",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1948,7 +1961,7 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
+        data = await _api(c.get, f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1970,7 +1983,7 @@ async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | No
                 "page_title": "page_title",
             },
         )
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", body)
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1980,7 +1993,7 @@ async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge")
         return _mutate_result(data, f"Challenge configuration for host {_id_path(host_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1991,7 +2004,7 @@ async def npg_verify_challenge(token: str, solution: str) -> dict:
         _validate_required("token", token)
         _validate_required("solution", solution)
         c = _get_client()
-        data = c.post("/api/v1/challenge/verify", {"token": token, "solution": solution})
+        data = await _api(c.post, "/api/v1/challenge/verify", {"token": token, "solution": solution})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2003,7 +2016,7 @@ async def npg_verify_challenge(token: str, solution: str) -> dict:
 async def npg_list_banned_ips() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/banned-ips")
+        data = await _api(c.get, "/api/v1/banned-ips")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2014,7 +2027,7 @@ async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", ban_ti
     try:
         _validate_required("ip_address", ip_address)
         c = _get_client()
-        data = c.post("/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "ban_time": ban_time})
+        data = await _api(c.post, "/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "ban_time": ban_time})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2024,7 +2037,7 @@ async def npg_unban_ip(ip_id: str | int) -> dict:
     try:
         _validate_id("ip_id", ip_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/banned-ips/{_id_path(ip_id)}")
+        data = await _api(c.delete, f"/api/v1/banned-ips/{_id_path(ip_id)}")
         return _mutate_result(data, f"IP ban {_id_path(ip_id)} removed")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2034,7 +2047,7 @@ async def npg_unban_ip_by_address(ip: str) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
-        data = c.delete("/api/v1/banned-ips", params={"ip": ip})
+        data = await _api(c.delete, "/api/v1/banned-ips", params={"ip": ip})
         return _mutate_result(data, f"IP {ip} unbanned")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2045,7 +2058,7 @@ async def npg_update_ban_duration(ban_id: str | int, ban_time: int) -> dict:
     try:
         _validate_id("ban_id", ban_id)
         c = _get_client()
-        data = c.put(f"/api/v1/banned-ips/{_id_path(ban_id)}/duration", {"ban_time": ban_time})
+        data = await _api(c.put, f"/api/v1/banned-ips/{_id_path(ban_id)}/duration", {"ban_time": ban_time})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2054,7 +2067,7 @@ async def npg_update_ban_duration(ban_id: str | int, ban_time: int) -> dict:
 async def npg_get_bots_known() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/bots/known")
+        data = await _api(c.get, "/api/v1/bots/known")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2063,7 +2076,7 @@ async def npg_get_bots_known() -> dict:
 async def npg_get_security_headers_presets() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/security-headers/presets")
+        data = await _api(c.get, "/api/v1/security-headers/presets")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2075,7 +2088,7 @@ async def npg_get_security_headers_presets() -> dict:
 async def npg_list_exploit_rules() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/exploit-rules")
+        data = await _api(c.get, "/api/v1/exploit-rules")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2085,7 +2098,7 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.get(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
+        data = await _api(c.get, f"/api/v1/exploit-rules/{_id_path(rule_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2105,7 +2118,7 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
             body["description"] = description
         if kwargs:
             body.update(kwargs)
-        data = c.post("/api/v1/exploit-rules", body)
+        data = await _api(c.post, "/api/v1/exploit-rules", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2115,7 +2128,7 @@ async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.put(f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs or {})
+        data = await _api(c.put, f"/api/v1/exploit-rules/{_id_path(rule_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2125,7 +2138,7 @@ async def npg_delete_exploit_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}")
+        data = await _api(c.delete, f"/api/v1/exploit-rules/{_id_path(rule_id)}")
         return _mutate_result(data, f"Exploit rule {_id_path(rule_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2135,7 +2148,7 @@ async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post(f"/api/v1/exploit-rules/{_id_path(rule_id)}/toggle")
+        data = await _api(c.post, f"/api/v1/exploit-rules/{_id_path(rule_id)}/toggle")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2147,7 +2160,7 @@ async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
 async def npg_list_waf_rules() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf/rules")
+        data = await _api(c.get, "/api/v1/waf/rules")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2156,7 +2169,7 @@ async def npg_list_waf_rules() -> dict:
 async def npg_get_waf_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf/hosts")
+        data = await _api(c.get, "/api/v1/waf/hosts")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2166,7 +2179,7 @@ async def npg_get_waf_host_config(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/waf/hosts/{_id_path(host_id)}/config")
+        data = await _api(c.get, f"/api/v1/waf/hosts/{_id_path(host_id)}/config")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2177,7 +2190,7 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        data = await _api(c.post, f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2188,7 +2201,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        data = await _api(c.delete, f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
         return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2213,7 +2226,7 @@ async def npg_get_logs(
             params["status"] = status
         if method is not None and str(method).strip():
             params["method"] = str(method)
-        data = c.get("/api/v1/logs", params=params or None)
+        data = await _api(c.get, "/api/v1/logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2222,7 +2235,7 @@ async def npg_get_logs(
 async def npg_get_log_settings() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/settings")
+        data = await _api(c.get, "/api/v1/logs/settings")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2231,7 +2244,7 @@ async def npg_get_log_settings() -> dict:
 async def npg_update_log_settings(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/logs/settings", kwargs or {})
+        data = await _api(c.put, "/api/v1/logs/settings", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2240,7 +2253,7 @@ async def npg_update_log_settings(kwargs: dict | None = None) -> dict:
 async def npg_get_log_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/stats")
+        data = await _api(c.get, "/api/v1/logs/stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2259,7 +2272,7 @@ async def npg_list_audit_logs(
             params["action"] = str(action)
         if resource_type is not None and str(resource_type).strip():
             params["resource_type"] = str(resource_type)
-        data = c.get("/api/v1/audit-logs", params=params or None)
+        data = await _api(c.get, "/api/v1/audit-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2277,7 +2290,7 @@ async def npg_list_system_logs(
             params["source"] = str(source)
         if level is not None and str(level).strip():
             params["level"] = str(level)
-        data = c.get("/api/v1/system-logs", params=params or None)
+        data = await _api(c.get, "/api/v1/system-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2289,7 +2302,7 @@ async def npg_list_system_logs(
 async def npg_list_backups() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/backups")
+        data = await _api(c.get, "/api/v1/backups")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2299,7 +2312,7 @@ async def npg_get_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        data = c.get(f"/api/v1/backups/{_id_path(backup_id)}")
+        data = await _api(c.get, f"/api/v1/backups/{_id_path(backup_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2308,7 +2321,7 @@ async def npg_get_backup(backup_id: str | int) -> dict:
 async def npg_create_backup() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/backups")
+        data = await _api(c.post, "/api/v1/backups")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2318,7 +2331,7 @@ async def npg_delete_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/backups/{_id_path(backup_id)}")
+        data = await _api(c.delete, f"/api/v1/backups/{_id_path(backup_id)}")
         return _mutate_result(data, f"Backup {_id_path(backup_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2328,7 +2341,7 @@ async def npg_restore_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        data = c.post(f"/api/v1/backups/{_id_path(backup_id)}/restore")
+        data = await _api(c.post, f"/api/v1/backups/{_id_path(backup_id)}/restore")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2340,7 +2353,7 @@ async def npg_restore_backup(backup_id: str | int) -> dict:
 async def npg_list_api_tokens() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/api-tokens")
+        data = await _api(c.get, "/api/v1/api-tokens")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2350,7 +2363,7 @@ async def npg_get_api_token(token_id: str | int) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = c.get(f"/api/v1/api-tokens/{_id_path(token_id)}")
+        data = await _api(c.get, f"/api/v1/api-tokens/{_id_path(token_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2362,7 +2375,7 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_at: st
         _validate_required("permissions", permissions)
         c = _get_client()
         body = {"name": name, "permissions": permissions, "expires_at": expires_at}
-        data = c.post("/api/v1/api-tokens", body)
+        data = await _api(c.post, "/api/v1/api-tokens", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2372,7 +2385,7 @@ async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None) 
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = c.put(f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs or {})
+        data = await _api(c.put, f"/api/v1/api-tokens/{_id_path(token_id)}", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2382,7 +2395,7 @@ async def npg_revoke_api_token(token_id: str | int) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = c.post(f"/api/v1/api-tokens/{_id_path(token_id)}/revoke")
+        data = await _api(c.post, f"/api/v1/api-tokens/{_id_path(token_id)}/revoke")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2392,7 +2405,7 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/api-tokens/{_id_path(token_id)}")
+        data = await _api(c.delete, f"/api/v1/api-tokens/{_id_path(token_id)}")
         return _mutate_result(data, f"API token {_id_path(token_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2403,7 +2416,7 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
 async def npg_list_notification_channels() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/notification-channels")
+        data = await _api(c.get, "/api/v1/notification-channels")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2419,7 +2432,7 @@ async def npg_create_notification_channel(name: str, channel_type: str, config: 
             body["config"] = config
         if events:
             body["events"] = events
-        data = c.post("/api/v1/notification-channels", body)
+        data = await _api(c.post, "/api/v1/notification-channels", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2432,7 +2445,7 @@ async def npg_update_notification_channel(channel_id: str | int, name: str | Non
         cid = _id_path(channel_id)
         # Read-modify-write: API is full-replace (UpdateNotificationChannelRequest = CreateNotificationChannelRequest)
         # There is no GET /:id endpoint, so we use the list endpoint and find by ID
-        listing = c.get("/api/v1/notification-channels")
+        listing = await _api(c.get, "/api/v1/notification-channels")
         existing: dict = {}
         if listing and isinstance(listing, dict):
             for ch in listing.get("data", []):
@@ -2466,7 +2479,7 @@ async def npg_update_notification_channel(channel_id: str | int, name: str | Non
         if language is not None: body["language"] = language
         if dashboard_url is not None: body["dashboard_url"] = dashboard_url
         if template is not None: body["template"] = template
-        data = c.put(f"/api/v1/notification-channels/{cid}", body)
+        data = await _api(c.put, f"/api/v1/notification-channels/{cid}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2476,7 +2489,7 @@ async def npg_delete_notification_channel(channel_id: str | int) -> dict:
     try:
         _validate_id("channel_id", channel_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/notification-channels/{_id_path(channel_id)}")
+        data = await _api(c.delete, f"/api/v1/notification-channels/{_id_path(channel_id)}")
         return _mutate_result(data, f"Notification channel {_id_path(channel_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2486,7 +2499,7 @@ async def npg_test_notification_channel(channel_id: str | int) -> dict:
     try:
         _validate_id("channel_id", channel_id)
         c = _get_client()
-        data = c.post(f"/api/v1/notification-channels/{_id_path(channel_id)}/test")
+        data = await _api(c.post, f"/api/v1/notification-channels/{_id_path(channel_id)}/test")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2496,7 +2509,7 @@ async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
     try:
         _validate_id("channel_id", channel_id)
         c = _get_client()
-        data = c.get(f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
+        data = await _api(c.get, f"/api/v1/notification-channels/{_id_path(channel_id)}/deliveries")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2509,7 +2522,7 @@ async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: st
             locals(),
             {"bot_token": "bot_token", "channel_id": "channel_id"},
         )
-        data = c.post("/api/v1/notification-channels/detect-telegram-chats", body)
+        data = await _api(c.post, "/api/v1/notification-channels/detect-telegram-chats", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2521,7 +2534,7 @@ async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: st
 async def npg_list_users() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/users")
+        data = await _api(c.get, "/api/v1/users")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2531,7 +2544,7 @@ async def npg_get_user(user_id: str | int) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
-        data = c.get(f"/api/v1/users/{_id_path(user_id)}")
+        data = await _api(c.get, f"/api/v1/users/{_id_path(user_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2545,7 +2558,7 @@ async def npg_create_user(username: str, email: str, password: str, role_id: str
         _validate_id("role_id", role_id)
         c = _get_client()
         body = {"username": username, "email": email, "password": password, "role_id": _id_path(role_id), "is_active": is_active}
-        data = c.post("/api/v1/users", body)
+        data = await _api(c.post, "/api/v1/users", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2556,7 +2569,7 @@ async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
         _validate_id("user_id", user_id)
         _validate_required("new_password", new_password)
         c = _get_client()
-        data = c.put(f"/api/v1/users/{_id_path(user_id)}/password", {"password": new_password})
+        data = await _api(c.put, f"/api/v1/users/{_id_path(user_id)}/password", {"password": new_password})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2566,7 +2579,7 @@ async def npg_end_user_sessions(user_id: str | int) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
-        data = c.post(f"/api/v1/users/{_id_path(user_id)}/end-sessions")
+        data = await _api(c.post, f"/api/v1/users/{_id_path(user_id)}/end-sessions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2576,7 +2589,7 @@ async def npg_delete_user(user_id: str | int) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/users/{_id_path(user_id)}")
+        data = await _api(c.delete, f"/api/v1/users/{_id_path(user_id)}")
         return _mutate_result(data, f"User {_id_path(user_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2588,7 +2601,7 @@ async def npg_delete_user(user_id: str | int) -> dict:
 async def npg_list_roles() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/roles")
+        data = await _api(c.get, "/api/v1/roles")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2599,7 +2612,7 @@ async def npg_create_role(name: str, permissions: list[str] | None = None, descr
         _validate_required("name", name)
         c = _get_client()
         body = {"name": name, "description": description, "permissions": permissions or []}
-        data = c.post("/api/v1/roles", body)
+        data = await _api(c.post, "/api/v1/roles", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2613,7 +2626,7 @@ async def npg_update_role(role_id: str | int, name: str | None = None, descripti
             locals(),
             {"name": "name", "description": "description", "permissions": "permissions"},
         )
-        data = c.put(f"/api/v1/roles/{_id_path(role_id)}", body)
+        data = await _api(c.put, f"/api/v1/roles/{_id_path(role_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2623,7 +2636,7 @@ async def npg_delete_role(role_id: str | int) -> dict:
     try:
         _validate_id("role_id", role_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/roles/{_id_path(role_id)}")
+        data = await _api(c.delete, f"/api/v1/roles/{_id_path(role_id)}")
         return _mutate_result(data, f"Role {_id_path(role_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2635,7 +2648,7 @@ async def npg_delete_role(role_id: str | int) -> dict:
 async def npg_list_sso_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/sso-providers")
+        data = await _api(c.get, "/api/v1/sso-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2653,7 +2666,7 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
             body["client_secret"] = client_secret
         if scopes is not None:
             body["scopes"] = scopes
-        data = c.post("/api/v1/sso-providers", body)
+        data = await _api(c.post, "/api/v1/sso-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2666,7 +2679,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
         cid = _id_path(provider_id)
         # Read-modify-write: API PUT is full-replace (requires slug, issuer_url, client_id, client_secret)
         # No GET /sso-providers/{id} exists, so fetch the list and find by ID
-        providers = c.get("/api/v1/sso-providers")
+        providers = await _api(c.get, "/api/v1/sso-providers")
         current = None
         if isinstance(providers, dict):
             items = providers.get("data", [])
@@ -2703,7 +2716,7 @@ async def npg_update_sso_provider(provider_id: str | int, name: str | None = Non
         if group_claim is not None: body["group_claim"] = group_claim
         if required_group is not None: body["required_group"] = required_group
         if default_role_id is not None: body["default_role_id"] = default_role_id
-        data = c.put(f"/api/v1/sso-providers/{cid}", body)
+        data = await _api(c.put, f"/api/v1/sso-providers/{cid}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2713,7 +2726,7 @@ async def npg_delete_sso_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/sso-providers/{_id_path(provider_id)}")
+        data = await _api(c.delete, f"/api/v1/sso-providers/{_id_path(provider_id)}")
         return _mutate_result(data, f"SSO provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2726,7 +2739,7 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
         body: dict = {"issuer_url": issuer_url}
         if scopes is not None:
             body["scopes"] = scopes
-        data = c.post("/api/v1/sso-providers/test", body)
+        data = await _api(c.post, "/api/v1/sso-providers/test", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2738,7 +2751,7 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
 async def npg_list_log_files() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings/log-files")
+        data = await _api(c.get, "/api/v1/system-settings/log-files")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2749,7 +2762,7 @@ async def npg_download_log_file(filename: str) -> dict:
         _validate_required("filename", filename)
         c = _get_client()
         encoded = quote(filename, safe="")
-        data = c.get_text(f"/api/v1/system-settings/log-files/{encoded}/download")
+        data = await _api(c.get_text, f"/api/v1/system-settings/log-files/{encoded}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2760,7 +2773,7 @@ async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
         _validate_required("filename", filename)
         c = _get_client()
         encoded = quote(filename, safe="")
-        data = c.get(f"/api/v1/system-settings/log-files/{encoded}/view", params={"lines": lines})
+        data = await _api(c.get, f"/api/v1/system-settings/log-files/{encoded}/view", params={"lines": lines})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2769,7 +2782,7 @@ async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
 async def npg_rotate_log_file() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/system-settings/log-files/rotate")
+        data = await _api(c.post, "/api/v1/system-settings/log-files/rotate")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2780,7 +2793,7 @@ async def npg_delete_log_file(filename: str) -> dict:
         _validate_required("filename", filename)
         c = _get_client()
         encoded = quote(filename, safe="")
-        data = c.delete(f"/api/v1/system-settings/log-files/{encoded}")
+        data = await _api(c.delete, f"/api/v1/system-settings/log-files/{encoded}")
         return _mutate_result(data, f"Log file {filename} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2792,7 +2805,7 @@ async def npg_delete_log_file(filename: str) -> dict:
 async def npg_get_expiring_certificates() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/certificates/expiring")
+        data = await _api(c.get, "/api/v1/certificates/expiring")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2801,7 +2814,7 @@ async def npg_get_expiring_certificates() -> dict:
 async def npg_get_certificate_history() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/certificates/history")
+        data = await _api(c.get, "/api/v1/certificates/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2814,7 +2827,7 @@ async def npg_upload_certificate(domain_names: list[str], cert_content: str, key
         _validate_required("key_content", key_content)
         c = _get_client()
         body = {"domain_names": domain_names, "certificate_pem": cert_content, "private_key_pem": key_content}
-        data = c.post("/api/v1/certificates/upload", body)
+        data = await _api(c.post, "/api/v1/certificates/upload", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2826,7 +2839,7 @@ async def npg_upload_certificate(domain_names: list[str], cert_content: str, key
 async def npg_list_uri_blocks() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/uri-blocks")
+        data = await _api(c.get, "/api/v1/uri-blocks")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2842,7 +2855,7 @@ async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", d
             body["description"] = description
         if host_ids is not None:
             body["host_ids"] = host_ids
-        data = c.post("/api/v1/uri-blocks/bulk-add-rule", body)
+        data = await _api(c.post, "/api/v1/uri-blocks/bulk-add-rule", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2854,7 +2867,7 @@ async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", d
 async def npg_get_global_uri_block() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/global-uri-block")
+        data = await _api(c.get, "/api/v1/global-uri-block")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2872,7 +2885,7 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
                 "allow_private_ips": "allow_private_ips",
             },
         )
-        data = c.put("/api/v1/global-uri-block", body)
+        data = await _api(c.put, "/api/v1/global-uri-block", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2886,7 +2899,7 @@ async def npg_add_global_uri_block_rule(pattern: str, match_type: str = "prefix"
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description: body["description"] = description
         if enabled is not None: body["enabled"] = enabled
-        data = c.post("/api/v1/global-uri-block/rules", body)
+        data = await _api(c.post, "/api/v1/global-uri-block/rules", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2896,7 +2909,7 @@ async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
+        data = await _api(c.delete, f"/api/v1/global-uri-block/rules/{_id_path(rule_id)}")
         return _mutate_result(data, f"Global URI block rule {_id_path(rule_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2909,7 +2922,7 @@ async def npg_get_upstream_health(upstream_id: str) -> dict:
     try:
         _validate_id("upstream_id", upstream_id)
         c = _get_client()
-        data = c.get(f"/api/v1/upstreams/{_id_path(upstream_id)}/health")
+        data = await _api(c.get, f"/api/v1/upstreams/{_id_path(upstream_id)}/health")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2922,7 +2935,7 @@ async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
     c = _get_client()
     try:
         params = {"region": region} if region else None
-        data = c.get("/api/v1/cloud-providers/by-region", params=params)
+        data = await _api(c.get, "/api/v1/cloud-providers/by-region", params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2934,7 +2947,7 @@ async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
 async def npg_get_catalog() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/filter-subscriptions/catalog")
+        data = await _api(c.get, "/api/v1/filter-subscriptions/catalog")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2946,7 +2959,7 @@ async def npg_get_catalog() -> dict:
 async def npg_get_docker_containers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/docker/containers")
+        data = await _api(c.get, "/api/v1/docker/containers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2958,7 +2971,7 @@ async def npg_get_docker_containers() -> dict:
 async def npg_check_update() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings/update/check")
+        data = await _api(c.get, "/api/v1/system-settings/update/check")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2971,7 +2984,7 @@ async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
     c = _get_client()
     try:
         body = {"dns_provider_id": _id_path(dns_provider_id)} if dns_provider_id is not None else {}
-        data = c.post("/api/v1/system-settings/acme/test", body)
+        data = await _api(c.post, "/api/v1/system-settings/acme/test", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2983,7 +2996,7 @@ async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
 async def npg_get_public_ui_settings() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/public/ui-settings")
+        data = await _api(c.get, "/api/v1/public/ui-settings")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2995,7 +3008,7 @@ async def npg_get_public_ui_settings() -> dict:
 async def npg_get_dashboard_containers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard/containers")
+        data = await _api(c.get, "/api/v1/dashboard/containers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3004,7 +3017,7 @@ async def npg_get_dashboard_containers() -> dict:
 async def npg_get_dashboard_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard/stats/hourly")
+        data = await _api(c.get, "/api/v1/dashboard/stats/hourly")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3013,7 +3026,7 @@ async def npg_get_dashboard_stats() -> dict:
 async def npg_get_dashboard_health_history() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dashboard/health/history")
+        data = await _api(c.get, "/api/v1/dashboard/health/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3025,7 +3038,7 @@ async def npg_get_dashboard_health_history() -> dict:
 async def npg_get_cloudflare_tunnel() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/cloudflare-tunnel")
+        data = await _api(c.get, "/api/v1/settings/cloudflare-tunnel")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3034,7 +3047,7 @@ async def npg_get_cloudflare_tunnel() -> dict:
 async def npg_update_cloudflare_tunnel(kwargs: dict | None = None) -> dict:
     c = _get_client()
     try:
-        data = c.put("/api/v1/settings/cloudflare-tunnel", kwargs or {})
+        data = await _api(c.put, "/api/v1/settings/cloudflare-tunnel", kwargs or {})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3043,7 +3056,7 @@ async def npg_update_cloudflare_tunnel(kwargs: dict | None = None) -> dict:
 async def npg_get_cloudflare_tunnel_status() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/cloudflare-tunnel/status")
+        data = await _api(c.get, "/api/v1/settings/cloudflare-tunnel/status")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3055,7 +3068,7 @@ async def npg_get_cloudflare_tunnel_status() -> dict:
 async def npg_get_global_security_headers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-security-headers")
+        data = await _api(c.get, "/api/v1/settings/global-security-headers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3079,7 +3092,7 @@ async def npg_update_global_security_headers(enabled: bool | None = None, hsts_e
                 "content_security_policy": "content_security_policy",
             },
         )
-        data = c.put("/api/v1/settings/global-security-headers", body)
+        data = await _api(c.put, "/api/v1/settings/global-security-headers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3091,7 +3104,7 @@ async def npg_update_global_security_headers(enabled: bool | None = None, hsts_e
 async def npg_get_global_bot_filter() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-bot-filter")
+        data = await _api(c.get, "/api/v1/settings/global-bot-filter")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3113,7 +3126,7 @@ async def npg_update_global_bot_filter(enabled: bool | None = None, block_bad_bo
                 "custom_allowed_agents": "custom_allowed_agents",
             },
         )
-        data = c.put("/api/v1/settings/global-bot-filter", body)
+        data = await _api(c.put, "/api/v1/settings/global-bot-filter", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3125,7 +3138,7 @@ async def npg_update_global_bot_filter(enabled: bool | None = None, block_bad_bo
 async def npg_get_global_cloud_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-cloud-providers")
+        data = await _api(c.get, "/api/v1/settings/global-cloud-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3142,7 +3155,7 @@ async def npg_update_global_cloud_providers(blocked_providers: list[str] | None 
                 "allow_search_bots": "allow_search_bots",
             },
         )
-        data = c.put("/api/v1/settings/global-cloud-providers", body)
+        data = await _api(c.put, "/api/v1/settings/global-cloud-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3154,7 +3167,7 @@ async def npg_update_global_cloud_providers(blocked_providers: list[str] | None 
 async def npg_get_global_geo() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-geo")
+        data = await _api(c.get, "/api/v1/settings/global-geo")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3175,7 +3188,7 @@ async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whit
                 "challenge_mode": "challenge_mode",
             },
         )
-        data = c.put("/api/v1/settings/global-geo", body)
+        data = await _api(c.put, "/api/v1/settings/global-geo", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3187,7 +3200,7 @@ async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whit
 async def npg_get_global_rate_limit() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-rate-limit")
+        data = await _api(c.get, "/api/v1/settings/global-rate-limit")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3208,7 +3221,7 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
                 "whitelist_ips": "whitelist_ips",
             },
         )
-        data = c.put("/api/v1/settings/global-rate-limit", body)
+        data = await _api(c.put, "/api/v1/settings/global-rate-limit", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3220,7 +3233,7 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
 async def npg_get_global_waf() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/global-waf")
+        data = await _api(c.get, "/api/v1/settings/global-waf")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3238,7 +3251,7 @@ async def npg_update_global_waf(enabled: bool | None = None, mode: str | None = 
                 "anomaly_threshold": "anomaly_threshold",
             },
         )
-        data = c.put("/api/v1/settings/global-waf", body)
+        data = await _api(c.put, "/api/v1/settings/global-waf", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3251,7 +3264,7 @@ async def npg_download_backup(backup_id: str | int) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
-        data = c.get_text(f"/api/v1/backups/{_id_path(backup_id)}/download")
+        data = await _api(c.get_text, f"/api/v1/backups/{_id_path(backup_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3273,7 +3286,7 @@ async def npg_upload_restore_backup(file_content: str, encoding: str = "base64")
                 return {"success": False, "error": f"file_content is not valid base64 (encoding='base64'): {e}"}
         else:
             raw = file_content.encode("utf-8")
-        data = c.post_file("/api/v1/backups/upload-restore", "backup", raw, "restore.tar.gz")
+        data = await _api(c.post_file, "/api/v1/backups/upload-restore", "backup", raw, "restore.tar.gz")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3282,7 +3295,7 @@ async def npg_upload_restore_backup(file_content: str, encoding: str = "base64")
 async def npg_get_backup_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/backups/stats")
+        data = await _api(c.get, "/api/v1/backups/stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3328,7 +3341,7 @@ def _bearer_auth_middleware(app, expected_token: str):
 async def npg_get_auth_status() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/auth/status")
+        data = await _api(c.get, "/api/v1/auth/status")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3337,7 +3350,7 @@ async def npg_get_auth_status() -> dict:
 async def npg_get_auth_me() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/auth/me")
+        data = await _api(c.get, "/api/v1/auth/me")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3346,7 +3359,7 @@ async def npg_get_auth_me() -> dict:
 async def npg_get_auth_sso_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/auth/sso/providers")
+        data = await _api(c.get, "/api/v1/auth/sso/providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3356,7 +3369,7 @@ async def npg_auth_sso_start(slug: str) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
-        data = c.get(f"/api/v1/auth/sso/{quote(slug, safe='')}/start", redirect_ok=True)
+        data = await _api(c.get, f"/api/v1/auth/sso/{quote(slug, safe='')}/start", redirect_ok=True)
         if data is not None and "redirect_url" in data:
             return {"success": True, "redirect_url": data["redirect_url"]}
         return {"success": True, "data": data}
@@ -3370,7 +3383,7 @@ async def npg_auth_sso_start(slug: str) -> dict:
 async def npg_list_auth_providers() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/auth-providers")
+        data = await _api(c.get, "/api/v1/auth-providers")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3391,7 +3404,7 @@ async def npg_create_auth_provider(name: str, provider_type: str, provider_url: 
         if container_network is not None: body["container_network"] = container_network
         if container_port is not None: body["container_port"] = container_port
         if container_scheme is not None: body["container_scheme"] = container_scheme
-        data = c.post("/api/v1/auth-providers", body)
+        data = await _api(c.post, "/api/v1/auth-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3401,7 +3414,7 @@ async def npg_get_auth_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.get(f"/api/v1/auth-providers/{_id_path(provider_id)}")
+        data = await _api(c.get, f"/api/v1/auth-providers/{_id_path(provider_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3425,7 +3438,7 @@ async def npg_update_auth_provider(provider_id: str | int, name: str | None = No
                 "container_scheme": "container_scheme",
             },
         )
-        data = c.put(f"/api/v1/auth-providers/{_id_path(provider_id)}", body)
+        data = await _api(c.put, f"/api/v1/auth-providers/{_id_path(provider_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3435,7 +3448,7 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/auth-providers/{_id_path(provider_id)}")
+        data = await _api(c.delete, f"/api/v1/auth-providers/{_id_path(provider_id)}")
         return _mutate_result(data, f"Auth provider {_id_path(provider_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3447,7 +3460,7 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
 async def npg_list_ddns_records() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/ddns-records")
+        data = await _api(c.get, "/api/v1/ddns-records")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3459,7 +3472,7 @@ async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, prox
         _validate_id("dns_provider_id", dns_provider_id)
         c = _get_client()
         body = {"hostname": hostname, "dns_provider_id": _id_path(dns_provider_id), "proxied": proxied, "ttl": ttl, "enabled": enabled}
-        data = c.post("/api/v1/ddns-records", body)
+        data = await _api(c.post, "/api/v1/ddns-records", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3469,7 +3482,7 @@ async def npg_get_ddns_record(record_id: str | int) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
-        data = c.get(f"/api/v1/ddns-records/{_id_path(record_id)}")
+        data = await _api(c.get, f"/api/v1/ddns-records/{_id_path(record_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3490,7 +3503,7 @@ async def npg_update_ddns_record(record_id: str | int, hostname: str | None = No
             },
             id_fields={"dns_provider_id"},
         )
-        data = c.put(f"/api/v1/ddns-records/{_id_path(record_id)}", body)
+        data = await _api(c.put, f"/api/v1/ddns-records/{_id_path(record_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3500,7 +3513,7 @@ async def npg_delete_ddns_record(record_id: str | int) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/ddns-records/{_id_path(record_id)}")
+        data = await _api(c.delete, f"/api/v1/ddns-records/{_id_path(record_id)}")
         return _mutate_result(data, f"DDNS record {_id_path(record_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3509,7 +3522,7 @@ async def npg_delete_ddns_record(record_id: str | int) -> dict:
 async def npg_sync_ddns_records() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/ddns-records/sync")
+        data = await _api(c.post, "/api/v1/ddns-records/sync")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3519,7 +3532,7 @@ async def npg_sync_ddns_record(record_id: str | int) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
-        data = c.post(f"/api/v1/ddns-records/{_id_path(record_id)}/sync")
+        data = await _api(c.post, f"/api/v1/ddns-records/{_id_path(record_id)}/sync")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3531,7 +3544,7 @@ async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id:
         _validate_id("dns_provider_id", dns_provider_id)
         c = _get_client()
         body = {"proxy_host_ids": proxy_host_ids, "dns_provider_id": _id_path(dns_provider_id)}
-        data = c.post("/api/v1/ddns-records/import-from-hosts", body)
+        data = await _api(c.post, "/api/v1/ddns-records/import-from-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3543,7 +3556,7 @@ async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id:
 async def npg_list_filter_subscriptions() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/filter-subscriptions")
+        data = await _api(c.get, "/api/v1/filter-subscriptions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3553,7 +3566,7 @@ async def npg_subscribe_filter_catalog(paths: list[str]) -> dict:
     try:
         _validate_required("paths", paths)
         c = _get_client()
-        data = c.post("/api/v1/filter-subscriptions/catalog/subscribe", {"paths": paths})
+        data = await _api(c.post, "/api/v1/filter-subscriptions/catalog/subscribe", {"paths": paths})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3566,7 +3579,7 @@ async def npg_create_filter_subscription(url: str, name: str | None = None) -> d
         body = {"url": url}
         if name is not None:
             body["name"] = name
-        data = c.post("/api/v1/filter-subscriptions", body)
+        data = await _api(c.post, "/api/v1/filter-subscriptions", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3576,7 +3589,7 @@ async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
+        data = await _api(c.get, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3590,7 +3603,7 @@ async def npg_update_filter_subscription(subscription_id: str | int, name: str |
             locals(),
             {"name": "name", "url": "url", "enabled": "enabled"},
         )
-        data = c.put(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}", body)
+        data = await _api(c.put, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3600,7 +3613,7 @@ async def npg_delete_filter_subscription(subscription_id: str | int) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
+        data = await _api(c.delete, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}")
         return _mutate_result(data, f"Filter subscription {_id_path(subscription_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3610,7 +3623,7 @@ async def npg_refresh_filter_subscription(subscription_id: str | int) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/refresh")
+        data = await _api(c.post, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/refresh")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3620,7 +3633,7 @@ async def npg_get_filter_subscription_exclusions(subscription_id: str | int) -> 
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions")
+        data = await _api(c.get, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3631,7 +3644,7 @@ async def npg_add_filter_subscription_exclusion(subscription_id: str | int, host
         _validate_id("subscription_id", subscription_id)
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
+        data = await _api(c.post, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3642,7 +3655,7 @@ async def npg_remove_filter_subscription_exclusion(subscription_id: str | int, h
         _validate_id("subscription_id", subscription_id)
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
+        data = await _api(c.delete, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/exclusions/{_id_path(host_id)}")
         return _mutate_result(data, f"Exclusion removed for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3652,7 +3665,7 @@ async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | in
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
-        data = c.get(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions")
+        data = await _api(c.get, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3663,7 +3676,7 @@ async def npg_add_filter_subscription_entry_exclusion(subscription_id: str | int
         _validate_id("subscription_id", subscription_id)
         _validate_required("entry_value", entry_value)
         c = _get_client()
-        data = c.post(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
+        data = await _api(c.post, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3674,7 +3687,7 @@ async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | 
         _validate_id("subscription_id", subscription_id)
         _validate_required("entry_value", entry_value)
         c = _get_client()
-        data = c.delete(f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
+        data = await _api(c.delete, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}/entry-exclusions", {"value": entry_value})
         return _mutate_result(data, f"Entry exclusion removed: {entry_value}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3686,7 +3699,7 @@ async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | 
 async def npg_get_exploit_rules_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/exploit-rules/hosts")
+        data = await _api(c.get, "/api/v1/exploit-rules/hosts")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3696,7 +3709,7 @@ async def npg_get_exploit_rules_for_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules")
+        data = await _api(c.get, f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3707,7 +3720,7 @@ async def npg_exclude_exploit_rule_from_host(host_id: str | int, rule_id: str | 
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
+        data = await _api(c.post, f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3718,7 +3731,7 @@ async def npg_remove_exploit_rule_exclusion_from_host(host_id: str | int, rule_i
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
+        data = await _api(c.delete, f"/api/v1/exploit-rules/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/exclude")
         return _mutate_result(data, f"Rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3728,7 +3741,7 @@ async def npg_global_exclude_exploit_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
+        data = await _api(c.post, f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3738,7 +3751,7 @@ async def npg_remove_exploit_rule_global_exclusion(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
+        data = await _api(c.delete, f"/api/v1/exploit-rules/{_id_path(rule_id)}/global-exclude")
         return _mutate_result(data, f"Rule {_id_path(rule_id)} re-enabled globally")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3750,7 +3763,7 @@ async def npg_remove_exploit_rule_global_exclusion(rule_id: str | int) -> dict:
 async def npg_delete_certificate_errors() -> dict:
     c = _get_client()
     try:
-        data = c.delete("/api/v1/certificates/errors")
+        data = await _api(c.delete, "/api/v1/certificates/errors")
         return _mutate_result(data, "All error certificates deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3760,7 +3773,7 @@ async def npg_clear_certificate_error(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/certificates/{_id_path(cert_id)}/error")
+        data = await _api(c.delete, f"/api/v1/certificates/{_id_path(cert_id)}/error")
         return _mutate_result(data, f"Certificate {_id_path(cert_id)} error cleared")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3773,7 +3786,7 @@ async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str, priva
         _validate_required("private_key_pem", private_key_pem)
         c = _get_client()
         body = {"certificate_pem": pem_content, "private_key_pem": private_key_pem}
-        data = c.put(f"/api/v1/certificates/{_id_path(cert_id)}/upload", body)
+        data = await _api(c.put, f"/api/v1/certificates/{_id_path(cert_id)}/upload", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3783,7 +3796,7 @@ async def npg_get_certificate_logs(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.get(f"/api/v1/certificates/{_id_path(cert_id)}/logs")
+        data = await _api(c.get, f"/api/v1/certificates/{_id_path(cert_id)}/logs")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3793,7 +3806,7 @@ async def npg_get_certificate_download(cert_id: str | int) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
-        data = c.get_text(f"/api/v1/certificates/{_id_path(cert_id)}/download")
+        data = await _api(c.get_text, f"/api/v1/certificates/{_id_path(cert_id)}/download")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3805,7 +3818,7 @@ async def npg_get_certificate_download(cert_id: str | int) -> dict:
 async def npg_get_challenge_config() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/challenge-config")
+        data = await _api(c.get, "/api/v1/challenge-config")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3824,7 +3837,7 @@ async def npg_update_challenge_config(enabled: bool | None = None, provider: str
                 "challenge_type": "challenge_type",
             },
         )
-        data = c.put("/api/v1/challenge-config", body)
+        data = await _api(c.put, "/api/v1/challenge-config", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3833,7 +3846,7 @@ async def npg_update_challenge_config(enabled: bool | None = None, provider: str
 async def npg_get_challenge_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/challenge-config/stats")
+        data = await _api(c.get, "/api/v1/challenge-config/stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3845,7 +3858,7 @@ async def npg_get_challenge_stats() -> dict:
 async def npg_get_dns_provider_default() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/dns-providers/default")
+        data = await _api(c.get, "/api/v1/dns-providers/default")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3863,7 +3876,7 @@ async def npg_post_log(level: str, message: str, source: str | None = None, comp
         body = {"level": level, "message": message, "log_type": log_type}
         if source is not None: body["source"] = source
         if component is not None: body["component"] = component
-        data = c.post("/api/v1/logs", body)
+        data = await _api(c.post, "/api/v1/logs", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3872,7 +3885,7 @@ async def npg_post_log(level: str, message: str, source: str | None = None, comp
 async def npg_cleanup_logs() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/logs/cleanup")
+        data = await _api(c.post, "/api/v1/logs/cleanup")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3881,7 +3894,7 @@ async def npg_cleanup_logs() -> dict:
 async def npg_get_log_autocomplete_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/hosts")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/hosts")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3890,7 +3903,7 @@ async def npg_get_log_autocomplete_hosts() -> dict:
 async def npg_get_log_autocomplete_ips() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/ips")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/ips")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3899,7 +3912,7 @@ async def npg_get_log_autocomplete_ips() -> dict:
 async def npg_get_log_autocomplete_user_agents() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/user-agents")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/user-agents")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3908,7 +3921,7 @@ async def npg_get_log_autocomplete_user_agents() -> dict:
 async def npg_get_log_autocomplete_uris() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/uris")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/uris")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3917,7 +3930,7 @@ async def npg_get_log_autocomplete_uris() -> dict:
 async def npg_get_log_autocomplete_countries() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/countries")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/countries")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3926,7 +3939,7 @@ async def npg_get_log_autocomplete_countries() -> dict:
 async def npg_get_log_autocomplete_methods() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/logs/autocomplete/methods")
+        data = await _api(c.get, "/api/v1/logs/autocomplete/methods")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3935,7 +3948,7 @@ async def npg_get_log_autocomplete_methods() -> dict:
 async def npg_get_log_filter_presets() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/log-filter-presets")
+        data = await _api(c.get, "/api/v1/log-filter-presets")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3949,7 +3962,7 @@ async def npg_create_log_filter_preset(name: str, filter: dict, description: str
         body = {"name": name, "filter": filter}
         if description is not None:
             body["description"] = description
-        data = c.post("/api/v1/log-filter-presets", body)
+        data = await _api(c.post, "/api/v1/log-filter-presets", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3963,7 +3976,7 @@ async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = 
             locals(),
             {"name": "name", "filter": "filter", "description": "description"},
         )
-        data = c.put(f"/api/v1/log-filter-presets/{_id_path(preset_id)}", body)
+        data = await _api(c.put, f"/api/v1/log-filter-presets/{_id_path(preset_id)}", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3973,7 +3986,7 @@ async def npg_delete_log_filter_preset(preset_id: str | int) -> dict:
     try:
         _validate_id("preset_id", preset_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/log-filter-presets/{_id_path(preset_id)}")
+        data = await _api(c.delete, f"/api/v1/log-filter-presets/{_id_path(preset_id)}")
         return _mutate_result(data, f"Log filter preset {_id_path(preset_id)} deleted")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3982,7 +3995,7 @@ async def npg_delete_log_filter_preset(preset_id: str | int) -> dict:
 async def npg_cleanup_system_logs() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/system-logs/cleanup")
+        data = await _api(c.post, "/api/v1/system-logs/cleanup")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3991,7 +4004,7 @@ async def npg_cleanup_system_logs() -> dict:
 async def npg_get_system_log_sources() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-logs/sources")
+        data = await _api(c.get, "/api/v1/system-logs/sources")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4000,7 +4013,7 @@ async def npg_get_system_log_sources() -> dict:
 async def npg_get_system_log_levels() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-logs/levels")
+        data = await _api(c.get, "/api/v1/system-logs/levels")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4009,7 +4022,7 @@ async def npg_get_system_log_levels() -> dict:
 async def npg_get_system_log_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-logs/stats")
+        data = await _api(c.get, "/api/v1/system-logs/stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4018,7 +4031,7 @@ async def npg_get_system_log_stats() -> dict:
 async def npg_get_system_settings_logs() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings/logs")
+        data = await _api(c.get, "/api/v1/system-settings/logs")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4031,7 +4044,7 @@ async def npg_update_system_settings_logs(max_age: str | None = None, max_size: 
             locals(),
             {"max_age": "max_age", "max_size": "max_size", "max_files": "max_files"},
         )
-        data = c.put("/api/v1/system-settings/logs", body)
+        data = await _api(c.put, "/api/v1/system-settings/logs", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4040,7 +4053,7 @@ async def npg_update_system_settings_logs(max_age: str | None = None, max_size: 
 async def npg_get_audit_log_actions() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/audit-logs/actions")
+        data = await _api(c.get, "/api/v1/audit-logs/actions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4049,7 +4062,7 @@ async def npg_get_audit_log_actions() -> dict:
 async def npg_get_audit_log_resource_types() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/audit-logs/resource-types")
+        data = await _api(c.get, "/api/v1/audit-logs/resource-types")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4058,7 +4071,7 @@ async def npg_get_audit_log_resource_types() -> dict:
 async def npg_get_audit_log_api_tokens() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/audit-logs/api-tokens")
+        data = await _api(c.get, "/api/v1/audit-logs/api-tokens")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4072,7 +4085,7 @@ async def npg_set_proxy_host_favorite(host_id: str | int, favorite: bool) -> dic
         _validate_id("host_id", host_id)
         _validate_required("favorite", favorite)
         c = _get_client()
-        data = c.put(f"/api/v1/proxy-hosts/{_id_path(host_id)}/favorite", {"favorite": favorite})
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/favorite", {"favorite": favorite})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4082,7 +4095,7 @@ async def npg_set_proxy_host_favorite(host_id: str | int, favorite: bool) -> dic
 async def npg_sync_redirect_hosts() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/redirect-hosts/sync")
+        data = await _api(c.post, "/api/v1/redirect-hosts/sync")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4094,7 +4107,7 @@ async def npg_delete_proxy_host_rate_limit(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit")
         return _mutate_result(data, f"Rate limit deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4104,7 +4117,7 @@ async def npg_delete_proxy_host_bot_filter(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter")
         return _mutate_result(data, f"Bot filter deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4114,7 +4127,7 @@ async def npg_delete_proxy_host_security_headers(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers")
         return _mutate_result(data, f"Security headers deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4124,7 +4137,7 @@ async def npg_delete_proxy_host_upstream(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream")
         return _mutate_result(data, f"Upstream config deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4134,7 +4147,7 @@ async def npg_delete_proxy_host_uri_block(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block")
         return _mutate_result(data, f"URI block deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4144,7 +4157,7 @@ async def npg_delete_proxy_host_fail2ban(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/fail2ban")
         return _mutate_result(data, f"Fail2ban config deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4154,7 +4167,7 @@ async def npg_bulk_unban_ips(ids: list[str | int]) -> dict:
     try:
         _validate_required("ids", ids)
         c = _get_client()
-        data = c.post("/api/v1/banned-ips/bulk-unban", {"ids": [_id_path(i) for i in ids]})
+        data = await _api(c.post, "/api/v1/banned-ips/bulk-unban", {"ids": [_id_path(i) for i in ids]})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4163,7 +4176,7 @@ async def npg_bulk_unban_ips(ids: list[str | int]) -> dict:
 async def npg_get_ban_history() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/banned-ips/history")
+        data = await _api(c.get, "/api/v1/banned-ips/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4172,7 +4185,7 @@ async def npg_get_ban_history() -> dict:
 async def npg_get_ban_history_stats() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/banned-ips/history/stats")
+        data = await _api(c.get, "/api/v1/banned-ips/history/stats")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4182,7 +4195,7 @@ async def npg_get_ban_history_for_ip(ip: str) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
-        data = c.get(f"/api/v1/banned-ips/history/ip/{quote(ip, safe='')}")
+        data = await _api(c.get, f"/api/v1/banned-ips/history/ip/{quote(ip, safe='')}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4195,7 +4208,7 @@ async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
         params: dict = {}
         if days is not None:
             params["days"] = days
-        data = c.get(f"/api/v1/banned-ips/stats/ip/{quote(ip, safe='')}", params=params or None)
+        data = await _api(c.get, f"/api/v1/banned-ips/stats/ip/{quote(ip, safe='')}", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4210,7 +4223,7 @@ async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, ma
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
             body["description"] = description
-        data = c.post(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", body)
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4221,7 +4234,7 @@ async def npg_delete_proxy_host_uri_block_rule(host_id: str | int, rule_id: str 
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules/{_id_path(rule_id)}")
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules/{_id_path(rule_id)}")
         return _mutate_result(data, f"URI block rule {_id_path(rule_id)} deleted for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4233,7 +4246,7 @@ async def npg_delete_proxy_host_uri_block_rule(host_id: str | int, rule_id: str 
 async def npg_reset_settings() -> dict:
     c = _get_client()
     try:
-        data = c.post("/api/v1/settings/reset")
+        data = await _api(c.post, "/api/v1/settings/reset")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4242,7 +4255,7 @@ async def npg_reset_settings() -> dict:
 async def npg_get_settings_presets() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/settings/presets")
+        data = await _api(c.get, "/api/v1/settings/presets")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4252,7 +4265,7 @@ async def npg_apply_settings_preset(preset: str) -> dict:
     try:
         _validate_required("preset", preset)
         c = _get_client()
-        data = c.post(f"/api/v1/settings/preset/{quote(preset, safe='')}")
+        data = await _api(c.post, f"/api/v1/settings/preset/{quote(preset, safe='')}")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4264,7 +4277,7 @@ async def npg_apply_settings_preset(preset: str) -> dict:
 async def npg_get_health_detailed() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/health/detailed")
+        data = await _api(c.get, "/api/v1/health/detailed")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4273,7 +4286,7 @@ async def npg_get_health_detailed() -> dict:
 async def npg_get_status() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/status")
+        data = await _api(c.get, "/api/v1/status")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4283,7 +4296,7 @@ async def npg_system_self_check() -> dict:
     """Run the upstream system self-check (DB + nginx -t + backup dir)."""
     c = _get_client()
     try:
-        data = c.get("/api/v1/test/system/self-check") or {}
+        data = await _api(c.get, "/api/v1/test/system/self-check") or {}
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4293,7 +4306,7 @@ async def npg_check_backup_restore() -> dict:
     """Run the upstream backup create/list/delete round-trip self-test."""
     c = _get_client()
     try:
-        data = c.get("/api/v1/test/backup-restore") or {}
+        data = await _api(c.get, "/api/v1/test/backup-restore") or {}
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4303,7 +4316,7 @@ async def npg_get_metrics() -> dict:
     """Fetch the upstream Prometheus metrics exposition text."""
     c = _get_client()
     try:
-        data = c.get_text("/metrics")
+        data = await _api(c.get_text, "/metrics")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4313,7 +4326,7 @@ async def npg_check_dashboard_queries() -> dict:
     """Run the upstream dashboard aggregation-query self-test."""
     c = _get_client()
     try:
-        data = c.get("/api/v1/test/dashboard/queries") or {}
+        data = await _api(c.get, "/api/v1/test/dashboard/queries") or {}
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4322,7 +4335,7 @@ async def npg_check_dashboard_queries() -> dict:
 async def npg_get_permission_areas() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/permission-areas")
+        data = await _api(c.get, "/api/v1/permission-areas")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4331,7 +4344,7 @@ async def npg_get_permission_areas() -> dict:
 async def npg_get_waf_global_rules() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf/global/rules")
+        data = await _api(c.get, "/api/v1/waf/global/rules")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4340,7 +4353,7 @@ async def npg_get_waf_global_rules() -> dict:
 async def npg_get_waf_global_exclusions() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf/global/exclusions")
+        data = await _api(c.get, "/api/v1/waf/global/exclusions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4349,7 +4362,7 @@ async def npg_get_waf_global_exclusions() -> dict:
 async def npg_get_waf_global_history() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf/global/history")
+        data = await _api(c.get, "/api/v1/waf/global/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4359,7 +4372,7 @@ async def npg_disable_waf_global_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
+        data = await _api(c.post, f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4369,7 +4382,7 @@ async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
+        data = await _api(c.delete, f"/api/v1/waf/global/rules/{_id_path(rule_id)}/disable")
         return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled globally")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4379,7 +4392,7 @@ async def npg_get_waf_host_history(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = c.get(f"/api/v1/waf/hosts/{_id_path(host_id)}/history")
+        data = await _api(c.get, f"/api/v1/waf/hosts/{_id_path(host_id)}/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4390,7 +4403,7 @@ async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> 
         _validate_required("domain_name", domain_name)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.post("/api/v1/waf/rules/disable-by-host", {"host": domain_name, "rule_id": int(rule_id)})
+        data = await _api(c.post, "/api/v1/waf/rules/disable-by-host", {"host": domain_name, "rule_id": int(rule_id)})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4401,7 +4414,7 @@ async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) ->
         _validate_id("host_id", host_id)
         _validate_id("rule_id", rule_id)
         c = _get_client()
-        data = c.delete(f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
+        data = await _api(c.delete, f"/api/v1/waf/hosts/{_id_path(host_id)}/rules/{_id_path(rule_id)}/disable")
         return _mutate_result(data, f"WAF rule {_id_path(rule_id)} re-enabled for host {_id_path(host_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4413,7 +4426,7 @@ async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) ->
 async def npg_get_api_token_permissions() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/api-tokens/permissions")
+        data = await _api(c.get, "/api/v1/api-tokens/permissions")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4423,7 +4436,7 @@ async def npg_get_api_token_usage(token_id: str | int) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = c.get(f"/api/v1/api-tokens/{_id_path(token_id)}/usage")
+        data = await _api(c.get, f"/api/v1/api-tokens/{_id_path(token_id)}/usage")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4435,7 +4448,7 @@ async def npg_get_api_token_usage(token_id: str | int) -> dict:
 async def npg_get_waf_test_patterns() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/waf-test/patterns")
+        data = await _api(c.get, "/api/v1/waf-test/patterns")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4446,7 +4459,7 @@ async def npg_test_waf_pattern(target_url: str, attack_type: str) -> dict:
         _validate_required("target_url", target_url)
         _validate_required("attack_type", attack_type)
         c = _get_client()
-        data = c.post("/api/v1/waf-test/test", {"target_url": target_url, "attack_type": attack_type})
+        data = await _api(c.post, "/api/v1/waf-test/test", {"target_url": target_url, "attack_type": attack_type})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4456,7 +4469,7 @@ async def npg_test_waf_all_patterns(target_url: str) -> dict:
     try:
         _validate_required("target_url", target_url)
         c = _get_client()
-        data = c.post("/api/v1/waf-test/test-all", {"target_url": target_url})
+        data = await _api(c.post, "/api/v1/waf-test/test-all", {"target_url": target_url})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4468,7 +4481,7 @@ async def npg_test_waf_all_patterns(target_url: str) -> dict:
 async def npg_get_geoip_history() -> dict:
     c = _get_client()
     try:
-        data = c.get("/api/v1/system-settings/geoip/history")
+        data = await _api(c.get, "/api/v1/system-settings/geoip/history")
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4481,7 +4494,7 @@ async def npg_set_user_role(user_id: str | int, role_id: str | int) -> dict:
         _validate_id("user_id", user_id)
         _validate_id("role_id", role_id)
         c = _get_client()
-        data = c.put(f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
+        data = await _api(c.put, f"/api/v1/users/{_id_path(user_id)}/role", {"role_id": _id_path(role_id)})
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4492,7 +4505,7 @@ async def npg_set_user_email(user_id: str | int, email: str) -> dict:
         _validate_id("user_id", user_id)
         _validate_required("email", email)
         c = _get_client()
-        data = c.put(f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
+        data = await _api(c.put, f"/api/v1/users/{_id_path(user_id)}/email", {"email": email})
         return _mutate_result(data, f"Email updated for user {_id_path(user_id)}")
     except Exception as e:
         return {"success": False, "error": str(e)}
