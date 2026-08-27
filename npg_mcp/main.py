@@ -1939,8 +1939,8 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds, 0=permanent), fail_codes, action (block/challenge). REQUIRED: host_id.")
-async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "challenge"] | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds, 0=permanent), fail_codes (comma-separated HTTP status codes, e.g. \"401,403\" — upstream rejects invalid codes like \"4o1\" with 400), action (block=log-and-ban, log=record only, notify=alert only without banning; upstream rejects other values with 400). REQUIRED: host_id.")
+async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "log", "notify"] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
