@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.17] - 2026-08-28
+
+### What changed
+- `npg_update_proxy_host_fail2ban` now accepts `action` values `block`, `log`, and `notify` (upstream NPG v2.50.0 added server-side validation: `challenge` is rejected with 400, and `notify` is a distinct no-ban action). Tool description documents the three actions and the new `fail_codes` validation (typo'd codes like `4o1` are rejected at save time).
+
+### What's new
+- Fail2ban "Notify Only" (action=`notify`) and "Log Only" (action=`log`) semantics are now reachable through the MCP tool, matching upstream v2.50.0 behavior where `notify` alerts without banning instead of silently banning.
+
+### Breaking changes
+- Callers passing `action="challenge"` to `npg_update_proxy_host_fail2ban` will now fail: the upstream API rejects `challenge` for fail2ban (HTTP 400) — use `block` for blocking behavior.
+
 ## [0.5.16] - 2026-08-25
 
 ### What changed
