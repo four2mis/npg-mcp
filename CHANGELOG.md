@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.18] - 2026-08-28
+
+### What changed
+- swagger.yaml synced to upstream NPG v2.50.0 (version string + trailing newline only). Upstream v2.50.0 is a server-side release (nginx/WAF/fail2ban runtime fixes) with zero API contract changes — no MCP tool code changes were needed.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.17] - 2026-08-28
 
 ### What changed
