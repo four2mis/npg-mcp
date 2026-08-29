@@ -1164,20 +1164,17 @@ async def npg_get_certificate(cert_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_certificate", description="Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc.")
+@mcp.tool(name="npg_create_certificate", description="Request a new Let's Encrypt certificate (upstream takes the ACME account email from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (e.g. 'letsencrypt'), dns_provider_id.")
 async def npg_create_certificate(
     domain_names: list[str],
-    email: str,
     provider: str = "letsencrypt",
     dns_provider_id: str | None = None,
 ) -> dict:
     try:
         _validate_required("domain_names", domain_names)
-        _validate_required("email", email)
         c = _get_client()
         body = {
             "domain_names": domain_names,
-            "email": email,
             "provider": provider,
             "dns_provider_id": dns_provider_id,
         }
@@ -3846,14 +3843,13 @@ async def npg_get_challenge_config() -> dict:
         return {"success": False, "error": str(e)}
 
 @mcp.tool(name="npg_update_challenge_config", description="UPDATE the global CAPTCHA challenge configuration (partial update). Pass only fields to change.")
-async def npg_update_challenge_config(enabled: bool | None = None, provider: str | None = None, secret_key: str | None = None, site_key: str | None = None, challenge_type: str | None = None) -> dict:
+async def npg_update_challenge_config(enabled: bool | None = None, secret_key: str | None = None, site_key: str | None = None, challenge_type: str | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
             locals(),
             {
                 "enabled": "enabled",
-                "provider": "provider",
                 "secret_key": "secret_key",
                 "site_key": "site_key",
                 "challenge_type": "challenge_type",
@@ -3975,28 +3971,26 @@ async def npg_get_log_filter_presets() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_log_filter_preset", description="Save a log filter preset. REQUIRED: name, filter (dict). Optional: description.")
-async def npg_create_log_filter_preset(name: str, filter: dict, description: str | None = None) -> dict:
+@mcp.tool(name="npg_create_log_filter_preset", description="Save a log filter preset. REQUIRED: name, filter (dict).")
+async def npg_create_log_filter_preset(name: str, filter: dict) -> dict:
     try:
         _validate_required("name", name)
         _validate_required("filter", filter)
         c = _get_client()
         body = {"name": name, "filter": filter}
-        if description is not None:
-            body["description"] = description
         data = await _api(c.post, "/api/v1/log-filter-presets", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_log_filter_preset", description="Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter, description.")
-async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = None, filter: dict | None = None, description: str | None = None) -> dict:
+@mcp.tool(name="npg_update_log_filter_preset", description="Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter.")
+async def npg_update_log_filter_preset(preset_id: str | int, name: str | None = None, filter: dict | None = None) -> dict:
     try:
         _validate_id("preset_id", preset_id)
         c = _get_client()
         body = _build_body(
             locals(),
-            {"name": "name", "filter": "filter", "description": "description"},
+            {"name": "name", "filter": "filter"},
         )
         data = await _api(c.put, f"/api/v1/log-filter-presets/{_id_path(preset_id)}", body)
         return {"success": True, "data": data}

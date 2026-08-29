@@ -117,7 +117,7 @@ npg_get_certificate:
       required: true
 
 npg_create_certificate:
-  description: "Request a new Let's Encrypt certificate. Required: domain_names (array), email. Optional: provider (e.g. 'letsencrypt'), dns_provider_id, etc."
+  description: "Request a new Let's Encrypt certificate (upstream takes the ACME account email from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (e.g. 'letsencrypt'), dns_provider_id."
   parameters: []
 
 npg_delete_certificate:
@@ -2134,9 +2134,6 @@ npg_update_challenge_config:
     - name: enabled
       type: boolean
       required: false
-    - name: provider
-      type: string
-      required: false
     - name: secret_key
       type: string
       required: false
@@ -2208,7 +2205,7 @@ npg_get_log_filter_presets:
   parameters: []
 
 npg_create_log_filter_preset:
-  description: "Save a log filter preset. REQUIRED: name, filter (dict). Optional: description."
+  description: "Save a log filter preset. REQUIRED: name, filter (dict)."
   parameters:
     - name: name
       type: string
@@ -2216,12 +2213,9 @@ npg_create_log_filter_preset:
     - name: filter
       type: object
       required: true
-    - name: description
-      type: string
-      required: false
 
 npg_update_log_filter_preset:
-  description: "Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter, description."
+  description: "Update a log filter preset (rename and/or replace filter). REQUIRED: preset_id. Optional: name, filter."
   parameters:
     - name: preset_id
       type: integer | string
@@ -2231,9 +2225,6 @@ npg_update_log_filter_preset:
       required: false
     - name: filter
       type: object
-      required: false
-    - name: description
-      type: string
       required: false
 
 npg_delete_log_filter_preset:
