@@ -216,7 +216,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
-| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (130 read-only tools), `standard` (238 tools, no destructive ops), `full` (all 286 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (131 read-only tools), `standard` (239 tools, no destructive ops), `full` (all 286 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 | `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
 
@@ -239,11 +239,11 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 
 | Level | Tools | Scope |
 |-------|-------|-------|
-| `read` | 130 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
-| `standard` | 238 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
-| `full` | 285 | All tools. Default; behavior without the variable is unchanged. |
+| `read` | 131 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
+| `standard` | 239 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
+| `full` | 286 | All tools. Default; behavior without the variable is unchanged. |
 
-Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 285-tool reference regardless of the selected level.
+Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 286-tool reference regardless of the selected level.
 
 ## Project Structure
 
