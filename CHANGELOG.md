@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.20] - 2026-08-30
+
+### What changed
+- Synced the MCP wrapper to upstream NPG v2.51.0. `npg_update_system_settings` now accepts the 3 new `UpdateSystemSettingsRequest` fields in its kwargs whitelist: `trusted_proxy_cidrs` (newline-separated IP/CIDR list), `trusted_proxy_preset` (none|cloudflare), and `real_ip_header` (X-Forwarded-For|X-Real-IP|CF-Connecting-IP|True-Client-IP). Previously, strict=true calls containing these fields were rejected client-side by the stale whitelist.
+- `npg_get_logs` gained 3 new query filters mirroring upstream `parseLogFilter` (v2.51.0): `status_classes` (list of 1xx-5xx class tokens), `exclude_status_codes` (list of ints), and `exclude_status_classes` (list of tokens). Upstream validates all filter values server-side — invalid values now surface as clean HTTP 400 errors naming the offending token instead of being silently dropped.
+- Tool descriptions for `npg_create_exploit_rule` and `npg_update_exploit_rule` now document the rewritten v2.51.0 validation: severity enum is `info|warning|critical` (default warning; legacy `low`/`medium`/`high` return 400), `pattern_type` is strictly enforced, `name` is capped at 100 chars, and regex patterns are validated.
+
+### What's new
+- Real-IP / trusted-proxy configuration is now reachable through the MCP API: set `trusted_proxy_cidrs`, `trusted_proxy_preset`, and `real_ip_header` via `npg_update_system_settings` to make NPG trust proxy-provided client IPs (e.g. behind Cloudflare).
+
+### Breaking changes
+- Callers passing `severity="low"`, `"medium"`, or `"high"` to exploit-rule tools will now get HTTP 400 from upstream — use `info`, `warning`, or `critical`.
+
 ## [0.5.19] - 2026-08-30
 
 ### What changed
