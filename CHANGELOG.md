@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.19] - 2026-08-30
+
+### What changed
+- `npg_get_logs` now sends the query parameter `status_code` instead of `status`: upstream `parseLogFilter` reads `status_code`, so the old param was silently ignored and the HTTP status filter had no effect. Verified against the test stack — `status=200` now returns only the matching log rows, and combined host/method/status filters work.
+- Dropped phantom request fields from 4 tools that upstream v2.50.0 request models don't define (fields were silently ignored by Go): `npg_create_certificate` lost the `email` param (ACME email comes from system settings via `npg_update_system_settings(acme_email=...)`), `npg_create_log_filter_preset` lost `description`, `npg_update_log_filter_preset` no longer sends `description` (a description-only PUT triggered upstream 400 "nothing to update"), and `npg_update_challenge_config` lost the `provider` param. Descriptions updated in the same commit per the CI description-sync gate.
+
+### What's new
+- (none)
+
+### Breaking changes
+- `npg_create_certificate` no longer accepts an `email` parameter — set the ACME contact email once via `npg_update_system_settings(acme_email=...)` instead.
+- `npg_create_log_filter_preset` / `npg_update_log_filter_preset` no longer accept a `description` parameter, and `npg_update_challenge_config` no longer accepts a `provider` parameter — these fields never existed upstream, so callers passing them were no-ops.
+
 ## [0.5.18] - 2026-08-28
 
 ### What changed
