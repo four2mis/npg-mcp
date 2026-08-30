@@ -2107,7 +2107,7 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name, pattern, pattern_type (query_string/request_uri/user_agent/request_method). Optional: severity, description (kwargs extras rejected unless strict=false).")
+@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name (max 100 chars), pattern (validated regex/strict per pattern_type), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced). severity: info|warning|critical (default warning; legacy low/medium/high now return HTTP 400, upstream v2.51.0). Optional: description (kwargs extras rejected unless strict=false).")
 async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("category", category)
@@ -2128,7 +2128,7 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change in kwargs: name, pattern, pattern_type, description, severity, enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id.")
+@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change in kwargs: name (max 100 chars), pattern (validated), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced), description, severity (info|warning|critical — legacy low/medium/high now return HTTP 400, upstream v2.51.0), enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id.")
 async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("rule_id", rule_id)
@@ -2214,11 +2214,14 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set.")
+@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), status_classes (list of 1xx-5xx class tokens, e.g. ['4xx']), exclude_status_codes (list of int), exclude_status_classes (list of 1xx-5xx tokens), limit (page size, the API maps it to per_page), offset (row offset, converted to page). All filter values are validated server-side — invalid tokens now return HTTP 400 naming the offending value instead of being silently dropped (upstream v2.51.0). REQUIRED: none — zero-arg call returns the full default log set.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
     method: str | None = None,
+    status_classes: list[str] | None = None,
+    exclude_status_codes: list[int] | None = None,
+    exclude_status_classes: list[str] | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> dict:
@@ -2232,6 +2235,12 @@ async def npg_get_logs(
             params["status_code"] = status
         if method is not None and str(method).strip():
             params["method"] = str(method)
+        if status_classes:
+            params["status_classes"] = [str(v) for v in status_classes]
+        if exclude_status_codes:
+            params["exclude_status_codes"] = [int(v) for v in exclude_status_codes]
+        if exclude_status_classes:
+            params["exclude_status_classes"] = [str(v) for v in exclude_status_classes]
         data = await _api(c.get, "/api/v1/logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:

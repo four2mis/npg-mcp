@@ -41,6 +41,16 @@ def test_none_and_empty_kwargs_pass():
     _validate_kwargs("npg_update_log_settings", None, strict=True)
 
 
+def test_system_settings_v2_51_fields_accepted():
+    """Upstream v2.51.0 added trusted-proxy fields to UpdateSystemSettingsRequest."""
+    kwargs = {
+        "trusted_proxy_cidrs": "10.0.0.0/8\n172.16.0.0/12",
+        "trusted_proxy_preset": "cloudflare",
+        "real_ip_header": "CF-Connecting-IP",
+    }
+    _validate_kwargs("npg_update_system_settings", kwargs, strict=True)
+
+
 def test_valid_dict_passes_through_unchanged():
     kwargs = {"retention_days": 30, "max_logs_per_type": 5000}
     _validate_kwargs("npg_update_log_settings", kwargs)

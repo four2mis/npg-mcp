@@ -131,6 +131,23 @@ class TestGetLogs:
         assert "non-negative integer" in result["error"]
         assert recording.calls == []
 
+    def test_status_class_filters_sent(self, recording):
+        _run(main_mod.npg_get_logs(status_classes=["4xx"], exclude_status_codes=[200, 404], exclude_status_classes=["2xx"]))
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"status_classes": ["4xx"], "exclude_status_codes": [200, 404], "exclude_status_classes": ["2xx"]})
+        ]
+
+    def test_status_class_filters_combined_with_existing(self, recording):
+        _run(main_mod.npg_get_logs(host="foo.example.com", status_classes=["5xx", "4xx"], limit=50))
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"per_page": 50, "host": "foo.example.com", "status_classes": ["5xx", "4xx"]})
+        ]
+
+    def test_empty_status_class_lists_not_sent(self, recording):
+        result = _run(main_mod.npg_get_logs(status_classes=[], exclude_status_codes=[], exclude_status_classes=[]))
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/logs", None)]
+
 
 class TestListAuditLogs:
     def test_zero_arg_sends_no_params(self, recording):

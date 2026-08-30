@@ -5,7 +5,7 @@ The Go API silently ignores unknown JSON fields, so a typo'd key in a
 whose real field is ``retention_days``) returns success while changing
 nothing — the silent-noop bug class behind the historical FastMCP
 ``**kwargs`` double-nesting incident. Each frozenset below is transcribed
-from the upstream request struct (api/internal/model/*.go) at NPG v2.48.0.
+from the upstream request struct (api/internal/model/*.go) at NPG v2.51.0.
 
 Maintenance: when upstream adds fields to one of these structs, add the new
 key here in the same commit that re-verifies against the latest tag.
@@ -80,6 +80,8 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         "ui_font_family", "ui_error_page_language",
         "system_logs_enabled", "system_logs_levels",
         "system_logs_exclude_patterns", "system_logs_stdout_excluded",
+        # v2.51.0
+        "trusted_proxy_cidrs", "trusted_proxy_preset", "real_ip_header",
     }),
     # model/log.go: UpdateLogSettingsRequest
     "npg_update_log_settings": frozenset({

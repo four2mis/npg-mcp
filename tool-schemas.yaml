@@ -862,7 +862,7 @@ npg_get_exploit_rule:
       required: true
 
 npg_create_exploit_rule:
-  description: "Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name, pattern, pattern_type (query_string/request_uri/user_agent/request_method). Optional: severity, description (kwargs extras rejected unless strict=false)."
+  description: "Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name (max 100 chars), pattern (validated regex/strict per pattern_type), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced). severity: info|warning|critical (default warning; legacy low/medium/high now return HTTP 400, upstream v2.51.0). Optional: description (kwargs extras rejected unless strict=false)."
   parameters:
     - name: category
       type: string
@@ -891,7 +891,7 @@ npg_create_exploit_rule:
       default: true
 
 npg_update_exploit_rule:
-  description: "Update an exploit rule. Pass only fields to change in kwargs: name, pattern, pattern_type, description, severity, enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id."
+  description: "Update an exploit rule. Pass only fields to change in kwargs: name (max 100 chars), pattern (validated), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced), description, severity (info|warning|critical — legacy low/medium/high now return HTTP 400, upstream v2.51.0), enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id."
   parameters:
     - name: rule_id
       type: integer | string
@@ -954,7 +954,7 @@ npg_enable_waf_rule:
       required: true
 
 npg_get_logs:
-  description: "GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set."
+  description: "GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), status_classes (list of 1xx-5xx class tokens, e.g. ['4xx']), exclude_status_codes (list of int), exclude_status_classes (list of 1xx-5xx tokens), limit (page size, the API maps it to per_page), offset (row offset, converted to page). All filter values are validated server-side — invalid tokens now return HTTP 400 naming the offending value instead of being silently dropped (upstream v2.51.0). REQUIRED: none — zero-arg call returns the full default log set."
   parameters: []
 
 npg_get_log_settings:
