@@ -3842,7 +3842,7 @@ async def npg_get_challenge_config() -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_update_challenge_config", description="UPDATE the global CAPTCHA challenge configuration (partial update). Pass only fields to change.")
+@mcp.tool(name="npg_update_challenge_config", description="UPDATE the global CAPTCHA challenge configuration (partial update). Fields: enabled, challenge_type (recaptcha_v2/recaptcha_v3/turnstile), site_key, secret_key (write-only, never returned). Pass only fields to change.")
 async def npg_update_challenge_config(enabled: bool | None = None, secret_key: str | None = None, site_key: str | None = None, challenge_type: str | None = None) -> dict:
     c = _get_client()
     try:
