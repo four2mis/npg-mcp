@@ -116,14 +116,14 @@ class TestGetLogs:
 
     def test_all_filters_sent(self, recording):
         _run(main_mod.npg_get_logs(host="foo.example.com", status=404, method="GET", limit=50, offset=10))
-        # limit -> per_page; offset 10 with page size 50 -> page 1
+        # limit -> per_page; offset 10 with page size 50 -> page 1; status -> status_code (upstream field name)
         assert recording.calls == [
-            ("GET", "/api/v1/logs", {"per_page": 50, "page": 1, "host": "foo.example.com", "status": 404, "method": "GET"})
+            ("GET", "/api/v1/logs", {"per_page": 50, "page": 1, "host": "foo.example.com", "status_code": 404, "method": "GET"})
         ]
 
     def test_partial_filters(self, recording):
         _run(main_mod.npg_get_logs(status=404, limit=50))
-        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 50, "status": 404})]
+        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 50, "status_code": 404})]
 
     def test_negative_status_clean_error(self, recording):
         result = _run(main_mod.npg_get_logs(status=-1))

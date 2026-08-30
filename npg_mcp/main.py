@@ -2214,7 +2214,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set.")
+@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), limit (page size, the API maps it to per_page), offset (row offset, converted to page). REQUIRED: none — zero-arg call returns the full default log set.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -2229,7 +2229,7 @@ async def npg_get_logs(
             params["host"] = str(host)
         if status is not None:
             _validate_query_int("status", status)
-            params["status"] = status
+            params["status_code"] = status
         if method is not None and str(method).strip():
             params["method"] = str(method)
         data = await _api(c.get, "/api/v1/logs", params=params or None)
