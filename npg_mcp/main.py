@@ -560,12 +560,24 @@ async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None
             section_paths = {s: section_paths[s] for s in selected}
         data: dict = {}
         failed: list[str] = []
-        for section, path in section_paths.items():
+
+        async def _fetch(section: str, path: str):
             try:
-                data[section] = {"success": True, "data": await _api(c.get, path)}
+                return section, {"success": True, "data": await _api(c.get, path)}
             except Exception as se:
+                return section, {"success": False, "error": str(se)}
+
+        # Independent GETs — gather concurrently so wall time ~= slowest
+        # single section instead of the sum of all sections. Results are
+        # consumed in section_paths order, so key order and sections_failed
+        # ordering stay deterministic (identical to the sequential version).
+        results = await asyncio.gather(
+            *(_fetch(section, path) for section, path in section_paths.items())
+        )
+        for section, payload in results:
+            data[section] = payload
+            if not payload["success"]:
                 failed.append(section)
-                data[section] = {"success": False, "error": str(se)}
         return {"success": True, "data": data, "sections_failed": failed}
     except Exception as e:
         return {"success": False, "error": str(e)}

@@ -251,3 +251,54 @@ class TestGetProxyHostFullSections:
         result = _run(main_mod.npg_get_proxy_host_full(42, sections=["host"]))
         assert result["success"] is True
         assert client.calls == [("GET", "/api/v1/proxy-hosts/42")]
+
+    def test_sections_fetched_concurrently(self, monkeypatch):
+        """Wall time ~= slowest single section, not the sum of all sections."""
+        import time
+
+        delay = 0.1
+        active = 0
+        max_active = 0
+
+        class _SlowClient(_GetRecordingClient):
+            def get(self, path, params=None):
+                nonlocal active, max_active
+                active += 1
+                max_active = max(max_active, active)
+                time.sleep(delay)
+                active -= 1
+                return super().get(path, params=params)
+
+        client = _SlowClient()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        start = time.monotonic()
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123"))
+        elapsed = time.monotonic() - start
+
+        assert result["success"] is True
+        assert result["sections_failed"] == []
+        assert len(result["data"]) == 11
+        # sequential would be ~11 * delay = 1.1s; concurrent ~= max(delay)
+        assert elapsed < 5 * delay, f"sections appear sequential: {elapsed:.2f}s"
+        assert max_active > 1, "section GETs did not overlap"
+
+    def test_concurrent_failure_isolation(self, monkeypatch):
+        """One failing section lands in sections_failed; others still succeed."""
+
+        class _FailingUpstream(_GetRecordingClient):
+            def get(self, path, params=None):
+                if path.endswith("/upstream"):
+                    raise RuntimeError("NPG API returned HTTP 500")
+                return super().get(path, params=params)
+
+        client = _FailingUpstream()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        result = _run(main_mod.npg_get_proxy_host_full("abc-123"))
+        assert result["success"] is True
+        assert result["sections_failed"] == ["upstream"]
+        assert result["data"]["upstream"]["success"] is False
+        assert "500" in result["data"]["upstream"]["error"]
+        assert all(
+            result["data"][s]["success"] is True
+            for s in result["data"] if s != "upstream"
+        )
