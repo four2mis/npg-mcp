@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.21] - 2026-09-01
+
+### What changed
+- Corrected the stale `description=` on `npg_rotate_log_file` in `npg_mcp/main.py` (commit fea9465): the old text claimed the tool rotates "a log file by its filename", but the tool takes NO parameters and rotates all raw log files globally. Agents reading the schema were being told to pass a filename that doesn't exist. The new description states the zero-parameter semantics, that raw log files must be enabled (upstream returns HTTP 500 "logrotate failed" otherwise), and that the call is a global rotate. Full 286-tool sweep (t_4874a076) confirmed this was the only defect; verified at wire level against a locally-built image pinned to the workspace commit.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.20] - 2026-08-30
 
 ### What changed
