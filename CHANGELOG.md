@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.22] - 2026-09-01
+
+### What changed
+- `npg_get_proxy_host_full` now fetches each host's 11 per-section sub-configs concurrently with `asyncio.gather` instead of a sequential for-loop (commit 38d9cd6): multi-host audits that call this tool repeatedly see a ~5-10x per-host latency reduction (measured 16ms vs 46ms per host on LAN at the wire level). Results are still consumed in the original dict-insertion order, so the response shape, key order, and error semantics are unchanged: per-section failures are isolated in `sections_failed` exactly as before (unknown host UUIDs deterministically fail only host/geo/waf because upstream auto-creates default sub-configs — identical to the previous sequential behavior, not a regression). Verified by t_fd05d012 at wire level with a locally-built image pinned to workspace commit 38d9cd6 (217 pytest tests pass, doc drift check exit 0, 286 tools, 0 duplicates, response shapes identical to the published 0.5.21 sequential baseline).
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.21] - 2026-09-01
 
 ### What changed
