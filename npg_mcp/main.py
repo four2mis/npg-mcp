@@ -2795,7 +2795,7 @@ async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_rotate_log_file", description="Rotate a log file by its filename.")
+@mcp.tool(name="npg_rotate_log_file", description="ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file.")
 async def npg_rotate_log_file() -> dict:
     c = _get_client()
     try:
