@@ -1389,7 +1389,7 @@ npg_view_log_file:
       default: 100
 
 npg_rotate_log_file:
-  description: "Rotate a log file by its filename."
+  description: "ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file."
   parameters: []
 
 npg_delete_log_file:
@@ -1698,6 +1698,21 @@ npg_update_global_rate_limit:
     - name: whitelist_ips
       type: string
       required: false
+
+npg_get_global_fail2ban:
+  description: "GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log."
+  parameters: []
+
+npg_update_global_fail2ban:
+  description: "UPDATE the global fail2ban jail (partial update — pass only fields to change in kwargs; omitted fields are left as-is). kwargs fields: enabled: bool, max_retries: int (min 1), find_time: int (min 1, sec), ban_time: int (min 0, sec; 0=permanent), fail_codes: str (comma-separated HTTP codes), action: \"block\"|\"log\"|\"notify\". Unknown fields rejected unless strict=false. WARNINGS: (1) enabling is REFUSED with 400 while Trusted Proxies are unconfigured; (2) bans here apply to EVERY host — a false positive blocks all sites; (3) upstream default fail_codes \"400,444\" — adding 403/404 catches nothing extra (those codes only come from configured hosts)."
+  parameters:
+    - name: kwargs
+      type: object
+      required: false
+    - name: strict
+      type: boolean
+      required: false
+      default: true
 
 npg_get_global_waf:
   description: "GET global WAF configuration."

@@ -116,6 +116,10 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
     "npg_update_cloudflare_tunnel": frozenset({
         "enabled", "token", "mode", "api_token", "catchall_enabled",
     }),
+    # model/rate_limit.go: UpdateGlobalFail2banRequest (v2.53.0) — all pointer fields, partial update
+    "npg_update_global_fail2ban": frozenset({
+        "enabled", "max_retries", "find_time", "ban_time", "fail_codes", "action",
+    }),
 }
 
 

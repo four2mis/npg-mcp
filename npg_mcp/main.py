@@ -3256,6 +3256,25 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log.")
+async def npg_get_global_fail2ban() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/settings/global-fail2ban")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update — pass only fields to change in kwargs; omitted fields are left as-is). kwargs fields: enabled: bool, max_retries: int (min 1), find_time: int (min 1, sec), ban_time: int (min 0, sec; 0=permanent), fail_codes: str (comma-separated HTTP codes), action: \"block\"|\"log\"|\"notify\". Unknown fields rejected unless strict=false. WARNINGS: (1) enabling is REFUSED with 400 while Trusted Proxies are unconfigured; (2) bans here apply to EVERY host — a false positive blocks all sites; (3) upstream default fail_codes \"400,444\" — adding 403/404 catches nothing extra (those codes only come from configured hosts).")
+async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = True) -> dict:
+    try:
+        _validate_kwargs("npg_update_global_fail2ban", kwargs, strict)
+        c = _get_client()
+        data = await _api(c.put, "/api/v1/settings/global-fail2ban", kwargs or {})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 # ── Global WAF ─────────────────────────────────────────────────────────
 

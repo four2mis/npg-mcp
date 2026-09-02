@@ -175,9 +175,9 @@ class TestDerivedDestructiveTools:
 
         all_tools = _discover_tool_names()
         # Invariant: standard hides exactly the destructive set.
-        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 239
-        # Live surface guardrail (current HEAD): 286 tools, 47 destructive.
-        assert len(all_tools) == 286
+        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 241
+        # Live surface guardrail (current HEAD): 288 tools, 47 destructive.
+        assert len(all_tools) == 288
         assert len(DESTRUCTIVE_TOOLS) == 47
 
     def test_destructive_count_47_exact(self):
@@ -188,9 +188,9 @@ class TestDerivedDestructiveTools:
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(tier_allowed(all_tools, "standard")) == 239
-        assert len(tier_allowed(all_tools, "read")) == 131
-        assert len(tier_allowed(all_tools, "full")) == 286
+        assert len(tier_allowed(all_tools, "standard")) == 241
+        assert len(tier_allowed(all_tools, "read")) == 132
+        assert len(tier_allowed(all_tools, "full")) == 288
 
     def test_docstring_documents_naming_convention(self):
         import inspect
