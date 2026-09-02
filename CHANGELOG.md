@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.23] - 2026-09-03
+
+### What changed
+- Synced the MCP wrapper to upstream NPG v2.53.0: added 2 tools for the new global fail2ban jail (upstream #275). `npg_get_global_fail2ban` GETs `/api/v1/settings/global-fail2ban` (never 404 — returns shipped defaults when unset: `enabled=false`, `max_retries=5`, `find_time=600`, `ban_time=3600`, `fail_codes="400,444"`, `action=log`). `npg_update_global_fail2ban` PUTs a partial update (only provided `kwargs` fields change; omitted fields left as-is) following the sibling global-* singleton pattern, with strict kwargs-whitelist validation against upstream `UpdateGlobalFail2banRequest` (exactly 6 pointer fields: `enabled`, `max_retries`, `find_time`, `ban_time`, `fail_codes`, `action`). Tool surface: 286 → 288 tools.
+- Tool descriptions document the upstream behavior quirks: enabling is refused with 400 while Trusted Proxies are unconfigured (on a stack WITH trusted_proxy_cidrs configured, enabling succeeds — verified observationally on the test stack); bans apply to every host (a false positive blocks all sites); upstream default `fail_codes="400,444"` — adding 403/404 catches nothing extra since those codes only come from configured hosts.
+- README.md / README.ko.md toolset-level counts refreshed to the live derived values (read=132, standard=241, full=288); test guardrails in `test_health.py` / `test_toolsets.py` bumped to 288.
+
+### What's new
+- Global fail2ban management: NPG v2.53.0's new jail bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all) globally across all hosts, distinct from per-host fail2ban. Ships disabled with `action=log` (log-only).
+
+### Breaking changes
+- (none)
+
 ## [0.5.22] - 2026-09-01
 
 ### What changed
