@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.24] - 2026-09-03
+
+### What changed
+- Corrected the toolset tier counts in `.env.example` comments (commit df7b934): the `NPG_TOOL_LEVEL` docstring claimed 131/239/286 tools for read/standard/full, but the actual derived counts after the v2.53.0 sync (which added the 2 global fail2ban tools) are 132/241/288. Comment-only fix — classification logic and tool code untouched. Verified by the t_9c977c9d verify task: re-classified all 288 registered tools against a locally-built image pinned to the workspace commit, deployed-image tier counts match the corrected `.env.example` claims exactly, 217 pytest tests pass, and the live tools/list serves all 288 tools.
+- Synced the local `swagger.yaml` reference to upstream NPG v2.53.0 (commit aed1faf) so future gap-analysis runs compare against the current upstream API surface. `swagger.yaml` is git-ignored and never shipped — no user-facing effect.
+- Fixed a ruff E501 lint failure in `npg_mcp/upstream_models.py` by wrapping an over-long comment line (commit 9c8eb8d); no code or behavior change.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.23] - 2026-09-03
 
 ### What changed
