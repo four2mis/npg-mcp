@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.50.0
+  version: 2.53.0
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -2569,6 +2569,11 @@ paths:
     put:
       tags: [Exploit Rules]
       summary: Update exploit rule
+      description: >-
+        Partial update: send only the fields you want to change. `category` is
+        deliberately absent — the handler decodes a dedicated update model that
+        has no such field, so sending it is silently ignored rather than
+        applied. Change a rule's category by deleting and recreating it.
       security:
         - BearerAuth: []
       parameters:
@@ -2582,7 +2587,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateExploitRule'
+              $ref: '#/components/schemas/UpdateExploitRule'
       responses:
         '200':
           description: Exploit rule updated
@@ -2785,10 +2790,14 @@ paths:
         window ending now (truncated to the minute). Set `start_time` explicitly to look
         further back.
 
-        **Invalid values are dropped, not rejected**: `log_type`, `severity` and
+        **Most invalid values are dropped, not rejected**: `log_type`, `severity` and
         `block_reason` outside their enum, and unparseable numbers/timestamps, are
-        silently ignored — the response is then *less* filtered than requested, never a
-        400. The one exception is `proxy_host_id`: a non-UUID matches nothing.
+        silently ignored — the response is then *less* filtered than requested. The
+        exceptions are `proxy_host_id`, where a non-UUID matches nothing, and the
+        status-code filters (`status_codes`, `status_classes`, `exclude_status_codes`,
+        `exclude_status_classes`), which answer **400** naming the offending token. A
+        silently dropped status filter returns an unfiltered page that looks filtered,
+        so those are validated instead.
 
         **Array parameters** are repeated (`?hosts=a&hosts=b`) and capped at 100 entries;
         extra entries are discarded. `exclude_ips` additionally drops any entry that is
@@ -2899,13 +2908,49 @@ paths:
             type: integer
         - name: status_codes
           in: query
-          description: Multi-select exact match; non-numeric entries are dropped.
+          description: >-
+            Multi-select exact match. Each entry must be 100-599; anything else
+            answers 400. At most 100 entries.
           style: form
           explode: true
           schema:
             type: array
             items:
               type: integer
+        - name: status_classes
+          in: query
+          description: >-
+            Whole status classes, expanded server-side into explicit codes
+            (`4xx` -> 400-499). Combines with `status_codes`. Anything other
+            than 1xx-5xx answers 400.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [1xx, 2xx, 3xx, 4xx, 5xx]
+        - name: exclude_status_codes
+          in: query
+          description: >-
+            Hide these status codes. Rows with no status code (error-log rows)
+            are always kept. Same validation as `status_codes`.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: integer
+        - name: exclude_status_classes
+          in: query
+          description: Hide whole status classes. Same validation as `status_classes`.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [1xx, 2xx, 3xx, 4xx, 5xx]
         - name: severity
           in: query
           description: Error-log severity.
@@ -3484,6 +3529,64 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '500':
           description: Update succeeded but regenerating the host configs failed
+  /settings/global-fail2ban:
+    get:
+      tags: [Settings]
+      summary: Get the global fail2ban jail
+      description: |
+        Returns the singleton `global_fail2ban` row, creating it with the
+        shipped defaults if it does not exist yet (never 404).
+
+        This jail acts on requests that matched **no configured host** — the
+        catch-all traffic a per-host jail structurally cannot see, because
+        fail2ban counts a failure only after attributing it to a proxy host.
+        That is why adding `444` to a host's fail codes never fires: `444` is
+        emitted only by the catch-all default server.
+
+        Not counted: domains configured as redirect hosts, requests whose Host
+        header could not be read, the internal pipeline canary, and loopback or
+        trusted-proxy addresses.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalFail2ban'
+    put:
+      tags: [Settings]
+      summary: Update the global fail2ban jail
+      description: |
+        Partial update: only the fields present are applied.
+
+        **Enabling is refused with 400 while Trusted Proxies are
+        unconfigured.** Behind a CDN with no trusted proxy set, every request
+        carries the CDN edge address, and a ban here applies to every host — so
+        one false positive would block every visitor behind that edge on every
+        site. An address-based guard cannot substitute: with the preset off the
+        CDN ranges are not in the trusted set at all.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGlobalFail2ban'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalFail2ban'
+        '400':
+          description: >-
+            Invalid value, or an attempt to enable the jail while Trusted
+            Proxies are unconfigured.
+
   /settings/global-rate-limit:
     get:
       tags: [Settings]
@@ -11215,6 +11318,42 @@ components:
     SystemSettings:
       type: object
       properties:
+        trusted_proxy_cidrs:
+          type: string
+          description: >-
+            Newline-separated IP/CIDR entries for proxies in front of NPG whose
+            forwarded client address should be believed. Additive to the
+            always-trusted private and loopback ranges. Rejected with 400 if an
+            entry is unparseable or the list covers too much of the internet.
+        trusted_proxy_preset:
+          type: string
+          enum: [none, cloudflare]
+          default: none
+          description: Adds a well-known CDN's published ranges to the trusted list.
+        real_ip_header:
+          type: string
+          enum: [X-Forwarded-For, X-Real-IP, CF-Connecting-IP, True-Client-IP]
+          default: X-Forwarded-For
+          description: >-
+            Header the client address is read from on requests arriving through a
+            trusted proxy. Changing it away from the default means requests
+            without that header keep the proxy's address.
+        trusted_proxy_builtins:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: Always-trusted private/loopback ranges. Not removable.
+        trusted_proxy_preset_ranges:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: Ranges contributed by the selected preset.
+        cloudflare_ranges_updated:
+          type: string
+          readOnly: true
+          description: Date the shipped Cloudflare range list was taken.
         geoip_enabled:
           type: boolean
         maxmind_account_id:
@@ -11706,25 +11845,124 @@ components:
           enum: [low, medium, high, critical]
     CreateExploitRule:
       type: object
-      required: [name, pattern]
+      description: >-
+        Request body for POST /exploit-rules. Every field below is validated;
+        an unknown enum value answers 400 naming the field and the accepted set.
+      required: [category, name, pattern, pattern_type]
       properties:
-        name:
-          type: string
-        description:
-          type: string
         category:
           type: string
+          enum: [sql_injection, xss, rfi, path_traversal, scanner, http_method, custom]
+        name:
+          type: string
+          maxLength: 100
         pattern:
+          type: string
+          description: >-
+            Regex applied by nginx. Compiled and rejected with 400 if invalid.
+        pattern_type:
+          type: string
+          enum: [query_string, request_uri, user_agent, request_method]
+          description: >-
+            Which part of the request the pattern is matched against. The nginx
+            template dispatches on this value, so it is required and closed —
+            an unrecognised type would render the rule nowhere while the rule
+            list still showed it as enabled.
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, critical]
+          default: warning
+          description: Labelling only; does not change enforcement.
+    GlobalFail2ban:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+          default: false
+          description: Ships disabled — its bans apply to every host.
+        max_retries:
+          type: integer
+          default: 5
+        find_time:
+          type: integer
+          default: 600
+          description: Sliding window in seconds.
+        ban_time:
+          type: integer
+          default: 3600
+          description: Seconds; 0 means permanent.
+        fail_codes:
+          type: string
+          default: "400,444"
+          description: >-
+            Comma-separated HTTP status codes. The default was chosen from log
+            analysis; 403 and 404 add nothing, because those come only from
+            configured hosts.
+        action:
+          type: string
+          enum: [block, log, notify]
+          default: log
+          description: >-
+            Ships as `log` so an operator can watch what would be banned before
+            anything is.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateGlobalFail2ban:
+      type: object
+      description: Partial update; every field is optional.
+      properties:
+        enabled:
+          type: boolean
+        max_retries:
+          type: integer
+          minimum: 1
+        find_time:
+          type: integer
+          minimum: 1
+        ban_time:
+          type: integer
+          minimum: 0
+        fail_codes:
           type: string
         action:
           type: string
-          enum: [block, log, challenge]
-        enabled:
-          type: boolean
-          default: true
+          enum: [block, log, notify]
+
+    UpdateExploitRule:
+      type: object
+      description: >-
+        Request body for PUT /exploit-rules/{id}. Every field is optional and
+        only the ones present are applied, so no field is listed as required.
+        Values are validated the same way as on create — an unknown enum or an
+        uncompilable pattern answers 400.
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        pattern:
+          type: string
+          description: Regex applied by nginx. Rejected with 400 if it does not compile.
+        pattern_type:
+          type: string
+          enum: [query_string, request_uri, user_agent, request_method]
+        description:
+          type: string
         severity:
           type: string
-          enum: [low, medium, high, critical]
+          enum: [info, warning, critical]
+        enabled:
+          type: boolean
+
     URIBlockConfig:
       type: object
       description: A proxy host's URI blocking rules.
