@@ -12,6 +12,7 @@ import os
 import secrets
 import time
 import warnings
+from datetime import datetime, timezone
 from contextvars import ContextVar
 from typing import Any, Literal
 from urllib.parse import quote
@@ -1085,6 +1086,289 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
         data = {hid: entry for hid, entry in results}
         hosts_failed = sorted(h for h, entry in data.items() if not entry.get("success"))
         return {"success": True, "data": data, "hosts_failed": hosts_failed}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+_HOST_CREATE_BODY_FIELDS = (
+    # host-section API field -> same-named field in the POST /proxy-hosts body.
+    # Field names are the API's (ssl_force_https, not the MCP ssl_forced alias).
+    "forward_scheme",
+    "ssl_enabled",
+    "ssl_force_https",
+    "ssl_http2",
+    "ssl_http3",
+    "cache_enabled",
+    "cache_static_only",
+    "cache_ttl",
+    "block_exploits",
+    "waf_enabled",
+    "waf_mode",
+    "waf_paranoia_level",
+    "waf_anomaly_threshold",
+    "waf_use_global",
+    "enabled",
+    "ddns_enabled",
+    "ddns_proxied",
+    "stream_ssl_preread",
+    "stream_accept_proxy_protocol",
+    "stream_send_proxy_protocol",
+    "allow_websocket_upgrade",
+    "proxy_type",
+)
+
+# Metadata/derived keys stripped from section payloads when building an
+# export bundle (or an import sub-config body): per-section row ids, the
+# parent host id, timestamps, and server-computed display fields.
+_EXPORT_STRIP_KEYS = frozenset({
+    "id", "proxy_host_id", "created_at", "updated_at", "meta", "config_status",
+    "is_favorite", "has_secret_key", "proxy_host_name", "exclusions",
+    "exclusion_count",
+})
+
+# Keys referencing instance-scoped resources (UUIDs of certificates, access
+# lists, auth providers, DDNS providers on the source NPG instance). Export
+# moves them to external_refs instead of copying blind; import never
+# auto-applies them — the caller must re-resolve them on the target instance.
+_EXTERNAL_REF_KEYS = frozenset({
+    "certificate_id", "access_list_id", "auth_provider_id", "ddns_provider_id",
+})
+
+
+def _extract_bundle_sections(bundle: dict) -> tuple[int | None, dict]:
+    """Extract (schema_version, sections) from an export bundle.
+
+    Accepts three shapes, most ergonomic first: the full npg_export_proxy_host
+    result ({"success", "data": {...}}), its bare "data" object, or a bare
+    sections dict. Raises ValueError on anything unparseable or carrying an
+    unsupported schema_version, so a bogus bundle fails before any mutation.
+    """
+    if not isinstance(bundle, dict):
+        raise ValueError("bundle must be a dict — pass the npg_export_proxy_host result (or its 'data' object)")
+    candidate = bundle
+    data = bundle.get("data")
+    if isinstance(data, dict) and isinstance(data.get("sections"), dict):
+        candidate = data
+    elif not isinstance(bundle.get("sections"), dict) and not (
+        isinstance(bundle.get("host"), dict)
+    ):
+        raise ValueError(
+            "bundle must contain a 'sections' dict (npg_export_proxy_host result, "
+            "its 'data' object, or bare sections) — got none of them"
+        )
+    sv = candidate.get("schema_version")
+    if sv is not None and sv != 1:
+        raise ValueError(f"unsupported bundle schema_version {sv!r} (supported: 1)")
+    sections = candidate.get("sections") or candidate
+    if not isinstance(sections, dict) or not isinstance(sections.get("host"), dict):
+        raise ValueError(
+            "bundle sections must include a 'host' dict — re-export with npg_export_proxy_host"
+        )
+    return (sv if isinstance(sv, int) else None), sections
+
+
+def _should_apply_section(name: str, payload: dict) -> bool:
+    """Decide whether an exported sub-config should be applied on import.
+
+    Rule mirrors the tri-state inherit semantics: a section whose stored state
+    equals 'unconfigured/inherit' is SKIPPED so the new host keeps inheriting
+    the global default; an explicit override or explicit disable is applied.
+    """
+    if name == "upstream":
+        return bool(payload.get("servers")) or bool(payload.get("health_check_enabled"))
+    if name == "geo":
+        return bool(payload.get("enabled")) and bool(payload.get("countries"))
+    if name == "cloud_blocking":
+        return bool(payload.get("blocked_providers")) or bool(payload.get("challenge_mode")) or bool(payload.get("cloud_disable_global"))
+    if name in ("rate_limit", "bot_filter", "security_headers"):
+        # enabled=true = override; enabled=false + disable_global=true = explicit disable
+        return bool(payload.get("enabled")) or bool(payload.get("disable_global"))
+    # fail2ban / challenge / uri_block: apply only when explicitly enabled
+    return bool(payload.get("enabled"))
+
+
+@mcp.tool(name="npg_export_proxy_host", description="EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host.")
+async def npg_export_proxy_host(host_id: str | int) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        hid = _id_path(host_id)
+        section_paths = _proxy_host_section_paths(hid)
+
+        async def _fetch(section: str, path: str):
+            try:
+                return section, await _api(c.get, path)
+            except Exception as se:
+                return section, {"__export_error__": str(se)}
+
+        results = await asyncio.gather(
+            *(_fetch(section, path) for section, path in section_paths.items())
+        )
+        sections: dict = {}
+        failed: list[str] = []
+        warnings: list[str] = []
+        external_refs: dict = {}
+        for section, payload in results:
+            if not isinstance(payload, dict) or "__export_error__" in payload:
+                failed.append(section)
+                err = payload.get("__export_error__", "unknown error") if isinstance(payload, dict) else "unexpected payload"
+                warnings.append(f"section {section} not exported: {err}")
+                continue
+            cleaned: dict = {}
+            for key, value in payload.items():
+                if key in _EXPORT_STRIP_KEYS:
+                    continue
+                if key in _EXTERNAL_REF_KEYS:
+                    if value:
+                        external_refs[key] = _id_path(value)
+                        warnings.append(
+                            f"instance-scoped ref {key} moved to external_refs — import flags it, "
+                            "never copies it blind; re-resolve on the target instance"
+                        )
+                    continue
+                cleaned[key] = value
+            if section == "host" and cleaned.get("custom_locations"):
+                warnings.append(
+                    "custom_locations is present but not applied by npg_import_proxy_host "
+                    "(no create-time parameter); re-add it manually after import"
+                )
+            sections[section] = cleaned
+        bundle: dict = {
+            "schema_version": 1,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "source_host_id": hid,
+            "sections": sections,
+        }
+        if external_refs:
+            bundle["external_refs"] = external_refs
+        if warnings:
+            bundle["warnings"] = warnings
+        return {"success": True, "data": bundle, "sections_failed": failed}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_import_proxy_host", description="IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone across hosts / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=false (default) returns a DRY-RUN plan (create body + sub-config requests) without executing; apply=true creates the host then applies each enabled sub-config (rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, uri_block, cloud_blocking). Inherit-state sections are skipped; instance-scoped UUID refs are flagged, never copied. skip_nginx=false runs nginx sync after apply. Unknown schema_version rejected; source host untouched.")
+async def npg_import_proxy_host(bundle: dict, domain_names: list[str], apply: bool = False, skip_nginx: bool = True) -> dict:
+    try:
+        _validate_required("bundle", bundle)
+        _validate_required("domain_names", domain_names)
+        schema_version, sections = _extract_bundle_sections(bundle)
+        host_sec = sections["host"]
+
+        # 1. Build the create body from the exported host core fields.
+        create_body: dict = {"domain_names": list(domain_names)}
+        for api_field in _HOST_CREATE_BODY_FIELDS:
+            if api_field in host_sec and host_sec[api_field] is not None:
+                create_body[api_field] = host_sec[api_field]
+        for req_field in ("forward_host", "forward_port"):
+            if create_body.get(req_field) is None and host_sec.get(req_field) is not None:
+                create_body[req_field] = host_sec[req_field]
+        if "forward_host" not in create_body or "forward_port" not in create_body:
+            raise ValueError(
+                "bundle host section lacks forward_host/forward_port — add them to "
+                "bundle['sections']['host'] before importing"
+            )
+
+        # 2. Plan per-host sub-config requests from exported section payloads.
+        sub_requests: list[dict] = []
+        skipped: list[str] = []
+        for name, payload in sections.items():
+            if name == "host" or name == "waf":
+                continue
+            if not isinstance(payload, dict):
+                skipped.append(name)
+                continue
+            cleaned = {k: v for k, v in payload.items() if k not in _EXPORT_STRIP_KEYS and k not in _EXTERNAL_REF_KEYS}
+            if not _should_apply_section(name, cleaned):
+                skipped.append(name)
+                continue
+            if name == "geo":
+                sub_requests.append({
+                    "section": name, "method": "POST",
+                    "path": "/api/v1/proxy-hosts/{new_host_id}/geo",
+                    "body": {
+                        "enabled": cleaned.get("enabled", True),
+                        "mode": cleaned.get("mode", "blacklist"),
+                        "countries": cleaned.get("countries", []),
+                        **({"allowed_ips": cleaned["allowed_ips"]} if cleaned.get("allowed_ips") else {}),
+                    },
+                })
+            else:
+                sub_path = {
+                    "rate_limit": "rate-limit", "bot_filter": "bot-filter",
+                    "security_headers": "security-headers", "upstream": "upstream",
+                    "challenge": "challenge", "fail2ban": "fail2ban",
+                    "uri_block": "uri-block", "cloud_blocking": "blocked-cloud-providers",
+                }.get(name)
+                if sub_path is None:
+                    skipped.append(name)
+                    continue
+                sub_requests.append({
+                    "section": name, "method": "PUT",
+                    "path": f"/api/v1/proxy-hosts/{{new_host_id}}/{sub_path}",
+                    "body": cleaned,
+                })
+
+        warnings = list(bundle.get("warnings") or [])
+        ext_refs = bundle.get("external_refs") or {}
+        if isinstance(sections.get("waf"), dict) and sections["waf"].get("exclusion_count"):
+            warnings.append(
+                "per-host WAF rule exclusions are not re-applied by import — "
+                "re-disable the rules via npg_disable_waf_rule after import"
+            )
+        if ext_refs:
+            warnings.append(
+                f"external_refs {sorted(ext_refs)} are instance-scoped and were NOT applied — "
+                "re-resolve them on the target instance (e.g. npg_bulk_apply_certificate)"
+            )
+
+        sync_step = {"method": "POST", "path": "/api/v1/proxy-hosts/sync"} if not skip_nginx else None
+
+        if not apply:
+            return {"success": True, "data": {
+                "dry_run": True,
+                "schema_version": schema_version,
+                "create": {"method": "POST", "path": "/api/v1/proxy-hosts", "body": create_body},
+                "sub_configs": sub_requests,
+                "skipped_sections": skipped,
+                "sync": sync_step,
+                "warnings": warnings,
+            }}
+
+        # 3. Execute: create host, then apply sub-configs sequentially.
+        c = _get_client()
+        created = await _api(c.post, "/api/v1/proxy-hosts", create_body)
+        new_id = created.get("id") if isinstance(created, dict) else None
+        if not new_id:
+            raise ValueError(f"host created but response carried no id: {str(created)[:200]}")
+        results: list[dict] = []
+        for req in sub_requests:
+            path = req["path"].replace("{new_host_id}", _id_path(new_id))
+            entry: dict = {"section": req["section"], "method": req["method"], "path": path}
+            try:
+                if req["method"] == "POST":
+                    entry["result"] = await _api(c.post, path, req["body"])
+                else:
+                    entry["result"] = await _api(c.put, path, req["body"])
+                entry["success"] = True
+            except Exception as se:
+                entry["success"] = False
+                entry["error"] = str(se)
+            results.append(entry)
+        synced = False
+        if not skip_nginx:
+            await _api(c.post, "/api/v1/proxy-hosts/sync")
+            synced = True
+        return {"success": True, "data": {
+            "dry_run": False,
+            "schema_version": schema_version,
+            "host_id": _id_path(new_id),
+            "created": created,
+            "sub_configs": results,
+            "skipped_sections": skipped,
+            "synced": synced,
+            "warnings": warnings,
+        }}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

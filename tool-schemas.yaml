@@ -95,7 +95,7 @@ npg_bulk_delete_proxy_hosts:
       required: true
 
 npg_bulk_get_proxy_host_full:
-  description: "GET the COMPLETE config of MANY proxy hosts in one call — fleet-wide config audit (e.g. 'which hosts have WAF disabled?'). REQUIRED: host_ids (list, max 50). OPTIONAL: sections=[...] subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Per-host fan-out runs concurrently: data[host_id] = {success, data, sections_failed} or {success:false, error} — one bad host never aborts the batch. Over 50 ids raises ValueError; empty rejected; duplicates deduped."
+  description: "GET the COMPLETE config of MANY proxy hosts in one call — fleet-wide config audit (e.g. 'which hosts have WAF disabled?'). REQUIRED: host_ids (list, max 50). OPTIONAL: sections=[...] subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Per-host fan-out runs concurrently: data[host_id] = {success, data, sections_failed}; a nonexistent host (or any host whose core host GET fails) gets success:false + error and lands in hosts_failed — one bad host never aborts the batch. Sub-section failures stay in sections_failed. Over 50 ids raises ValueError; empty rejected; duplicates deduped."
   parameters:
     - name: host_ids
       type: array<st> | int]
@@ -103,6 +103,31 @@ npg_bulk_get_proxy_host_full:
     - name: sections
       type: array<string>
       required: false
+
+npg_export_proxy_host:
+  description: "EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+
+npg_import_proxy_host:
+  description: "IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone across hosts / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=false (default) returns a DRY-RUN plan (create body + sub-config requests) without executing; apply=true creates the host then applies each enabled sub-config (rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, uri_block, cloud_blocking). Inherit-state sections are skipped; instance-scoped UUID refs are flagged, never copied. skip_nginx=false runs nginx sync after apply. Unknown schema_version rejected; source host untouched."
+  parameters:
+    - name: bundle
+      type: object
+      required: true
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: apply
+      type: boolean
+      required: false
+      default: false
+    - name: skip_nginx
+      type: boolean
+      required: false
+      default: true
 
 npg_bulk_import_proxy_hosts:
   description: "BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; other columns optional, inherit global defaults when empty. Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually."
