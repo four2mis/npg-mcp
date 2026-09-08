@@ -1158,13 +1158,21 @@ def _extract_bundle_sections(bundle: dict) -> tuple[int | None, dict]:
             "its 'data' object, or bare sections) — got none of them"
         )
     sv = candidate.get("schema_version")
-    if sv is not None and sv != 1:
-        raise ValueError(f"unsupported bundle schema_version {sv!r} (supported: 1)")
     sections = candidate.get("sections") or candidate
     if not isinstance(sections, dict) or not isinstance(sections.get("host"), dict):
         raise ValueError(
             "bundle sections must include a 'host' dict — re-export with npg_export_proxy_host"
         )
+    # A schema_version may also hide inside the sections dict (hand-built
+    # bundles). An unknown version must fail closed wherever it appears,
+    # before any mutation — and must not leak into skipped_sections as a
+    # fake section name, so work on a shallow copy.
+    sections = dict(sections)
+    hidden_sv = sections.pop("schema_version", None)
+    if sv is None and hidden_sv is not None:
+        sv = hidden_sv
+    if sv is not None and sv != 1:
+        raise ValueError(f"unsupported bundle schema_version {sv!r} (supported: 1)")
     return (sv if isinstance(sv, int) else None), sections
 
 
