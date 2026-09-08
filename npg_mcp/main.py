@@ -528,36 +528,71 @@ async def npg_get_proxy_host_by_domain(domain: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+_PROXY_HOST_SECTION_NAMES = (
+    "host",
+    "rate_limit",
+    "bot_filter",
+    "security_headers",
+    "upstream",
+    "geo",
+    "challenge",
+    "fail2ban",
+    "cloud_blocking",
+    "waf",
+    "uri_block",
+)
+
+
+def _proxy_host_section_paths(hid: str) -> dict[str, str]:
+    """Build the 11 per-host GET paths composed by npg_get_proxy_host_full.
+
+    Shared by ``npg_get_proxy_host_full`` and ``npg_bulk_get_proxy_host_full``
+    so both tools expose the same section names and endpoints from one source
+    of truth.
+    """
+    return {
+        "host": f"/api/v1/proxy-hosts/{hid}",
+        "rate_limit": f"/api/v1/proxy-hosts/{hid}/rate-limit",
+        "bot_filter": f"/api/v1/proxy-hosts/{hid}/bot-filter",
+        "security_headers": f"/api/v1/proxy-hosts/{hid}/security-headers",
+        "upstream": f"/api/v1/proxy-hosts/{hid}/upstream",
+        "geo": f"/api/v1/proxy-hosts/{hid}/geo",
+        "challenge": f"/api/v1/proxy-hosts/{hid}/challenge",
+        "fail2ban": f"/api/v1/proxy-hosts/{hid}/fail2ban",
+        "cloud_blocking": f"/api/v1/proxy-hosts/{hid}/blocked-cloud-providers",
+        "waf": f"/api/v1/waf/hosts/{hid}/config",
+        "uri_block": f"/api/v1/proxy-hosts/{hid}/uri-block",
+    }
+
+
+def _select_section_paths(
+    section_paths: dict[str, str], sections: list[str]
+) -> dict[str, str]:
+    """Validate a sections subset against section_paths and filter it.
+
+    Raises ValueError on unknown section names; dedupes preserving order.
+    """
+    invalid = sorted({s for s in sections if s not in section_paths})
+    if invalid:
+        raise ValueError(f"Invalid section name(s): {invalid}. Valid sections: {list(section_paths)}")
+    seen: set[str] = set()
+    selected = []
+    for s in sections:
+        if s not in seen:
+            seen.add(s)
+            selected.append(s)
+    return {s: section_paths[s] for s in selected}
+
+
 @mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE config of one proxy host in one call — composes 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed")
 async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
         hid = _id_path(host_id)
-        section_paths = {
-            "host": f"/api/v1/proxy-hosts/{hid}",
-            "rate_limit": f"/api/v1/proxy-hosts/{hid}/rate-limit",
-            "bot_filter": f"/api/v1/proxy-hosts/{hid}/bot-filter",
-            "security_headers": f"/api/v1/proxy-hosts/{hid}/security-headers",
-            "upstream": f"/api/v1/proxy-hosts/{hid}/upstream",
-            "geo": f"/api/v1/proxy-hosts/{hid}/geo",
-            "challenge": f"/api/v1/proxy-hosts/{hid}/challenge",
-            "fail2ban": f"/api/v1/proxy-hosts/{hid}/fail2ban",
-            "cloud_blocking": f"/api/v1/proxy-hosts/{hid}/blocked-cloud-providers",
-            "waf": f"/api/v1/waf/hosts/{hid}/config",
-            "uri_block": f"/api/v1/proxy-hosts/{hid}/uri-block",
-        }
+        section_paths = _proxy_host_section_paths(hid)
         if sections is not None:
-            invalid = sorted({s for s in sections if s not in section_paths})
-            if invalid:
-                raise ValueError(f"Invalid section name(s): {invalid}. Valid sections: {list(section_paths)}")
-            seen: set[str] = set()
-            selected = []
-            for s in sections:
-                if s not in seen:
-                    seen.add(s)
-                    selected.append(s)
-            section_paths = {s: section_paths[s] for s in selected}
+            section_paths = _select_section_paths(section_paths, sections)
         data: dict = {}
         failed: list[str] = []
 
@@ -986,6 +1021,70 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
                 entry["error"] = str(e)
             results.append(entry)
         return {"success": True, "data": results}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET the COMPLETE config of MANY proxy hosts in one call — fleet-wide config audit (e.g. 'which hosts have WAF disabled?'). REQUIRED: host_ids (list, max 50). OPTIONAL: sections=[...] subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Per-host fan-out runs concurrently: data[host_id] = {success, data, sections_failed}; a nonexistent host (or any host whose core host GET fails) gets success:false + error and lands in hosts_failed — one bad host never aborts the batch. Sub-section failures stay in sections_failed. Over 50 ids raises ValueError; empty rejected; duplicates deduped.")
+async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None) -> dict:
+    try:
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(host_ids)})"
+            )
+        if sections is not None:
+            _select_section_paths(_proxy_host_section_paths("validation"), sections)
+        c = _get_client()
+
+        # Dedupe preserving first-seen order so the same id is fetched once.
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for host_id in host_ids:
+            key = _id_path(host_id)
+            if key not in seen:
+                seen.add(key)
+                ordered.append(key)
+
+        async def _one(hid: str) -> tuple[str, dict]:
+            entry: dict = {"success": True, "data": {}, "sections_failed": []}
+            try:
+                section_paths = _proxy_host_section_paths(hid)
+                if sections is not None:
+                    section_paths = _select_section_paths(section_paths, sections)
+
+                async def _fetch(section: str, path: str):
+                    try:
+                        return section, {"success": True, "data": await _api(c.get, path)}
+                    except Exception as se:
+                        return section, {"success": False, "error": str(se)}
+
+                results = await asyncio.gather(
+                    *(_fetch(section, path) for section, path in section_paths.items())
+                )
+                for section, payload in results:
+                    entry["data"][section] = payload
+                    if not payload["success"]:
+                        entry["sections_failed"].append(section)
+                # A host whose core "host" GET failed (e.g. nonexistent id ->
+                # 404) has no real config to audit: escalate the whole per-host
+                # entry to a failure so it lands in hosts_failed. Sub-section
+                # failures (geo/challenge not configured, etc.) stay in
+                # sections_failed with the host still marked healthy — this
+                # mirrors npg_get_proxy_host_full semantics.
+                host_payload = entry["data"].get("host")
+                if isinstance(host_payload, dict) and not host_payload.get("success"):
+                    entry["success"] = False
+                    entry["error"] = host_payload.get("error", "host section failed")
+            except Exception as he:
+                entry["success"] = False
+                entry["error"] = str(he)
+            return hid, entry
+
+        results = await asyncio.gather(*(_one(h) for h in ordered))
+        data = {hid: entry for hid, entry in results}
+        hosts_failed = sorted(h for h, entry in data.items() if not entry.get("success"))
+        return {"success": True, "data": data, "hosts_failed": hosts_failed}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

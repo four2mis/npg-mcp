@@ -94,6 +94,16 @@ npg_bulk_delete_proxy_hosts:
       type: array<st> | int]
       required: true
 
+npg_bulk_get_proxy_host_full:
+  description: "GET the COMPLETE config of MANY proxy hosts in one call — fleet-wide config audit (e.g. 'which hosts have WAF disabled?'). REQUIRED: host_ids (list, max 50). OPTIONAL: sections=[...] subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Per-host fan-out runs concurrently: data[host_id] = {success, data, sections_failed} or {success:false, error} — one bad host never aborts the batch. Over 50 ids raises ValueError; empty rejected; duplicates deduped."
+  parameters:
+    - name: host_ids
+      type: array<st> | int]
+      required: true
+    - name: sections
+      type: array<string>
+      required: false
+
 npg_bulk_import_proxy_hosts:
   description: "BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; other columns optional, inherit global defaults when empty. Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually."
   parameters:
@@ -531,11 +541,20 @@ npg_delete_dns_provider:
       required: true
 
 npg_test_dns_provider:
-  description: "Test DNS provider credentials. REQUIRED: provider_id."
+  description: "Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here."
   parameters:
-    - name: provider_id
-      type: integer | string
+    - name: name
+      type: string
       required: true
+    - name: provider_type
+      type: string
+      required: true
+    - name: credentials
+      type: object
+      required: true
+    - name: is_default
+      type: boolean
+      required: false
 
 npg_list_cloud_providers:
   description: "List all cloud providers (for certificate DNS challenges)."
