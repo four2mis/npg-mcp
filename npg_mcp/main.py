@@ -1747,12 +1747,14 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials. REQUIRED: provider_id.")
-async def npg_test_dns_provider(provider_id: str | int) -> dict:
+@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here.")
+async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict, is_default: bool | None = None) -> dict:
     try:
-        _validate_id("provider_id", provider_id)
         c = _get_client()
-        data = await _api(c.post, "/api/v1/dns-providers/test", {"dns_provider_id": provider_id})
+        body = {"name": name, "provider_type": provider_type, "credentials": credentials}
+        if is_default is not None:
+            body["is_default"] = is_default
+        data = await _api(c.post, "/api/v1/dns-providers/test", body)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
