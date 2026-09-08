@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.26] - 2026-09-08
+
+### What changed
+- Error results across the tool surface now carry a machine-readable `hint` field (commit 7781001): every failure envelope built through the shared `_error_result()` helper includes an actionable next-step hint alongside the sanitized error message, so MCP clients no longer have to guess what to retry or which parameter failed. Verified end-to-end on the test stack: 404 (fake proxy-host UUID), 400 (invalid DNS provider type), and validation-error paths all return populated hints; 8-tool read regression sample passed; pytest 243 passed.
+- Hardened `npg_import_proxy_host` bundle validation (commit 9befb6e): an unknown `schema_version` smuggled inside the bundle's `sections` dict is now rejected instead of silently accepted — import only accepts bundles produced by the matching exporter version.
+- Fixed `npg_import_proxy_host` / proxy-host creation (commit 8181aff): import now applies the full geo field set and `stream_protocol` on host create; previously those fields were dropped for stream-type and geo-restricted bundles, so imported hosts lost geo restrictions and stream protocol settings.
+
+### What's new
+- `npg_get_server_info` — read-only server-info tool reporting the NPG version, reachability, and the MCP server's own tool count in one call (commit 7781001). Tool surface: 288 → 292 tools.
+- `npg_export_proxy_host` + `npg_import_proxy_host` (commit fdebcc1) — portable per-host config bundles: export a proxy host's full configuration (sections: base, geo, bot-filter, rate-limit, security-headers, uri-block, upstream, challenge, fail2ban, blocked-cloud-providers) to a schema-versioned JSON bundle and import it onto a new host, enabling host migration and templated deployments across stacks.
+- `npg_bulk_get_proxy_host_full` (commit f659cb4) — one-call fleet-wide config audit: fans out all 11 per-host section GETs for up to 50 hosts concurrently, with an optional `sections` subset, dedupe, and per-host error isolation (ghost hosts reported as errors, not silent omissions). Replaces 11+ sequential calls per host for fleet audits.
+
+### Breaking changes
+- (none)
+
 ## [0.5.25] - 2026-09-08
 
 ### What changed
