@@ -1751,7 +1751,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
 async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict, is_default: bool | None = None) -> dict:
     try:
         c = _get_client()
-        body = {"name": name, "provider_type": provider_type, "credentials": credentials}
+        body: dict = {"name": name, "provider_type": provider_type, "credentials": credentials}
         if is_default is not None:
             body["is_default"] = is_default
         data = await _api(c.post, "/api/v1/dns-providers/test", body)
