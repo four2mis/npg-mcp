@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.25] - 2026-09-08
+
+### What changed
+- Fixed `npg_test_dns_provider` (commit 7399585): the tool previously sent the DNS provider's id in the request body, but `POST /api/v1/dns-providers/test` expects the create-payload shape — `name`, `provider_type`, and `credentials` (plus optional `is_default`). Verified against the test stack: valid manual-provider payloads return success, invalid credentials produce a genuine upstream 400, the old provider-id signature is schema-rejected, and 5 unrelated read tools show no regressions. Full 288-tool sweep on the test stack (t_ea5bec6c): 276 PASS including all destructive-tool round-trips, this was the only confirmed MCP bug.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.24] - 2026-09-03
 
 ### What changed
