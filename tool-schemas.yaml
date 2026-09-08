@@ -2476,6 +2476,10 @@ npg_get_status:
   description: "GET component status — health of all NPG subsystems (API, database, nginx)."
   parameters: []
 
+npg_get_server_info:
+  description: "GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything."
+  parameters: []
+
 npg_system_self_check:
   description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'."
   parameters: []
