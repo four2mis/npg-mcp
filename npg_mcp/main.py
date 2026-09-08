@@ -1113,6 +1113,7 @@ _HOST_CREATE_BODY_FIELDS = (
     "stream_ssl_preread",
     "stream_accept_proxy_protocol",
     "stream_send_proxy_protocol",
+    "stream_protocol",
     "allow_websocket_upgrade",
     "proxy_type",
 )
@@ -1290,7 +1291,11 @@ async def npg_import_proxy_host(bundle: dict, domain_names: list[str], apply: bo
                         "enabled": cleaned.get("enabled", True),
                         "mode": cleaned.get("mode", "blacklist"),
                         "countries": cleaned.get("countries", []),
-                        **({"allowed_ips": cleaned["allowed_ips"]} if cleaned.get("allowed_ips") else {}),
+                        "allowed_ips": cleaned.get("allowed_ips", []),
+                        "allow_private_ips": cleaned.get("allow_private_ips", True),
+                        "allow_search_bots": cleaned.get("allow_search_bots", True),
+                        "challenge_mode": cleaned.get("challenge_mode", False),
+                        "disable_global": cleaned.get("disable_global", False),
                     },
                 })
             else:
