@@ -168,6 +168,50 @@ class TestUpdateProxyHostSimple:
         assert "host_id is required" in result["error"]
 
 
+class TestFullProxyHostCertIdCoercion:
+    """npg_create_proxy_host / npg_update_proxy_host must coerce int ssl_cert_id
+    to str like npg_update_proxy_host_simple does (id_fields regression tests)."""
+
+    def test_create_coerces_int_cert_id(self, recording):
+        _run(
+            main_mod.npg_create_proxy_host(
+                domain_names=["cert-coerce.four2mis.com"],
+                forward_host="127.0.0.1",
+                forward_port=65530,
+                ssl_cert_id=7,
+            )
+        )
+        _, _, body = recording.calls[0]
+        assert body["certificate_id"] == "7"
+
+    def test_create_str_cert_id_unchanged(self, recording):
+        _run(
+            main_mod.npg_create_proxy_host(
+                domain_names=["cert-coerce.four2mis.com"],
+                forward_host="127.0.0.1",
+                forward_port=65530,
+                ssl_cert_id="a7a057e9-6b31-4780-8d66-cfb920918284",
+            )
+        )
+        _, _, body = recording.calls[0]
+        assert body["certificate_id"] == "a7a057e9-6b31-4780-8d66-cfb920918284"
+
+    def test_update_coerces_int_cert_id(self, recording):
+        _run(main_mod.npg_update_proxy_host(host_id=1, ssl_cert_id=7))
+        _, _, body, _ = recording.calls[0]
+        assert body == {"certificate_id": "7"}
+
+    def test_update_str_cert_id_unchanged(self, recording):
+        _run(
+            main_mod.npg_update_proxy_host(
+                host_id="a7a057e9-6b31-4780-8d66-cfb920918284",
+                ssl_cert_id="a7a057e9-6b31-4780-8d66-cfb920918284",
+            )
+        )
+        _, _, body, _ = recording.calls[0]
+        assert body == {"certificate_id": "a7a057e9-6b31-4780-8d66-cfb920918284"}
+
+
 class _GetRecordingClient:
     """Fake NPGClient that records every GET and returns a stub payload."""
 

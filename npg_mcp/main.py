@@ -835,7 +835,7 @@ async def npg_create_proxy_host(
                 "stream_proxy_connect_timeout": "stream_proxy_connect_timeout",
                 "stream_proxy_timeout": "stream_proxy_timeout",
             },
-            id_fields={"access_list_id", "auth_provider_id", "ddns_provider_id"},
+            id_fields={"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"},
         )
 
         data = await _api(c.post, "/api/v1/proxy-hosts", body)
@@ -937,7 +937,7 @@ async def npg_update_proxy_host(
                 "forward_container_name": "forward_container_name",
                 "forward_container_network": "forward_container_network",
             },
-            id_fields={"access_list_id", "auth_provider_id", "ddns_provider_id"},
+            id_fields={"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"},
         )
 
         params = {"skip_nginx": "true"} if skip_nginx else None
