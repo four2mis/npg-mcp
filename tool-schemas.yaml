@@ -31,7 +31,7 @@ npg_create_proxy_host:
   parameters: []
 
 npg_update_proxy_host:
-  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
+  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
   parameters: []
 
 npg_create_proxy_host_simple:

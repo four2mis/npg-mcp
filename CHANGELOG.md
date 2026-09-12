@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.28] - 2026-09-12
+
+### What changed
+- `npg_update_proxy_host` now accepts `waf_mode` (`detection`|`blocking`). The parameter was missing from the tool signature and body map entirely, so per-host WAF mode changes silently no-op'd — the tool returned `success: true` while the API never received the field. Note the upstream contract: per-host `waf_mode` is only consulted when `waf_use_global=false`; while a host inherits the global WAF, the API ignores a per-host mode by design. Description updated to document this in the same commit (CI description-sync gate).
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.27] - 2026-09-10
 
 ### What changed

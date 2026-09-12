@@ -843,7 +843,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -852,6 +852,7 @@ async def npg_update_proxy_host(
     forward_scheme: str | None = None,
     block_normal: bool | None = None,
     waf_enabled: bool | None = None,
+    waf_mode: str | None = None,
     waf_use_global: bool | None = None,
     waf_paranoia_level: int | None = None,
     waf_anomaly_threshold: int | None = None,
@@ -901,6 +902,7 @@ async def npg_update_proxy_host(
                 "forward_scheme": "forward_scheme",
                 "block_normal": "block_normal_access",
                 "waf_enabled": "waf_enabled",
+                "waf_mode": "waf_mode",
                 "waf_use_global": "waf_use_global",
                 "waf_paranoia_level": "waf_paranoia_level",
                 "waf_anomaly_threshold": "waf_anomaly_threshold",
