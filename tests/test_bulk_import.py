@@ -91,9 +91,16 @@ class TestCsvParsing:
         result = _run(main_mod.npg_bulk_import_proxy_hosts(
             csv_data=_csv(HEADER, '"app.example.com,api.example.com",10.0.0.10,8080')))
         assert result["success"] is True
-        post_calls = [c for c in recording.calls if c[0] == "POST" and c[1].endswith("proxy-hosts")]
+        post_calls = [
+            c
+            for c in recording.calls
+            if c[0] == "POST" and c[1].endswith("proxy-hosts")
+        ]
         assert len(post_calls) == 1
-        assert post_calls[0][2]["domain_names"] == ["app.example.com", "api.example.com"]
+        assert post_calls[0][2]["domain_names"] == [
+            "app.example.com",
+            "api.example.com",
+        ]
 
 
 class TestRowImport:
@@ -105,7 +112,11 @@ class TestRowImport:
         result = _run(main_mod.npg_bulk_import_proxy_hosts(csv_data=csv_data))
         assert result["success"] is True
         assert result["summary"] == {"rows": 1, "created": 1, "failed": 0}
-        post_calls = [c for c in recording.calls if c[0] == "POST" and c[1].endswith("proxy-hosts")]
+        post_calls = [
+            c
+            for c in recording.calls
+            if c[0] == "POST" and c[1].endswith("proxy-hosts")
+        ]
         body = post_calls[0][2]
         # MCP param names map to API field names via npg_create_proxy_host.
         assert body["certificate_id"] == "cert-uuid-1"
@@ -167,7 +178,9 @@ class TestRowImport:
         assert result["summary"]["created"] == 1
 
     def test_cap_raises_value_error_before_any_call(self, recording):
-        rows = "\n".join(f"h{i}.example.com,10.0.0.1,80" for i in range(_BULK_HOST_LIMIT + 1))
+        rows = "\n".join(
+            f"h{i}.example.com,10.0.0.1,80" for i in range(_BULK_HOST_LIMIT + 1)
+        )
         csv_data = _csv(HEADER, rows)
         result = _run(main_mod.npg_bulk_import_proxy_hosts(csv_data=csv_data))
         assert result["success"] is False
@@ -175,7 +188,9 @@ class TestRowImport:
         assert recording.calls == []
 
     def test_at_cap_is_allowed(self, recording):
-        rows = "\n".join(f"h{i}.example.com,10.0.0.1,80" for i in range(_BULK_HOST_LIMIT))
+        rows = "\n".join(
+            f"h{i}.example.com,10.0.0.1,80" for i in range(_BULK_HOST_LIMIT)
+        )
         csv_data = _csv(HEADER, rows)
         result = _run(main_mod.npg_bulk_import_proxy_hosts(csv_data=csv_data))
         assert result["success"] is True
@@ -184,7 +199,9 @@ class TestRowImport:
 
 class TestSyncBehavior:
     def test_default_skip_nginx_never_syncs(self, recording):
-        result = _run(main_mod.npg_bulk_import_proxy_hosts(csv_data=_csv(HEADER, GOOD_ROW)))
+        result = _run(
+            main_mod.npg_bulk_import_proxy_hosts(csv_data=_csv(HEADER, GOOD_ROW))
+        )
         assert result["success"] is True
         assert result["sync"] is None
         syncs = [c for c in recording.calls if c[1] == "/api/v1/proxy-hosts/sync"]

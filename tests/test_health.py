@@ -21,11 +21,11 @@ import logging
 import httpx
 import pytest
 
-import npg_mcp.client as client_mod
-import npg_mcp.main as main_mod
-
 # starlette TestClient drives the ASGI app in-process (httpx-based).
 from starlette.testclient import TestClient
+
+import npg_mcp.client as client_mod
+import npg_mcp.main as main_mod
 
 
 @pytest.fixture
@@ -228,8 +228,9 @@ class TestAccessLogRequestId:
         """A tools/call request logs one MCP line and one NPG line sharing the
         same unique req= prefix."""
         middleware = main_mod._access_log_middleware(self._make_app(do_api_call=True))
-        import anyio
         import re
+
+        import anyio
 
         with caplog.at_level(logging.INFO):
             send, _ = self._make_send()
@@ -248,7 +249,9 @@ class TestAccessLogRequestId:
 
         records = [r for r in caplog.records if r.name.startswith("npg_mcp")]
         mcp_lines = [r.getMessage() for r in records if "MCP request" in r.getMessage()]
-        npg_lines = [r.getMessage() for r in records if r.getMessage().startswith("NPG ")]
+        npg_lines = [
+            r.getMessage() for r in records if r.getMessage().startswith("NPG ")
+        ]
         assert mcp_lines, "expected an MCP request log line"
         assert npg_lines, "expected an outbound NPG log line"
         mcp_req = re.search(r"req=(r-[0-9a-f]{8})", mcp_lines[0])
@@ -264,8 +267,9 @@ class TestAccessLogRequestId:
     def test_ids_unique_across_requests(self, caplog):
         """Two sequential requests get different req= IDs."""
         middleware = main_mod._access_log_middleware(self._make_app(do_api_call=True))
-        import anyio
         import re
+
+        import anyio
 
         with caplog.at_level(logging.INFO):
             for n in (1, 2):

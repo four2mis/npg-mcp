@@ -29,10 +29,10 @@ jobs:
         run: python3 -c "import ast; ast.parse(open('npg_mcp/main.py').read()); print('Syntax OK')"
 
       - name: Install test/lint dependencies
-        run: python3 -m pip install --quiet . pytest respx ruff mypy
+        run: python3 -m pip install --quiet -e '.[dev]'
 
       - name: Run ruff linter
-        run: ruff check npg_mcp/
+        run: ruff check .
 
       - name: Run mypy type checker
         run: mypy npg_mcp/ --ignore-missing-imports

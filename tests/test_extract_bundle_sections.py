@@ -19,7 +19,10 @@ _HOST = {"forward_host": "127.0.0.1", "forward_port": 8080}
 
 class TestExtractBundleSections:
     def test_full_export_result_shape(self):
-        bundle = {"success": True, "data": {"schema_version": 1, "sections": {"host": _HOST}}}
+        bundle = {
+            "success": True,
+            "data": {"schema_version": 1, "sections": {"host": _HOST}},
+        }
         sv, sections = _extract_bundle_sections(bundle)
         assert sv == 1
         assert sections["host"] == _HOST

@@ -38,7 +38,9 @@ class TestValidateId:
             _validate_id("host_id", bad)
 
     def test_error_message_uses_param_name(self):
-        with pytest.raises(ValueError, match="cert_id is required \\(got: empty string\\)"):
+        with pytest.raises(
+            ValueError, match="cert_id is required \\(got: empty string\\)"
+        ):
             _validate_id("cert_id", "")
 
 
@@ -62,7 +64,9 @@ class TestValidateRequired:
             _validate_required("domain_names", bad)
 
     def test_error_message_uses_param_name(self):
-        with pytest.raises(ValueError, match="domain_names is required \\(got: empty string\\)"):
+        with pytest.raises(
+            ValueError, match="domain_names is required \\(got: empty string\\)"
+        ):
             _validate_required("domain_names", [])
 
 
@@ -76,7 +80,10 @@ class TestIdPath:
             (0, "0"),
             (-7, "-7"),
             ("abc", "abc"),
-            ("a7a057e9-6b31-4780-8d66-cfb920918284", "a7a057e9-6b31-4780-8d66-cfb920918284"),
+            (
+                "a7a057e9-6b31-4780-8d66-cfb920918284",
+                "a7a057e9-6b31-4780-8d66-cfb920918284",
+            ),
             ("42", "42"),
         ],
     )
@@ -114,15 +121,27 @@ class TestBuildBody:
                 "block_normal": None,
                 "enabled": True,
             },
-            {"forward_scheme": "forward_scheme", "block_normal": "block_normal_access", "enabled": "enabled"},
+            {
+                "forward_scheme": "forward_scheme",
+                "block_normal": "block_normal_access",
+                "enabled": "enabled",
+            },
         )
         assert body == {"forward_scheme": "http", "enabled": True}
 
     def test_applies_id_path_to_id_fields(self):
         _build_body = self._helper()
         body = _build_body(
-            {"ssl_cert_id": "a7a057e9-6b31-4780-8d66-cfb920918284", "host_id": 42, "forward_port": 8080},
-            {"ssl_cert_id": "certificate_id", "host_id": "host_id", "forward_port": "forward_port"},
+            {
+                "ssl_cert_id": "a7a057e9-6b31-4780-8d66-cfb920918284",
+                "host_id": 42,
+                "forward_port": 8080,
+            },
+            {
+                "ssl_cert_id": "certificate_id",
+                "host_id": "host_id",
+                "forward_port": "forward_port",
+            },
             id_fields={"ssl_cert_id", "host_id"},
         )
         assert body == {

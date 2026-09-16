@@ -202,7 +202,9 @@ class TestBulkRenewCertificatesConcurrency:
     def test_wall_time_bounded_not_sequential(self, slow):
         n = 3 * _BULK_RENEW_CONCURRENCY
         t0 = time.monotonic()
-        result = _run(main_mod.npg_bulk_renew_certificates(cert_ids=_many_ids(n, "cert")))
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(cert_ids=_many_ids(n, "cert"))
+        )
         elapsed = time.monotonic() - t0
         assert result["success"] is True
         assert elapsed < n * _DELAY * 0.6
@@ -210,7 +212,9 @@ class TestBulkRenewCertificatesConcurrency:
 
     def test_peak_concurrency_never_exceeds_acme_cap(self, slow):
         n = 2 * _BULK_RENEW_CONCURRENCY + 2
-        result = _run(main_mod.npg_bulk_renew_certificates(cert_ids=_many_ids(n, "cert")))
+        result = _run(
+            main_mod.npg_bulk_renew_certificates(cert_ids=_many_ids(n, "cert"))
+        )
         assert result["success"] is True
         assert slow.peak <= _BULK_RENEW_CONCURRENCY
         assert slow.peak > 1
@@ -245,7 +249,9 @@ class TestBulkGetProxyHostFullConcurrency:
         assert result["hosts_failed"] == []
         for hid, entry in result["data"].items():
             assert entry["success"] is True
-            assert set(entry["data"].keys()) == set(main_mod._proxy_host_section_paths(hid))
+            assert set(entry["data"].keys()) == set(
+                main_mod._proxy_host_section_paths(hid)
+            )
             assert entry["sections_failed"] == []
 
     def test_failed_host_isolated_not_abort(self, slow):

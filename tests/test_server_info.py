@@ -80,7 +80,10 @@ class TestErrorHintMapping:
         assert main_mod._error_hint(e) == main_mod._ERROR_HINT_TOKEN
 
     def test_validation_error(self):
-        for e in (ValueError("host_id is required (got: empty string)"), TypeError("bad")):
+        for e in (
+            ValueError("host_id is required (got: empty string)"),
+            TypeError("bad"),
+        ):
             assert main_mod._error_hint(e) == main_mod._ERROR_HINT_INPUT
 
     def test_default_fallback(self):
@@ -98,7 +101,9 @@ class TestErrorHintMapping:
 
 class TestErrorResultShape:
     def test_shape_is_additive(self):
-        result = main_mod._error_result(client_mod.NPGError("NPG API returned HTTP 404"))
+        result = main_mod._error_result(
+            client_mod.NPGError("NPG API returned HTTP 404")
+        )
         assert result["success"] is False
         assert result["error"] == "NPG API returned HTTP 404"
         assert isinstance(result["hint"], str) and result["hint"]

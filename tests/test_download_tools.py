@@ -102,7 +102,9 @@ class TestGetBytes:
 class TestDownloadToolsBase64RoundTrip:
     """Tool-level: binary payload -> base64 -> decode == original bytes."""
 
-    @pytest.mark.parametrize("tool_name", ["npg_download_backup", "npg_get_certificate_download"])
+    @pytest.mark.parametrize(
+        "tool_name", ["npg_download_backup", "npg_get_certificate_download"]
+    )
     def test_binary_payload_base64_round_trip(self, tool_name, monkeypatch):
         if tool_name == "npg_download_backup":
             raw = _make_gzip(b"backup-payload-" * 50)
@@ -128,7 +130,7 @@ class TestDownloadToolsBase64RoundTrip:
         # Tools are async functions — run the coroutine.
         import asyncio
         if asyncio.iscoroutine(result):
-            result = asyncio.get_event_loop().run_until_complete(result) if False else asyncio.run(result)
+            result = asyncio.run(result)
 
         assert result["success"] is True
         assert result["encoding"] == "base64"

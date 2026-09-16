@@ -1,4 +1,5 @@
-"""Concurrency smoke test: blocking NPGClient calls must not serialize on the event loop.
+"""Concurrency smoke test: blocking NPGClient calls must not serialize
+on the event loop.
 
 Every tool wraps its HTTP call in ``_api()`` (asyncio.to_thread). With a fake
 client whose GET sleeps ``DELAY`` seconds, N concurrent tool calls must finish

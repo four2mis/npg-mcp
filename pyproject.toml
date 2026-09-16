@@ -12,7 +12,7 @@ dependencies = [
 dev = [
     "pytest",
     "respx",
-    "ruff",
+    "ruff==0.16.3",
     "mypy",
 ]
 

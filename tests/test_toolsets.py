@@ -12,15 +12,13 @@ Pure-function tests — no MCP server, no network.
 
 from __future__ import annotations
 
-import pytest
-
 from npg_mcp.toolsets import (
-    DEFAULT_LEVEL,
     DESTRUCTIVE_TOOLS,
     VALID_LEVELS,
     resolve_level,
     tier_allowed,
 )
+
 
 def _sample_tools() -> set[str]:
     """A representative tool name set mirroring the real naming contract."""
@@ -86,11 +84,19 @@ class TestTierAllowed:
         }
         # every allowed name must match one of the read prefixes
         for name in allowed:
-            assert name.startswith(("npg_get_", "npg_list_", "npg_view_", "npg_download_", "npg_check_", "npg_detect_"))
+            assert name.startswith(
+                ("npg_get_", "npg_list_", "npg_view_",
+                 "npg_download_", "npg_check_", "npg_detect_")
+            )
 
     def test_read_excludes_all_mutations(self):
         allowed = tier_allowed(_sample_tools(), "read")
-        for mut in ("npg_create_proxy_host", "npg_ban_ip", "npg_sync_nginx", "npg_delete_proxy_host"):
+        for mut in (
+            "npg_create_proxy_host",
+            "npg_ban_ip",
+            "npg_sync_nginx",
+            "npg_delete_proxy_host",
+        ):
             assert mut not in allowed
 
     def test_standard_excludes_all_47_destructive_tools(self):
@@ -141,7 +147,8 @@ class TestDestructiveListIntegrity:
     def test_no_readonly_prefix_collides_with_destructive(self):
         for name in DESTRUCTIVE_TOOLS:
             assert not name.startswith(
-                ("npg_get_", "npg_list_", "npg_view_", "npg_download_", "npg_check_", "npg_detect_")
+                ("npg_get_", "npg_list_", "npg_view_", "npg_download_",
+                 "npg_check_", "npg_detect_")
             ), name
 
 
@@ -155,10 +162,12 @@ class TestDerivedDestructiveTools:
     """
 
     def test_derived_set_matches_regex_semantics(self):
-        from npg_mcp.toolsets import (_DESTRUCTIVE_ALLOWLIST,
-                                      _DESTRUCTIVE_DENYLIST,
-                                      _DESTRUCTIVE_NAME_RE,
-                                      _discover_tool_names)
+        from npg_mcp.toolsets import (
+            _DESTRUCTIVE_ALLOWLIST,
+            _DESTRUCTIVE_DENYLIST,
+            _DESTRUCTIVE_NAME_RE,
+            _discover_tool_names,
+        )
 
         all_tools = _discover_tool_names()
         regex_matches = {n for n in all_tools if _DESTRUCTIVE_NAME_RE.match(n)}
@@ -175,7 +184,11 @@ class TestDerivedDestructiveTools:
 
         all_tools = _discover_tool_names()
         # Invariant: standard hides exactly the destructive set.
-        assert len(tier_allowed(all_tools, "standard")) == len(all_tools) - len(DESTRUCTIVE_TOOLS) == 245
+        assert (
+            len(tier_allowed(all_tools, "standard"))
+            == len(all_tools) - len(DESTRUCTIVE_TOOLS)
+            == 245
+        )
         # Live surface guardrail (current HEAD): 292 tools, 47 destructive.
         assert len(all_tools) == 292
         assert len(DESTRUCTIVE_TOOLS) == 47
@@ -199,7 +212,9 @@ class TestDerivedDestructiveTools:
 
         doc = inspect.getdoc(toolsets) or ""
         assert "naming convention" in doc.lower()
-        assert "delete_" in doc and "DESTRUCTIVE_ALLOWLIST" in doc and "DESTRUCTIVE_DENYLIST" in doc
+        assert "delete_" in doc
+        assert "DESTRUCTIVE_ALLOWLIST" in doc
+        assert "DESTRUCTIVE_DENYLIST" in doc
 
     def test_bulk_delete_denylisted_bulk_apply_not(self):
         """The bulk-delete tool is destructive (denylist); the bulk cert-apply

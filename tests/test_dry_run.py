@@ -22,10 +22,8 @@ import asyncio
 import pytest
 
 import npg_mcp.client as client_mod
-from npg_mcp.client import NPGClient
-
 import npg_mcp.main as main_mod
-
+from npg_mcp.client import NPGClient
 
 BASE = "https://npg.test"
 
@@ -62,7 +60,9 @@ class TestClientInterception:
         return NPGClient(base_url=BASE, token="ng_tok")
 
     def test_post_returns_payload(self):
-        payload = self._client().post("/api/v1/proxy-hosts", {"domain_names": ["x.test"]})
+        payload = self._client().post(
+            "/api/v1/proxy-hosts", {"domain_names": ["x.test"]}
+        )
         assert payload == {
             "dry_run": True,
             "method": "POST",
@@ -72,7 +72,11 @@ class TestClientInterception:
 
     def test_post_without_body_omits_body_key(self):
         payload = self._client().post("/api/v1/proxy-hosts/sync")
-        assert payload == {"dry_run": True, "method": "POST", "path": "/api/v1/proxy-hosts/sync"}
+        assert payload == {
+            "dry_run": True,
+            "method": "POST",
+            "path": "/api/v1/proxy-hosts/sync",
+        }
 
     def test_put_with_params(self):
         payload = self._client().put(
@@ -84,7 +88,11 @@ class TestClientInterception:
 
     def test_delete_payload(self):
         payload = self._client().delete("/api/v1/proxy-hosts/1")
-        assert payload == {"dry_run": True, "method": "DELETE", "path": "/api/v1/proxy-hosts/1"}
+        assert payload == {
+            "dry_run": True,
+            "method": "DELETE",
+            "path": "/api/v1/proxy-hosts/1",
+        }
 
     def test_delete_with_params_payload(self):
         payload = self._client().delete("/api/v1/banned-ips", params={"ip": "1.2.3.4"})
@@ -157,7 +165,11 @@ class TestToolDryRunSurface:
         result = self._run(main_mod.npg_delete_proxy_host("h1"))
         assert result == {
             "success": True,
-            "data": {"dry_run": True, "method": "DELETE", "path": "/api/v1/proxy-hosts/h1"},
+            "data": {
+                "dry_run": True,
+                "method": "DELETE",
+                "path": "/api/v1/proxy-hosts/h1",
+            },
         }
 
     def test_reload_nginx_surfaces_payload(self, dry_client):

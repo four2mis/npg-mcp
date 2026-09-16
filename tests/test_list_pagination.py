@@ -93,11 +93,15 @@ class TestListProxyHosts:
 
     def test_limit_and_page_sent(self, recording):
         _run(main_mod.npg_list_proxy_hosts(page=2, limit=10))
-        assert recording.calls == [("GET", "/api/v1/proxy-hosts", {"page": 2, "per_page": 10})]
+        assert recording.calls == [
+            ("GET", "/api/v1/proxy-hosts", {"page": 2, "per_page": 10})
+        ]
 
     def test_search_sent_only_when_nonempty(self, recording):
         _run(main_mod.npg_list_proxy_hosts(search="mcp-test-"))
-        assert recording.calls == [("GET", "/api/v1/proxy-hosts", {"search": "mcp-test-"})]
+        assert recording.calls == [
+            ("GET", "/api/v1/proxy-hosts", {"search": "mcp-test-"})
+        ]
         _run(main_mod.npg_list_proxy_hosts(search="  "))
         assert recording.calls[-1] == ("GET", "/api/v1/proxy-hosts", None)
 
@@ -115,15 +119,32 @@ class TestGetLogs:
         assert recording.calls == [("GET", "/api/v1/logs", None)]
 
     def test_all_filters_sent(self, recording):
-        _run(main_mod.npg_get_logs(host="foo.example.com", status=404, method="GET", limit=50, offset=10))
-        # limit -> per_page; offset 10 with page size 50 -> page 1; status -> status_code (upstream field name)
+        _run(
+            main_mod.npg_get_logs(
+                host="foo.example.com", status=404, method="GET", limit=50, offset=10
+            )
+        )
+        # limit -> per_page; offset 10 with page size 50 -> page 1;
+        # status -> status_code (upstream field name)
         assert recording.calls == [
-            ("GET", "/api/v1/logs", {"per_page": 50, "page": 1, "host": "foo.example.com", "status_code": 404, "method": "GET"})
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "per_page": 50,
+                    "page": 1,
+                    "host": "foo.example.com",
+                    "status_code": 404,
+                    "method": "GET",
+                },
+            )
         ]
 
     def test_partial_filters(self, recording):
         _run(main_mod.npg_get_logs(status=404, limit=50))
-        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 50, "status_code": 404})]
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"per_page": 50, "status_code": 404})
+        ]
 
     def test_negative_status_clean_error(self, recording):
         result = _run(main_mod.npg_get_logs(status=-1))
@@ -132,19 +153,49 @@ class TestGetLogs:
         assert recording.calls == []
 
     def test_status_class_filters_sent(self, recording):
-        _run(main_mod.npg_get_logs(status_classes=["4xx"], exclude_status_codes=[200, 404], exclude_status_classes=["2xx"]))
+        _run(
+            main_mod.npg_get_logs(
+                status_classes=["4xx"],
+                exclude_status_codes=[200, 404],
+                exclude_status_classes=["2xx"],
+            )
+        )
         assert recording.calls == [
-            ("GET", "/api/v1/logs", {"status_classes": ["4xx"], "exclude_status_codes": [200, 404], "exclude_status_classes": ["2xx"]})
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "status_classes": ["4xx"],
+                    "exclude_status_codes": [200, 404],
+                    "exclude_status_classes": ["2xx"],
+                },
+            )
         ]
 
     def test_status_class_filters_combined_with_existing(self, recording):
-        _run(main_mod.npg_get_logs(host="foo.example.com", status_classes=["5xx", "4xx"], limit=50))
+        _run(
+            main_mod.npg_get_logs(
+                host="foo.example.com", status_classes=["5xx", "4xx"], limit=50
+            )
+        )
         assert recording.calls == [
-            ("GET", "/api/v1/logs", {"per_page": 50, "host": "foo.example.com", "status_classes": ["5xx", "4xx"]})
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "per_page": 50,
+                    "host": "foo.example.com",
+                    "status_classes": ["5xx", "4xx"],
+                },
+            )
         ]
 
     def test_empty_status_class_lists_not_sent(self, recording):
-        result = _run(main_mod.npg_get_logs(status_classes=[], exclude_status_codes=[], exclude_status_classes=[]))
+        result = _run(
+            main_mod.npg_get_logs(
+                status_classes=[], exclude_status_codes=[], exclude_status_classes=[]
+            )
+        )
         assert result["success"] is True
         assert recording.calls == [("GET", "/api/v1/logs", None)]
 
@@ -156,9 +207,22 @@ class TestListAuditLogs:
         assert recording.calls == [("GET", "/api/v1/audit-logs", None)]
 
     def test_filters_sent(self, recording):
-        _run(main_mod.npg_list_audit_logs(page=1, limit=25, action="create", resource_type="proxy_host"))
+        _run(
+            main_mod.npg_list_audit_logs(
+                page=1, limit=25, action="create", resource_type="proxy_host"
+            )
+        )
         assert recording.calls == [
-            ("GET", "/api/v1/audit-logs", {"page": 1, "limit": 25, "action": "create", "resource_type": "proxy_host"})
+            (
+                "GET",
+                "/api/v1/audit-logs",
+                {
+                    "page": 1,
+                    "limit": 25,
+                    "action": "create",
+                    "resource_type": "proxy_host",
+                },
+            )
         ]
 
 
@@ -170,4 +234,10 @@ class TestListSystemLogs:
 
     def test_filters_sent(self, recording):
         _run(main_mod.npg_list_system_logs(source="nginx", level="error", limit=100))
-        assert recording.calls == [("GET", "/api/v1/system-logs", {"source": "nginx", "level": "error", "limit": 100})]
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/system-logs",
+                {"source": "nginx", "level": "error", "limit": 100},
+            )
+        ]

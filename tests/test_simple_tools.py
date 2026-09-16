@@ -244,7 +244,9 @@ class TestGetProxyHostFullSections:
 
     def test_sections_filter_only_fetches_selected(self, monkeypatch):
         client = self._client(monkeypatch)
-        result = _run(main_mod.npg_get_proxy_host_full("abc-123", sections=["geo", "fail2ban"]))
+        result = _run(
+            main_mod.npg_get_proxy_host_full("abc-123", sections=["geo", "fail2ban"])
+        )
         assert result["success"] is True
         assert result["sections_failed"] == []
         assert set(result["data"]) == {"geo", "fail2ban"}
@@ -284,7 +286,9 @@ class TestGetProxyHostFullSections:
 
         client = _FailingGeo()
         monkeypatch.setattr(main_mod, "_get_client", lambda: client)
-        result = _run(main_mod.npg_get_proxy_host_full("abc-123", sections=["host", "geo"]))
+        result = _run(
+            main_mod.npg_get_proxy_host_full("abc-123", sections=["host", "geo"])
+        )
         assert result["success"] is True
         assert result["sections_failed"] == ["geo"]
         assert result["data"]["geo"]["success"] is False

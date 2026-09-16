@@ -47,7 +47,9 @@ def client():
     return NPGClient(base_url=BASE, token="ng_test_token")
 
 
-def _status_error(status: int, json_body: dict | None = None, content: bytes | None = None) -> httpx.HTTPStatusError:
+def _status_error(
+    status: int, json_body: dict | None = None, content: bytes | None = None
+) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", f"{BASE}/api/v1/hosts")
     response = httpx.Response(status, request=request, json=json_body, content=content)
     return httpx.HTTPStatusError(f"HTTP {status}", request=request, response=response)
@@ -55,7 +57,9 @@ def _status_error(status: int, json_body: dict | None = None, content: bytes | N
 
 def _status_error_with_headers(status: int, headers: dict) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", f"{BASE}/api/v1/hosts")
-    response = httpx.Response(status, request=request, headers=headers, json={"message": "rl"})
+    response = httpx.Response(
+        status, request=request, headers=headers, json={"message": "rl"}
+    )
     return httpx.HTTPStatusError(f"HTTP {status}", request=request, response=response)
 
 
@@ -66,7 +70,9 @@ class TestNPGErrorSanitization:
     def test_http_400_json_message_detail(self, client):
         with respx.mock:
             respx.get(f"{BASE}/api/v1/hosts").mock(
-                return_value=httpx.Response(400, json={"message": "domain_names is required"})
+                return_value=httpx.Response(
+                    400, json={"message": "domain_names is required"}
+                )
             )
             with pytest.raises(NPGError) as ei:
                 client.get("/api/v1/hosts")
@@ -117,7 +123,8 @@ class TestNPGErrorSanitization:
         assert BASE not in str(err)
 
     def test_sanitize_transport_error_never_leaks_url(self):
-        err = NPGClient(base_url=BASE, token="t")._sanitize(httpx.ConnectError("connection refused"))
+        client = NPGClient(base_url=BASE, token="t")
+        err = client._sanitize(httpx.ConnectError("connection refused"))
         assert err.message == "NPG API request failed"
         assert BASE not in str(err)
 
@@ -296,7 +303,9 @@ class TestRateLimit429Retry:
                 data = client.get("/api/v1/hosts")
                 assert route.call_count == 2
         assert data == {"data": ["host"]}
-        warn_lines = [r.getMessage() for r in caplog.records if "rate-limited" in r.getMessage()]
+        warn_lines = [
+            r.getMessage() for r in caplog.records if "rate-limited" in r.getMessage()
+        ]
         assert warn_lines, "expected a 'rate-limited' retry warning log line"
 
     def test_post_never_retries_on_429(self, client):
@@ -362,7 +371,9 @@ class TestRequestIdCorrelation:
                     client.get("/api/v1/hosts")
             finally:
                 client_mod.set_request_id("")
-        messages = [r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"]
+        messages = [
+            r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"
+        ]
         ok_lines = [m for m in messages if m.startswith("NPG GET /api/v1/hosts -> 200")]
         assert ok_lines, f"expected NPG GET success log line, got: {messages}"
         # Existing format preserved — only a req= suffix added.
@@ -377,7 +388,9 @@ class TestRequestIdCorrelation:
                     return_value=httpx.Response(200, json={"data": []})
                 )
                 client.get("/api/v1/hosts")
-        messages = [r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"]
+        messages = [
+            r.getMessage() for r in caplog.records if r.name == "npg_mcp.client"
+        ]
         ok_lines = [m for m in messages if m.startswith("NPG GET /api/v1/hosts -> 200")]
         assert ok_lines, f"expected NPG GET success log line, got: {messages}"
         assert "req=" not in ok_lines[0]
