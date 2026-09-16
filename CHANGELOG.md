@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.29] - 2026-09-17
+
+### What changed
+- Percent-encode path-interpolated identifiers (commit c40c1b5): `_id_path()` now returns `quote(str(id), safe="")`, so URL-unsafe characters in ids/slugs (spaces, slashes, `%`, etc.) can never alter the URL path structure of API calls. Added `_id_str` for identifiers embedded in raw request/response body values. Verified against the test stack with a local image build of the release commit: 281 unit tests pass (incl. 25 new encoding tests), ruff + mypy clean, doc drift check exit 0, and 9 read-only tools regressed successfully over the live MCP protocol.
+- Capped concurrent NPG API calls in bulk fan-out (commit 3be533a): added the `_gather_bounded(limit, coros)` order-preserving helper and rewired bulk tools (e.g. `npg_bulk_apply_certificate`, cap 8) to use it, preventing request floods against the NPG API that triggered upstream rate limiting and connection failures during bulk operations.
+- Enforced repo-wide lint in CI (commit 825eda5): fixed all 74 ruff findings in `tests/` (62 E501 line-length rewraps with zero test-logic changes plus 12 auto-fixable I001/W292/F401) and added a lint gate to the publish.yml validate job so future lint regressions block publishing.
+- Synced swagger.yaml to upstream NPG v2.56.0 (commit b067212) to keep the local API reference current.
+
+### What's new
+- `_id_str` helper for stringifying identifiers in raw body values, complementing the URL-path percent-encoding of `_id_path` (commit c40c1b5).
+- `_gather_bounded` bounded-concurrency helper used by all bulk fan-out tools (commit 3be533a).
+
+### Breaking changes
+- (none)
+
 ## [0.5.28] - 2026-09-12
 
 ### What changed
