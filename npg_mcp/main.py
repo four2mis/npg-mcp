@@ -338,6 +338,38 @@ async def _api(callable_, *args, **kwargs):
     return await asyncio.to_thread(callable_, *args, **kwargs)
 
 
+# Concurrency caps for the bulk fan-out tools. All caps are per-call (one
+# bulk tool invocation), never global: the shared client is a thin wrapper
+# over httpx and the NPG API rate-limits by request, so the goal is to keep
+# each batch's in-flight request count bounded and predictable.
+_BULK_WRITE_CONCURRENCY = 8    # parallel PUT/DELETE per bulk mutator batch
+_BULK_RENEW_CONCURRENCY = 4    # ACME-friendly cap for bulk certificate renewals
+_BULK_HOST_CONCURRENCY = 16    # concurrent per-host workers in npg_bulk_get_proxy_host_full
+_BULK_SECTION_CONCURRENCY = 8  # concurrent section GETs per host worker (two-level cap)
+
+
+async def _gather_bounded(limit: int, coros) -> list:
+    """Gather coroutines with a hard concurrency cap of ``limit``.
+
+    Uses a per-call ``asyncio.Semaphore`` (created inside the running loop —
+    a module-level semaphore binds to whichever loop first awaits it and
+    raises ``RuntimeError`` when reused from another loop, so it must be
+    per-call). ``asyncio.gather`` preserves input order in its result list
+    regardless of completion order, so callers consume results positionally
+    exactly like the sequential loop they replace (byte-identical response
+    shapes). Exceptions propagate from gather — each coroutine must handle
+    its own errors when per-entry failure isolation is required, which every
+    bulk tool here does.
+    """
+    sem = asyncio.Semaphore(limit)
+
+    async def _run(coro):
+        async with sem:
+            return await coro
+
+    return await asyncio.gather(*(_run(coro) for coro in coros))
+
+
 def _id_path(id_val) -> str:
     """Convert an ID (int or str) to a string for URL path interpolation."""
     return str(id_val)
@@ -1081,8 +1113,13 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
                 f"(got {len(host_ids)})"
             )
         c = _get_client()
-        results: list[dict] = []
-        for host_id in host_ids:
+
+        # Per-host worker; exceptions are caught per entry so one failing
+        # host never aborts the batch (same isolation as the sequential
+        # version). Runs under a semaphore-capped gather — at most
+        # _BULK_WRITE_CONCURRENCY PUTs in flight (order preserved, so the
+        # response list matches host_ids order exactly as before).
+        async def _apply(host_id) -> dict:
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
@@ -1095,7 +1132,10 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
             except Exception as e:
                 entry["success"] = False
                 entry["error"] = str(e)
-            results.append(entry)
+            return entry
+
+        results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
+                                        (_apply(h) for h in host_ids))
         return {"success": True, "data": results}
     except Exception as e:
         return _error_result(e)
@@ -1110,8 +1150,12 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
                 f"(got {len(host_ids)})"
             )
         c = _get_client()
-        results: list[dict] = []
-        for host_id in host_ids:
+
+        # Per-host worker with per-entry error isolation (same as the
+        # sequential version). DRY_RUN passthrough preserved per entry.
+        # Semaphore-capped gather — at most _BULK_WRITE_CONCURRENCY DELETEs
+        # in flight; order preserved so the response list matches host_ids.
+        async def _delete_one(host_id) -> dict:
             entry: dict = {"host_id": _id_path(host_id)}
             try:
                 _validate_id("host_id", host_id)
@@ -1123,7 +1167,10 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
             except Exception as e:
                 entry["success"] = False
                 entry["error"] = str(e)
-            results.append(entry)
+            return entry
+
+        results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
+                                        (_delete_one(h) for h in host_ids))
         return {"success": True, "data": results}
     except Exception as e:
         return _error_result(e)
@@ -1163,8 +1210,9 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
                     except Exception as se:
                         return section, {"success": False, "error": str(se), "hint": _error_hint(se)}
 
-                results = await asyncio.gather(
-                    *(_fetch(section, path) for section, path in section_paths.items())
+                results = await _gather_bounded(
+                    _BULK_SECTION_CONCURRENCY,
+                    (_fetch(section, path) for section, path in section_paths.items())
                 )
                 for section, payload in results:
                     entry["data"][section] = payload
@@ -1185,7 +1233,14 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
                 entry["error"] = str(he)
             return hid, entry
 
-        results = await asyncio.gather(*(_one(h) for h in ordered))
+        # Two-level bounded fan-out: at most _BULK_HOST_CONCURRENCY host
+        # workers run concurrently and each worker issues at most
+        # _BULK_SECTION_CONCURRENCY section GETs at once, so a full 50-host
+        # call holds <= 16*8 = 128 outstanding NPG API calls (previously up
+        # to 550 uncapped gathers -> 429-storm risk against a rate-limited
+        # API). Per-host results stay keyed by host id exactly as before.
+        results = await _gather_bounded(_BULK_HOST_CONCURRENCY,
+                                        (_one(h) for h in ordered))
         data = {hid: entry for hid, entry in results}
         hosts_failed = sorted(h for h, entry in data.items() if not entry.get("success"))
         return {"success": True, "data": data, "hosts_failed": hosts_failed}
@@ -1599,6 +1654,11 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
             )
         results: list[dict] = []
         created_any = False
+        # Kept deliberately SEQUENTIAL (not _gather_bounded): rows are not
+        # independent — each create may trigger reconciliation on the NPG
+        # side and callers expect row-ordered results; creates are also the
+        # heaviest operations. Revisit only if a concrete workload proves
+        # the sequential round-trip sum is a problem.
         for idx, row in enumerate(rows, start=1):
             entry: dict = {"row": idx}
             try:
@@ -1724,8 +1784,12 @@ async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
                 f"(got {len(cert_ids)})"
             )
         c = _get_client()
-        results: list[dict] = []
-        for cert_id in cert_ids:
+
+        # Per-cert worker with per-entry error isolation. Capped at
+        # _BULK_RENEW_CONCURRENCY (4) — deliberately lower than the write
+        # cap so a batch of ACME renewals respects Let's Encrypt rate
+        # limits instead of fully parallelizing.
+        async def _renew(cert_id) -> dict:
             entry: dict = {"cert_id": _id_path(cert_id)}
             try:
                 _validate_id("cert_id", cert_id)
@@ -1735,7 +1799,10 @@ async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
             except Exception as e:
                 entry["success"] = False
                 entry["error"] = str(e)
-            results.append(entry)
+            return entry
+
+        results = await _gather_bounded(_BULK_RENEW_CONCURRENCY,
+                                        (_renew(cid) for cid in cert_ids))
         return {"success": True, "data": results}
     except Exception as e:
         return _error_result(e)
