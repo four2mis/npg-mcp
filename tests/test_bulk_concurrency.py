@@ -263,3 +263,57 @@ class TestBulkGetProxyHostFullConcurrency:
         # Healthy hosts still return their full config
         assert result["data"]["ok-a"]["success"] is True
         assert result["data"]["ok-c"]["success"] is True
+
+
+class _PathRecordingClient:
+    """Synchronous fake client that records every GET path and returns ok."""
+
+    def __init__(self):
+        self.paths: list[str] = []
+
+    def get(self, path, params=None):
+        self.paths.append(path)
+        return {"ok": True}
+
+
+class TestBulkGetProxyHostFullDedupe:
+    """Regression: dedupe key must match the URL the section GETs hit.
+
+    The dedupe key is the URL-encoded id (_id_path) — the same form
+    npg_get_proxy_host_full interpolates into section URLs — so quote-variant
+    spellings of one id cannot produce different request URLs. Response keys
+    stay the raw caller spelling (_id_str, non-URL display context).
+    """
+
+    def test_dedupes_on_encoded_form_not_raw_strings(self, monkeypatch):
+        client = _PathRecordingClient()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        result = _run(main_mod.npg_bulk_get_proxy_host_full(
+            host_ids=["host-a", "host-a", "host-a/1"],
+        ))
+        assert result["success"] is True
+        # 3 ids -> 2 unique entries: "host-a" (x2 collapsed) and "host-a/1".
+        # Under the pre-fix _id_str key, "host-a/1" and "host-a" were also 2
+        # entries, but the URL the second id's sections hit contained the raw
+        # "/" while npg_get_proxy_host_full (single-host) encodes it as %2F —
+        # this test pins the bulk tool to the same encoded-URL form.
+        # 2 unique ids x 11 sections = 22 GETs (pre-dedupe would be 33).
+        assert len(client.paths) == 22
+        # "host-a": 1 host GET + 9 proxy-hosts sub-sections + 1 waf = 11 calls
+        assert sum(1 for p in client.paths
+                   if p.startswith("/api/v1/proxy-hosts/host-a")
+                   and not p.startswith("/api/v1/proxy-hosts/host-a%2F1")) == 10
+        assert sum(1 for p in client.paths
+                   if p.startswith("/api/v1/proxy-hosts/host-a%2F1")
+                   or p.startswith("/api/v1/waf/hosts/host-a%2F1")) == 11
+        # Response keys echo the raw caller spelling (first-seen wins)
+        assert list(result["data"].keys()) == ["host-a", "host-a/1"]
+
+    def test_int_and_str_same_id_dedupe_to_one(self, monkeypatch):
+        client = _PathRecordingClient()
+        monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+        result = _run(main_mod.npg_bulk_get_proxy_host_full(host_ids=[1, "1"]))
+        assert result["success"] is True
+        # int 1 and str "1" are the same URL — one entry, 11 section calls.
+        assert list(result["data"].keys()) == ["1"]
+        assert len(client.paths) == 11

@@ -1207,15 +1207,20 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
         c = _get_client()
 
         # Dedupe preserving first-seen order so the same id is fetched once.
+        # Key on the URL-encoded form (_id_path) — identical to what
+        # npg_get_proxy_host_full interpolates into section URLs — so
+        # quote-variant spellings of one id cannot fetch different URLs.
+        # The raw spelling is kept separately for response dict keys, which
+        # are non-URL display context and must echo the caller's id (_id_str).
         seen: set[str] = set()
-        ordered: list[str] = []
+        ordered: list[tuple[str, str]] = []
         for host_id in host_ids:
-            key = _id_str(host_id)
+            key = _id_path(host_id)
             if key not in seen:
                 seen.add(key)
-                ordered.append(key)
+                ordered.append((key, _id_str(host_id)))
 
-        async def _one(hid: str) -> tuple[str, dict]:
+        async def _one(hid: str, display: str) -> tuple[str, dict]:
             entry: dict = {"success": True, "data": {}, "sections_failed": []}
             try:
                 section_paths = _proxy_host_section_paths(hid)
@@ -1249,7 +1254,7 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
             except Exception as he:
                 entry["success"] = False
                 entry["error"] = str(he)
-            return hid, entry
+            return display, entry
 
         # Two-level bounded fan-out: at most _BULK_HOST_CONCURRENCY host
         # workers run concurrently and each worker issues at most
@@ -1258,7 +1263,7 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
         # to 550 uncapped gathers -> 429-storm risk against a rate-limited
         # API). Per-host results stay keyed by host id exactly as before.
         results = await _gather_bounded(_BULK_HOST_CONCURRENCY,
-                                        (_one(h) for h in ordered))
+                                        (_one(h, disp) for h, disp in ordered))
         data = {_id_str(hid): entry for hid, entry in results}
         hosts_failed = sorted(_id_str(h) for h, entry in data.items() if not entry.get("success"))
         return {"success": True, "data": data, "hosts_failed": hosts_failed}
@@ -3424,7 +3429,7 @@ async def npg_get_expiring_certificates() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_history", description="Get certificate history.")
+@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. No parameters. Returns past renewals and issuance events per certificate — use npg_get_expiring_certificates to check upcoming expiry dates instead.")
 async def npg_get_certificate_history() -> dict:
     c = _get_client()
     try:
