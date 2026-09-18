@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.30] - 2026-09-19
+
+### What changed
+- `npg_bulk_get_proxy_host_full` now dedupes incoming `host_ids` on the URL-encoded `_id_path` form (commit 13302f3): since the percent-encoding change in 0.5.29 (commit c40c1b5), the dedupe key had regressed to the raw `_id_str` form while section URLs are interpolated with `_id_path` — a no-op for UUIDs (quote-invariant) but an encoding-contract deviation that could double-fetch for ids needing encoding. The fix matches the single-host tool `npg_get_proxy_host_full`, and response keys still echo the caller's raw spelling via `_id_str`. Verified with 2 new regression tests (283 passed) and live MCP calls against the test stack (dedupe, sections filter, nonexistent-id isolation into `hosts_failed`).
+- `npg_get_certificate_history` description rewritten from a 24-char stub to a workflow-aware GET description (commit 13302f3): explains it returns cert history events after issuance, suggests `npg_get_expiring_certificates` for expiry tracking, and notes an empty result is normal. No signature change.
+
+### What's new
+- Regression-test coverage for the bulk full-fetch encoding contract (dedupe key + response-key pinning) in `tests/test_bulk_concurrency.py` (281 → 283 tests).
+
+### Breaking changes
+- (none)
+
 ## [0.5.29] - 2026-09-17
 
 ### What changed
