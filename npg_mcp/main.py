@@ -644,7 +644,7 @@ def _list_params_per_page(limit: int | None = None, offset: int | None = None, p
 
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text), tags (list — repeatable 'tag' query param, AND semantics, API normalizes/validates each), domain, upstream (text match), enabled (true/false filter). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text), tags (list — repeatable 'tag' query param, AND semantics, API normalizes+validates each), domain (parent-domain bucket of the host's first domain name, e.g. 'sub.example.com' filters by 'example.com' — NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
