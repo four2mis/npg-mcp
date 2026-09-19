@@ -789,8 +789,6 @@ async def npg_create_proxy_host(
     cache_template: str | None = None,
     advanced_config: str | None = None,
     enable_proxy_headers: bool | None = None,
-    host_header: str | None = None,
-    extra_domains: list[str] | None = None,
     block_exploits: bool = True,
     block_exploits_exceptions: str | None = None,
     allow_websocket_upgrade: bool = True,
@@ -850,8 +848,6 @@ async def npg_create_proxy_host(
                 "cache_template": "cache_template",
                 "advanced_config": "advanced_config",
                 "enable_proxy_headers": "enable_proxy_headers",
-                "host_header": "pass_host_header",
-                "extra_domains": "extra_domains",
                 "block_exploits": "block_exploits",
                 "block_exploits_exceptions": "block_exploits_exceptions",
                 "allow_websocket_upgrade": "allow_websocket_upgrade",
@@ -915,8 +911,6 @@ async def npg_update_proxy_host(
     cache_template: str | None = None,
     advanced_config: str | None = None,
     enable_proxy_headers: bool | None = None,
-    host_header: str | None = None,
-    extra_domains: list[str] | None = None,
     enabled: bool | None = None,
     ssl_http2: bool | None = None,
     ssl_http3: bool | None = None,
@@ -965,8 +959,6 @@ async def npg_update_proxy_host(
                 "cache_template": "cache_template",
                 "advanced_config": "advanced_config",
                 "enable_proxy_headers": "enable_proxy_headers",
-                "host_header": "pass_host_header",
-                "extra_domains": "extra_domains",
                 "enabled": "enabled",
                 "ssl_http2": "ssl_http2",
                 "ssl_http3": "ssl_http3",
@@ -1587,7 +1579,6 @@ _BULK_IMPORT_OPTIONAL_COLUMNS: dict[str, str] = {
     "waf_mode": "waf_mode",
     "client_max_body_size": "client_max_body_size",
     "advanced_config": "advanced_config",
-    "extra_domains": "extra_domains",
     "access_list_id": "access_list_id",
     "auth_provider_id": "auth_provider_id",
     "proxy_type": "proxy_type",
@@ -1602,7 +1593,7 @@ def _parse_csv_cell(name: str, value) -> Any:
     """Convert one CSV cell to the Python value npg_create_proxy_host expects.
 
     Empty/whitespace cells -> None (field omitted; global defaults inherit).
-    Comma-separated cells (domain_names, extra_domains) -> list[str].
+    Comma-separated cells (domain_names) -> list[str].
     true/false/1/0/yes/no/on/off (case-insensitive) -> bool for bool columns;
     anything else on a known-bool column raises ValueError so a typo like
     'ture' fails that row instead of being sent as a bogus string.
@@ -1610,7 +1601,7 @@ def _parse_csv_cell(name: str, value) -> Any:
     text = (value or "").strip()
     if not text:
         return None
-    if name in ("domain_names", "extra_domains"):
+    if name in ("domain_names",):
         items = [part.strip() for part in text.split(",") if part.strip()]
         if not items:
             return None

@@ -1,6 +1,15 @@
 npg_list_proxy_hosts:
   description: "LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list."
-  parameters: []
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
+    - name: search
+      type: string
+      required: false
 
 npg_get_proxy_host:
   description: "Get a single proxy host by its ID. REQUIRED: host_id."
@@ -28,19 +37,365 @@ npg_get_proxy_host_full:
 
 npg_create_proxy_host:
   description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
-  parameters: []
+  parameters:
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: forward_host
+      type: string
+      required: true
+    - name: forward_port
+      type: integer
+      required: true
+    - name: forward_scheme
+      type: string
+      required: false
+    - name: block_normal
+      type: boolean
+      required: false
+    - name: waf_enabled
+      type: boolean
+      required: false
+    - name: block_http
+      type: boolean
+      required: false
+    - name: ssl_enabled
+      type: boolean
+      required: false
+      default: true
+    - name: ssl_forced
+      type: boolean
+      required: false
+      default: true
+    - name: ssl_http2
+      type: boolean
+      required: false
+      default: true
+    - name: ssl_http3
+      type: boolean
+      required: false
+    - name: ssl_cert_id
+      type: integer | string
+      required: false
+    - name: cache_enabled
+      type: boolean
+      required: false
+    - name: cache_static_only
+      type: boolean
+      required: false
+    - name: cache_ttl
+      type: string
+      required: false
+    - name: cache_template
+      type: string
+      required: false
+    - name: advanced_config
+      type: string
+      required: false
+    - name: enable_proxy_headers
+      type: boolean
+      required: false
+    - name: block_exploits
+      type: boolean
+      required: false
+      default: true
+    - name: block_exploits_exceptions
+      type: string
+      required: false
+    - name: allow_websocket_upgrade
+      type: boolean
+      required: false
+      default: true
+    - name: waf_use_global
+      type: boolean
+      required: false
+      default: true
+    - name: waf_paranoia_level
+      type: integer
+      required: false
+    - name: waf_anomaly_threshold
+      type: integer
+      required: false
+    - name: waf_mode
+      type: string
+      required: false
+    - name: proxy_connect_timeout
+      type: integer
+      required: false
+    - name: proxy_send_timeout
+      type: integer
+      required: false
+    - name: proxy_read_timeout
+      type: integer
+      required: false
+    - name: proxy_buffering
+      type: string
+      required: false
+    - name: proxy_request_buffering
+      type: string
+      required: false
+    - name: client_max_body_size
+      type: string
+      required: false
+    - name: proxy_max_temp_file_size
+      type: string
+      required: false
+    - name: access_list_id
+      type: integer | string
+      required: false
+    - name: auth_provider_id
+      type: integer | string
+      required: false
+    - name: auth_bypass_paths
+      type: array<string>
+      required: false
+    - name: ddns_enabled
+      type: boolean
+      required: false
+    - name: ddns_provider_id
+      type: integer | string
+      required: false
+    - name: ddns_proxied
+      type: boolean
+      required: false
+    - name: forward_container_name
+      type: string
+      required: false
+    - name: forward_container_network
+      type: string
+      required: false
+    - name: proxy_type
+      type: string
+      required: false
+      default: "http"
+    - name: enabled
+      type: boolean
+      required: false
+      default: true
+    - name: stream_listen_host
+      type: string
+      required: false
+    - name: stream_listen_port
+      type: integer
+      required: false
+    - name: stream_protocol
+      type: string
+      required: false
+      default: "tcp"
+    - name: stream_ssl_preread
+      type: boolean
+      required: false
+    - name: stream_accept_proxy_protocol
+      type: boolean
+      required: false
+    - name: stream_send_proxy_protocol
+      type: boolean
+      required: false
+    - name: stream_proxy_connect_timeout
+      type: integer
+      required: false
+    - name: stream_proxy_timeout
+      type: integer
+      required: false
 
 npg_update_proxy_host:
   description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
-  parameters: []
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: domain_names
+      type: array<string>
+      required: false
+    - name: forward_host
+      type: string
+      required: false
+    - name: forward_port
+      type: integer
+      required: false
+    - name: forward_scheme
+      type: string
+      required: false
+    - name: block_normal
+      type: boolean
+      required: false
+    - name: waf_enabled
+      type: boolean
+      required: false
+    - name: waf_mode
+      type: string
+      required: false
+    - name: waf_use_global
+      type: boolean
+      required: false
+    - name: waf_paranoia_level
+      type: integer
+      required: false
+    - name: waf_anomaly_threshold
+      type: integer
+      required: false
+    - name: block_http
+      type: boolean
+      required: false
+    - name: ssl_forced
+      type: boolean
+      required: false
+    - name: ssl_cert_id
+      type: integer | string
+      required: false
+    - name: cache_enabled
+      type: boolean
+      required: false
+    - name: cache_static_only
+      type: boolean
+      required: false
+    - name: cache_ttl
+      type: string
+      required: false
+    - name: cache_template
+      type: string
+      required: false
+    - name: advanced_config
+      type: string
+      required: false
+    - name: enable_proxy_headers
+      type: boolean
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: ssl_http2
+      type: boolean
+      required: false
+    - name: ssl_http3
+      type: boolean
+      required: false
+    - name: block_exploits
+      type: boolean
+      required: false
+    - name: block_exploits_exceptions
+      type: string
+      required: false
+    - name: allow_websocket_upgrade
+      type: boolean
+      required: false
+    - name: proxy_connect_timeout
+      type: integer
+      required: false
+    - name: proxy_send_timeout
+      type: integer
+      required: false
+    - name: proxy_read_timeout
+      type: integer
+      required: false
+    - name: proxy_buffering
+      type: string
+      required: false
+    - name: proxy_request_buffering
+      type: string
+      required: false
+    - name: client_max_body_size
+      type: string
+      required: false
+    - name: proxy_max_temp_file_size
+      type: string
+      required: false
+    - name: access_list_id
+      type: integer | string
+      required: false
+    - name: auth_provider_id
+      type: integer | string
+      required: false
+    - name: auth_bypass_paths
+      type: array<string>
+      required: false
+    - name: ddns_enabled
+      type: boolean
+      required: false
+    - name: ddns_provider_id
+      type: integer | string
+      required: false
+    - name: ddns_proxied
+      type: boolean
+      required: false
+    - name: forward_container_name
+      type: string
+      required: false
+    - name: forward_container_network
+      type: string
+      required: false
+    - name: skip_nginx
+      type: boolean
+      required: false
+      default: false
 
 npg_create_proxy_host_simple:
   description: "CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme (default 'http'), ssl_enabled, ssl_forced, enabled, block_exploits, waf_enabled, waf_use_global (all default true). For cache/streaming/DDNS use npg_create_proxy_host."
-  parameters: []
+  parameters:
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: forward_host
+      type: string
+      required: true
+    - name: forward_port
+      type: integer
+      required: true
+    - name: forward_scheme
+      type: string
+      required: false
+    - name: ssl_enabled
+      type: boolean
+      required: false
+      default: true
+    - name: ssl_forced
+      type: boolean
+      required: false
+      default: true
+    - name: enabled
+      type: boolean
+      required: false
+      default: true
+    - name: block_exploits
+      type: boolean
+      required: false
+      default: true
+    - name: waf_enabled
+      type: boolean
+      required: false
+      default: true
+    - name: waf_use_global
+      type: boolean
+      required: false
+      default: true
 
 npg_update_proxy_host_simple:
   description: "UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host."
-  parameters: []
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: domain_names
+      type: array<string>
+      required: false
+    - name: forward_host
+      type: string
+      required: false
+    - name: forward_port
+      type: integer
+      required: false
+    - name: forward_scheme
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: ssl_forced
+      type: boolean
+      required: false
+    - name: ssl_cert_id
+      type: integer | string
+      required: false
 
 npg_delete_proxy_host:
   description: "Delete a proxy host by its ID. REQUIRED: host_id."
@@ -153,7 +508,17 @@ npg_get_certificate:
 
 npg_create_certificate:
   description: "Request a new Let's Encrypt certificate (upstream takes the ACME account email from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (e.g. 'letsencrypt'), dns_provider_id."
-  parameters: []
+  parameters:
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: provider
+      type: string
+      required: false
+      default: "letsencrypt"
+    - name: dns_provider_id
+      type: string
+      required: false
 
 npg_delete_certificate:
   description: "Delete a certificate by its ID. REQUIRED: cert_id."
@@ -205,11 +570,47 @@ npg_get_redirect_host:
 
 npg_create_redirect_host:
   description: "Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, 301/302/307/308 only — 303 rejected by API v2.44.0+, default 301)."
-  parameters: []
+  parameters:
+    - name: domain_names
+      type: array<string>
+      required: true
+    - name: forward_domain_name
+      type: string
+      required: true
+    - name: forward_scheme
+      type: string
+      required: false
+      default: "auto"
+    - name: preserve_path
+      type: boolean
+      required: false
+      default: true
+    - name: redirect_code
+      type: integer
+      required: false
+      default: 301
 
 npg_update_redirect_host:
   description: "Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code (301/302/307/308 only — 303 rejected by API v2.44.0+). REQUIRED: host_id."
-  parameters: []
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: domain_names
+      type: array<string>
+      required: false
+    - name: forward_domain_name
+      type: string
+      required: false
+    - name: forward_scheme
+      type: string
+      required: false
+    - name: preserve_path
+      type: boolean
+      required: false
+    - name: redirect_code
+      type: integer
+      required: false
 
 npg_delete_redirect_host:
   description: "Delete a redirect host by its ID. REQUIRED: host_id."
@@ -999,7 +1400,31 @@ npg_enable_waf_rule:
 
 npg_get_logs:
   description: "GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), status_classes (list of 1xx-5xx class tokens, e.g. ['4xx']), exclude_status_codes (list of int), exclude_status_classes (list of 1xx-5xx tokens), limit (page size, the API maps it to per_page), offset (row offset, converted to page). All filter values are validated server-side — invalid tokens now return HTTP 400 naming the offending value instead of being silently dropped (upstream v2.51.0). REQUIRED: none — zero-arg call returns the full default log set."
-  parameters: []
+  parameters:
+    - name: host
+      type: string
+      required: false
+    - name: status
+      type: integer
+      required: false
+    - name: method
+      type: string
+      required: false
+    - name: status_classes
+      type: array<string>
+      required: false
+    - name: exclude_status_codes
+      type: array<integer>
+      required: false
+    - name: exclude_status_classes
+      type: array<string>
+      required: false
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_log_settings:
   description: "Get log settings."
@@ -1022,11 +1447,32 @@ npg_get_log_stats:
 
 npg_list_audit_logs:
   description: "LIST audit log entries. Optional filters: page, limit, action, resource_type. REQUIRED: none — zero-arg call returns the full audit log set."
-  parameters: []
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
+    - name: action
+      type: string
+      required: false
+    - name: resource_type
+      type: string
+      required: false
 
 npg_list_system_logs:
   description: "LIST system logs. Optional filters: source, level, limit. REQUIRED: none — zero-arg call returns the full system log set."
-  parameters: []
+  parameters:
+    - name: source
+      type: string
+      required: false
+    - name: level
+      type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_list_backups:
   description: "List all backups."
@@ -1448,7 +1894,7 @@ npg_get_expiring_certificates:
   parameters: []
 
 npg_get_certificate_history:
-  description: "Get certificate history."
+  description: "GET the certificate issuance/renewal history log. No parameters. Returns past renewals and issuance events per certificate — use npg_get_expiring_certificates to check upcoming expiry dates instead."
   parameters: []
 
 npg_upload_certificate:
