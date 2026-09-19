@@ -644,18 +644,39 @@ def _list_params_per_page(limit: int | None = None, offset: int | None = None, p
 
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text), tags (list — repeatable 'tag' query param, AND semantics, API normalizes/validates each), domain, upstream (text match), enabled (true/false filter). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
     search: str | None = None,
+    tags: list[str] | None = None,
+    domain: str | None = None,
+    upstream: str | None = None,
+    enabled: bool | None = None,
 ) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
         if search is not None and str(search).strip():
             params["search"] = str(search)
+        if tags:
+            params["tag"] = [str(t) for t in tags]
+        if domain is not None and str(domain).strip():
+            params["domain"] = str(domain)
+        if upstream is not None and str(upstream).strip():
+            params["upstream"] = str(upstream)
+        if enabled is not None:
+            params["enabled"] = "true" if enabled else "false"
         data = await _api(c.get, "/api/v1/proxy-hosts", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_list_proxy_host_groups", description="LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Zero required params. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters.")
+async def npg_list_proxy_host_groups() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/proxy-hosts/groups")
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -769,7 +790,7 @@ async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_proxy_host", description="CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*.")
+@mcp.tool(name="npg_create_proxy_host", description="CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*.")
 async def npg_create_proxy_host(
     domain_names: list[str],
     forward_host: str,
@@ -813,6 +834,7 @@ async def npg_create_proxy_host(
     forward_container_network: str | None = None,
     proxy_type: str = "http",
     enabled: bool = True,
+    tags: list[str] | None = None,
     stream_listen_host: str | None = None,
     stream_listen_port: int | None = None,
     stream_protocol: str = "tcp",
@@ -872,6 +894,7 @@ async def npg_create_proxy_host(
                 "forward_container_network": "forward_container_network",
                 "proxy_type": "proxy_type",
                 "enabled": "enabled",
+                "tags": "tags",
                 "stream_listen_host": "stream_listen_host",
                 "stream_listen_port": "stream_listen_port",
                 "stream_protocol": "stream_protocol",
@@ -889,7 +912,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags: tri-state — omitted leaves tags unchanged, explicit [] clears all tags, non-empty list replaces them (API normalizes to lowercase, max 10, max 32 chars each). Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -932,6 +955,7 @@ async def npg_update_proxy_host(
     ddns_proxied: bool | None = None,
     forward_container_name: str | None = None,
     forward_container_network: str | None = None,
+    tags: list[str] | None = None,
     skip_nginx: bool = False,
 ) -> dict:
     try:
@@ -980,6 +1004,7 @@ async def npg_update_proxy_host(
                 "ddns_proxied": "ddns_proxied",
                 "forward_container_name": "forward_container_name",
                 "forward_container_network": "forward_container_network",
+                "tags": "tags",
             },
             id_fields={"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"},
         )

@@ -1,5 +1,5 @@
 npg_list_proxy_hosts:
-  description: "LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list."
+  description: "LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text), tags (list — repeatable 'tag' query param, AND semantics, API normalizes/validates each), domain, upstream (text match), enabled (true/false filter). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list."
   parameters:
     - name: page
       type: integer
@@ -10,6 +10,22 @@ npg_list_proxy_hosts:
     - name: search
       type: string
       required: false
+    - name: tags
+      type: array<string>
+      required: false
+    - name: domain
+      type: string
+      required: false
+    - name: upstream
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+
+npg_list_proxy_host_groups:
+  description: "LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Zero required params. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters."
+  parameters: []
 
 npg_get_proxy_host:
   description: "Get a single proxy host by its ID. REQUIRED: host_id."
@@ -36,7 +52,7 @@ npg_get_proxy_host_full:
       required: false
 
 npg_create_proxy_host:
-  description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
+  description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
   parameters:
     - name: domain_names
       type: array<string>
@@ -172,6 +188,9 @@ npg_create_proxy_host:
       type: boolean
       required: false
       default: true
+    - name: tags
+      type: array<string>
+      required: false
     - name: stream_listen_host
       type: string
       required: false
@@ -199,7 +218,7 @@ npg_create_proxy_host:
       required: false
 
 npg_update_proxy_host:
-  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
+  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags: tri-state — omitted leaves tags unchanged, explicit [] clears all tags, non-empty list replaces them (API normalizes to lowercase, max 10, max 32 chars each). Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears."
   parameters:
     - name: host_id
       type: integer | string
@@ -323,6 +342,9 @@ npg_update_proxy_host:
       required: false
     - name: forward_container_network
       type: string
+      required: false
+    - name: tags
+      type: array<string>
       required: false
     - name: skip_nginx
       type: boolean
