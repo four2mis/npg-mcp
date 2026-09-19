@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.31] - 2026-09-19
+
+### What changed
+- Removed phantom `host_header` and `extra_domains` parameters from `npg_create_proxy_host` and `npg_update_proxy_host` (commit f7801da): the fields were accepted by the tools and mapped to a body key `pass_host_header`, but the upstream `CreateProxyHostRequest`/`UpdateProxyHostRequest` models do not define them, so Go silently ignored them — callers got `success: true` with nothing applied. Also dropped the phantom `extra_domains` optional CSV column from `npg_bulk_import_proxy_hosts` (it fed the removed create param). Verified against a locally-built image (local/npg-mcp:f7801da) on the test stack: phantom fields absent from signatures, tool-schemas.yaml, and the served MCP surface (292/292 tools, 0 dupes); create/get/update/bulk-import round-trips clean; extra_domains CSV column now ignored; 0 param mismatches across all 292 tools; 283 tests pass; all verify- fixtures cleaned up.
+- `scripts/regenerate_all_docs.py` now parses multi-line `def` signatures (commit f7801da): tool-schemas.yaml had drifted because signature lines spanning multiple lines were only partially parsed, inflating the diff. Docs verified in sync (drift check exit 0).
+
+### What's new
+- (none)
+
+### Breaking changes
+- `npg_create_proxy_host` and `npg_update_proxy_host` no longer accept `host_header` or `extra_domains` parameters, and `npg_bulk_import_proxy_hosts` no longer accepts an `extra_domains` CSV column. The parameters were phantom (silently ignored by the NPG API), so no behavior is lost — callers passing them will now get a Pydantic validation error instead of a silent no-op.
+
 ## [0.5.30] - 2026-09-19
 
 ### What changed
