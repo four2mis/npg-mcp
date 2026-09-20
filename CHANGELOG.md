@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.32] - 2026-09-20
+
+### What changed
+- Upstream v2.57.0 sync (commit 5c94e0e): `npg_list_proxy_hosts` now supports filtering by `tags`, `domain`, `upstream`, and `enabled` — `domain` matches the parent-domain bucket (a full subdomain value returns nothing by design), and tag filters combine with AND semantics. `npg_create_proxy_host` and `npg_update_proxy_host` accept a `tags` list (create replaces with sent tags; update fully replaces the stored set).
+- Documentation pass on the new filters (commit a988761): clarified `domain`/`upstream` filter semantics directly in the `npg_list_proxy_hosts` description so agents don't misinterpret subdomain filtering.
+- Test hygiene (commit 101decf): ruff W292 trailing-newline fix in the tag tests; no behavior change.
+- swagger.yaml updated to upstream v2.57.0 (commit 7f49510, local-only reference file). Verified against the test stack on a locally built image matching workspace HEAD (local/npg-mcp:7f49510): 293/293 pytest passed, 293 tools registered with no duplicates, docs drift check clean, live create/update/tag-filter/groups round-trips with disposable hosts all passed.
+
+### What's new
+- New tool `npg_list_proxy_host_groups` (GET /api/v1/proxy-hosts/groups): returns host counts grouped by tag, domain, and upstream, and mirrors the enabled/disabled status split — cross-checkable against the new list filters.
+
+### Breaking changes
+- (none)
+
 ## [0.5.31] - 2026-09-19
 
 ### What changed
