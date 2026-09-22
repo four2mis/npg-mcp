@@ -2869,7 +2869,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (sent to API as status_code), method, status_classes (['4xx'] class tokens), exclude_status_codes, exclude_status_classes, limit (maps to per_page), offset (converted to page). Filter values validated server-side — invalid tokens return 400 naming the offending value. Zero-arg returns the full default log set.")
+@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters: host(s), log_type, status classes/codes+excl, method, client_ip/uri/user_agent (&plural), severity, rule_id, proxy_host_id, geo country, start/end (RFC3339, 24h default), search, sizes, min_request_time, upstream_addr/status, block_reason, bot_category, exploit_rule, exclude_* lists, sort_by/order. Zero-arg = 24h set.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -2879,12 +2879,64 @@ async def npg_get_logs(
     exclude_status_classes: list[str] | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    cursor: str | None = None,
+    log_type: Literal["access", "error", "modsec"] | None = None,
+    hosts: list[str] | None = None,
+    client_ip: str | None = None,
+    client_ips: list[str] | None = None,
+    uri: str | None = None,
+    uris: list[str] | None = None,
+    user_agent: str | None = None,
+    user_agents: list[str] | None = None,
+    status_codes: list[int] | None = None,
+    severity: str | None = None,
+    rule_id: str | None = None,
+    proxy_host_id: str | None = None,
+    geo_country_code: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    search: str | None = None,
+    min_size: int | None = None,
+    max_size: int | None = None,
+    min_request_time: int | None = None,
+    upstream_addr: str | None = None,
+    upstream_status: str | None = None,
+    block_reason: str | None = None,
+    bot_category: str | None = None,
+    exploit_rule: str | None = None,
+    exclude_ips: list[str] | None = None,
+    exclude_user_agents: list[str] | None = None,
+    exclude_uris: list[str] | None = None,
+    exclude_hosts: list[str] | None = None,
+    exclude_countries: list[str] | None = None,
+    sort_by: str | None = None,
+    sort_order: Literal["asc", "desc"] | None = None,
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params_per_page(limit=limit, offset=offset)
+        # cursor = keyset paging: when present it replaces offset/page entirely
+        # (upstream honors it only for the default created_at sort).
+        params = _list_params_per_page(limit=limit, offset=None if cursor else offset)
+        if cursor is not None and str(cursor).strip():
+            params["cursor"] = str(cursor)
+        if log_type is not None:
+            params["log_type"] = log_type
         if host is not None and str(host).strip():
             params["host"] = str(host)
+        if hosts:
+            params["hosts"] = [str(v) for v in hosts]
+        if client_ip is not None and str(client_ip).strip():
+            params["client_ip"] = str(client_ip)
+        if client_ips:
+            params["client_ips"] = [str(v) for v in client_ips]
+        if uri is not None and str(uri).strip():
+            params["uri"] = str(uri)
+        if uris:
+            params["uris"] = [str(v) for v in uris]
+        if user_agent is not None and str(user_agent).strip():
+            params["user_agent"] = str(user_agent)
+        if user_agents:
+            params["user_agents"] = [str(v) for v in user_agents]
         if status is not None:
             _validate_query_int("status", status)
             params["status_code"] = status
@@ -2892,10 +2944,59 @@ async def npg_get_logs(
             params["method"] = str(method)
         if status_classes:
             params["status_classes"] = [str(v) for v in status_classes]
+        if status_codes:
+            params["status_codes"] = [int(v) for v in status_codes]
         if exclude_status_codes:
             params["exclude_status_codes"] = [int(v) for v in exclude_status_codes]
         if exclude_status_classes:
             params["exclude_status_classes"] = [str(v) for v in exclude_status_classes]
+        if severity is not None and str(severity).strip():
+            params["severity"] = str(severity)
+        if rule_id is not None and str(rule_id).strip():
+            params["rule_id"] = str(rule_id)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        if geo_country_code is not None and str(geo_country_code).strip():
+            params["geo_country_code"] = str(geo_country_code)
+        if start_time is not None and str(start_time).strip():
+            params["start_time"] = str(start_time)
+        if end_time is not None and str(end_time).strip():
+            params["end_time"] = str(end_time)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        if min_size is not None:
+            _validate_query_int("min_size", min_size)
+            params["min_size"] = min_size
+        if max_size is not None:
+            _validate_query_int("max_size", max_size)
+            params["max_size"] = max_size
+        if min_request_time is not None:
+            _validate_query_int("min_request_time", min_request_time)
+            params["min_request_time"] = min_request_time
+        if upstream_addr is not None and str(upstream_addr).strip():
+            params["upstream_addr"] = str(upstream_addr)
+        if upstream_status is not None and str(upstream_status).strip():
+            params["upstream_status"] = str(upstream_status)
+        if block_reason is not None and str(block_reason).strip():
+            params["block_reason"] = str(block_reason)
+        if bot_category is not None and str(bot_category).strip():
+            params["bot_category"] = str(bot_category)
+        if exploit_rule is not None and str(exploit_rule).strip():
+            params["exploit_rule"] = str(exploit_rule)
+        if exclude_ips:
+            params["exclude_ips"] = [str(v) for v in exclude_ips]
+        if exclude_user_agents:
+            params["exclude_user_agents"] = [str(v) for v in exclude_user_agents]
+        if exclude_uris:
+            params["exclude_uris"] = [str(v) for v in exclude_uris]
+        if exclude_hosts:
+            params["exclude_hosts"] = [str(v) for v in exclude_hosts]
+        if exclude_countries:
+            params["exclude_countries"] = [str(v) for v in exclude_countries]
+        if sort_by is not None and str(sort_by).strip():
+            params["sort_by"] = str(sort_by)
+        if sort_order is not None:
+            params["sort_order"] = sort_order
         data = await _api(c.get, "/api/v1/logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:

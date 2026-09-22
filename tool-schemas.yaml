@@ -1469,7 +1469,7 @@ npg_enable_waf_rule:
       required: true
 
 npg_get_logs:
-  description: "GET access logs. Optional filters: host, status (sent to API as status_code), method, status_classes (['4xx'] class tokens), exclude_status_codes, exclude_status_classes, limit (maps to per_page), offset (converted to page). Filter values validated server-side — invalid tokens return 400 naming the offending value. Zero-arg returns the full default log set."
+  description: "GET access/error/WAF logs: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters: host(s), log_type, status classes/codes+excl, method, client_ip/uri/user_agent (&plural), severity, rule_id, proxy_host_id, geo country, start/end (RFC3339, 24h default), search, sizes, min_request_time, upstream_addr/status, block_reason, bot_category, exploit_rule, exclude_* lists, sort_by/order. Zero-arg = 24h set."
   parameters:
     - name: host
       type: string
@@ -1494,6 +1494,102 @@ npg_get_logs:
       required: false
     - name: offset
       type: integer
+      required: false
+    - name: cursor
+      type: string
+      required: false
+    - name: log_type
+      type: string
+      required: false
+    - name: hosts
+      type: array<string>
+      required: false
+    - name: client_ip
+      type: string
+      required: false
+    - name: client_ips
+      type: array<string>
+      required: false
+    - name: uri
+      type: string
+      required: false
+    - name: uris
+      type: array<string>
+      required: false
+    - name: user_agent
+      type: string
+      required: false
+    - name: user_agents
+      type: array<string>
+      required: false
+    - name: status_codes
+      type: array<integer>
+      required: false
+    - name: severity
+      type: string
+      required: false
+    - name: rule_id
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: geo_country_code
+      type: string
+      required: false
+    - name: start_time
+      type: string
+      required: false
+    - name: end_time
+      type: string
+      required: false
+    - name: search
+      type: string
+      required: false
+    - name: min_size
+      type: integer
+      required: false
+    - name: max_size
+      type: integer
+      required: false
+    - name: min_request_time
+      type: integer
+      required: false
+    - name: upstream_addr
+      type: string
+      required: false
+    - name: upstream_status
+      type: string
+      required: false
+    - name: block_reason
+      type: string
+      required: false
+    - name: bot_category
+      type: string
+      required: false
+    - name: exploit_rule
+      type: string
+      required: false
+    - name: exclude_ips
+      type: array<string>
+      required: false
+    - name: exclude_user_agents
+      type: array<string>
+      required: false
+    - name: exclude_uris
+      type: array<string>
+      required: false
+    - name: exclude_hosts
+      type: array<string>
+      required: false
+    - name: exclude_countries
+      type: array<string>
+      required: false
+    - name: sort_by
+      type: string
+      required: false
+    - name: sort_order
+      type: string
       required: false
 
 npg_get_log_settings:

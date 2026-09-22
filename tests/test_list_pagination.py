@@ -199,6 +199,157 @@ class TestGetLogs:
         assert result["success"] is True
         assert recording.calls == [("GET", "/api/v1/logs", None)]
 
+    # ── Phase-3 batch: cursor + 32 upstream filters ───────────────────────
+
+    def test_cursor_passed_verbatim_replaces_offset(self, recording):
+        _run(main_mod.npg_get_logs(cursor="abc123|42", limit=5))
+        # cursor replaces the offset->page mapping entirely
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"per_page": 5, "cursor": "abc123|42"})
+        ]
+
+    def test_cursor_with_offset_drops_offset(self, recording):
+        _run(main_mod.npg_get_logs(cursor="abc123|42", offset=20, limit=5))
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"per_page": 5, "cursor": "abc123|42"})
+        ]
+
+    def test_blank_cursor_not_sent(self, recording):
+        _run(main_mod.npg_get_logs(cursor="  ", offset=20, limit=5))
+        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 5})]
+
+    def test_log_type_enum_forwarded(self, recording):
+        _run(main_mod.npg_get_logs(log_type="modsec"))
+        assert recording.calls == [("GET", "/api/v1/logs", {"log_type": "modsec"})]
+
+    def test_time_range_forwarded(self, recording):
+        _run(
+            main_mod.npg_get_logs(
+                start_time="2026-09-20T00:00:00Z", end_time="2026-09-21T00:00:00Z"
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "start_time": "2026-09-20T00:00:00Z",
+                    "end_time": "2026-09-21T00:00:00Z",
+                },
+            )
+        ]
+
+    def test_multiselect_lists_repeatable(self, recording):
+        _run(
+            main_mod.npg_get_logs(
+                hosts=["a.example.com", "b.example.com"],
+                client_ips=["1.1.1.1", "2.2.2.2"],
+                uris=["/login"],
+                user_agents=["curl"],
+                status_codes=[404, 500],
+                severity="error",
+                block_reason="waf",
+                bot_category="bad_bot",
+                exploit_rule="SQLI-001",
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "hosts": ["a.example.com", "b.example.com"],
+                    "client_ips": ["1.1.1.1", "2.2.2.2"],
+                    "uris": ["/login"],
+                    "user_agents": ["curl"],
+                    "status_codes": [404, 500],
+                    "severity": "error",
+                    "block_reason": "waf",
+                    "bot_category": "bad_bot",
+                    "exploit_rule": "SQLI-001",
+                },
+            )
+        ]
+
+    def test_scalar_filters_forwarded(self, recording):
+        _run(
+            main_mod.npg_get_logs(
+                client_ip="10.0.0.1",
+                uri="/admin",
+                user_agent="Mozilla",
+                rule_id="942100",
+                proxy_host_id="123e4567-e89b-12d3-a456-426614174000",
+                geo_country_code="KR",
+                search="suspicious",
+                min_size=100,
+                max_size=5000,
+                min_request_time=2,
+                upstream_addr="127.0.0.1:8080",
+                upstream_status="502, 200",
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "client_ip": "10.0.0.1",
+                    "uri": "/admin",
+                    "user_agent": "Mozilla",
+                    "rule_id": "942100",
+                    "proxy_host_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "geo_country_code": "KR",
+                    "search": "suspicious",
+                    "min_size": 100,
+                    "max_size": 5000,
+                    "min_request_time": 2,
+                    "upstream_addr": "127.0.0.1:8080",
+                    "upstream_status": "502, 200",
+                },
+            )
+        ]
+
+    def test_exclude_lists_forwarded(self, recording):
+        _run(
+            main_mod.npg_get_logs(
+                exclude_ips=["1.2.3.4", "10.0.0.0/8"],
+                exclude_user_agents=["bot"],
+                exclude_uris=["/health"],
+                exclude_hosts=["x.example.com"],
+                exclude_countries=["US"],
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "exclude_ips": ["1.2.3.4", "10.0.0.0/8"],
+                    "exclude_user_agents": ["bot"],
+                    "exclude_uris": ["/health"],
+                    "exclude_hosts": ["x.example.com"],
+                    "exclude_countries": ["US"],
+                },
+            )
+        ]
+
+    def test_sort_params_forwarded(self, recording):
+        _run(main_mod.npg_get_logs(sort_by="host", sort_order="asc"))
+        assert recording.calls == [
+            ("GET", "/api/v1/logs", {"sort_by": "host", "sort_order": "asc"})
+        ]
+
+    def test_negative_int_filter_clean_error(self, recording):
+        result = _run(main_mod.npg_get_logs(min_size=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+    def test_new_phase3_filters_zero_arg_still_no_params(self, recording):
+        result = _run(main_mod.npg_get_logs())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/logs", None)]
+
 
 class TestListAuditLogs:
     def test_zero_arg_sends_no_params(self, recording):
