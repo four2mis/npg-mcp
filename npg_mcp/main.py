@@ -1755,11 +1755,30 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
 
 # ── Certificates ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_certificates", description="List all SSL/TLS certificates.")
-async def npg_list_certificates() -> dict:
+@mcp.tool(name="npg_list_certificates", description="LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_certificates(
+    page: int | None = None,
+    limit: int | None = None,
+    search: str | None = None,
+    status: Literal["pending", "issued", "expired", "error", "renewing"] | None = None,
+    provider: Literal["letsencrypt", "selfsigned", "custom"] | None = None,
+    sort_by: Literal["domain", "expires", "created"] | None = None,
+    sort_order: Literal["asc", "desc"] | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/certificates")
+        params = _list_params_per_page(limit=limit, page=page)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        if status is not None:
+            params["status"] = str(status)
+        if provider is not None:
+            params["provider"] = str(provider)
+        if sort_by is not None:
+            params["sort_by"] = str(sort_by)
+        if sort_order is not None:
+            params["sort_order"] = str(sort_order)
+        data = await _api(c.get, "/api/v1/certificates", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -1896,11 +1915,12 @@ async def npg_validate_nginx_config() -> dict:
 
 # ── Redirect Hosts ────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_redirect_hosts", description="List all redirect hosts.")
-async def npg_list_redirect_hosts() -> dict:
+@mcp.tool(name="npg_list_redirect_hosts", description="LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_redirect_hosts(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/redirect-hosts")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/redirect-hosts", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2227,11 +2247,12 @@ async def npg_get_dashboard_geoip_stats() -> dict:
 
 # ── Access Lists ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_access_lists", description="List all access lists (authentication/restriction lists).")
-async def npg_list_access_lists() -> dict:
+@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_access_lists(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/access-lists")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/access-lists", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2637,11 +2658,21 @@ async def npg_verify_challenge(token: str, solution: str) -> dict:
 
 # ── Security (banned IPs, etc.) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_banned_ips", description="List banned IP addresses.")
-async def npg_list_banned_ips() -> dict:
+@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_banned_ips(
+    filter: Literal["global", "host"] | None = None,
+    proxy_host_id: str | None = None,
+    page: int | None = None,
+    limit: int | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/banned-ips")
+        params = _list_params_per_page(limit=limit, page=page)
+        if filter is not None:
+            params["filter"] = str(filter)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        data = await _api(c.get, "/api/v1/banned-ips", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2783,11 +2814,14 @@ async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
 
 # ── WAF ───────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_waf_rules", description="List all WAF (Web Application Firewall) rules.")
-async def npg_list_waf_rules() -> dict:
+@mcp.tool(name="npg_list_waf_rules", description="LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 600+ rule set). Zero-arg returns all rules.")
+async def npg_list_waf_rules(proxy_host_id: str | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/waf/rules")
+        params: dict = {}
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        data = await _api(c.get, "/api/v1/waf/rules", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2935,11 +2969,12 @@ async def npg_list_system_logs(
 
 # ── Backups ───────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_backups", description="List all backups.")
-async def npg_list_backups() -> dict:
+@mcp.tool(name="npg_list_backups", description="LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_backups(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/backups")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/backups", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4039,11 +4074,12 @@ async def npg_auth_sso_start(slug: str) -> dict:
 
 # ── Auth Providers (ForwardAuth) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_auth_providers", description="List ForwardAuth (Authelia, Authentik, custom) providers.")
-async def npg_list_auth_providers() -> dict:
+@mcp.tool(name="npg_list_auth_providers", description="LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list.")
+async def npg_list_auth_providers(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/auth-providers")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/auth-providers", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4116,11 +4152,12 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
 
 # ── DDNS Records ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_ddns_records", description="List all DDNS records.")
-async def npg_list_ddns_records() -> dict:
+@mcp.tool(name="npg_list_ddns_records", description="LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_ddns_records(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/ddns-records")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/ddns-records", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4212,11 +4249,12 @@ async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id:
 
 # ── Filter Subscriptions ───────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_filter_subscriptions", description="List all filter subscriptions (remote IP/UA blocklists).")
-async def npg_list_filter_subscriptions() -> dict:
+@mcp.tool(name="npg_list_filter_subscriptions", description="LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+async def npg_list_filter_subscriptions(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/filter-subscriptions")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/filter-subscriptions", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

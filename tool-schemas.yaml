@@ -518,8 +518,29 @@ npg_bulk_import_proxy_hosts:
       default: true
 
 npg_list_certificates:
-  description: "List all SSL/TLS certificates."
-  parameters: []
+  description: "LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
+    - name: search
+      type: string
+      required: false
+    - name: status
+      type: string
+      required: false
+    - name: provider
+      type: string
+      required: false
+    - name: sort_by
+      type: string
+      required: false
+    - name: sort_order
+      type: string
+      required: false
 
 npg_get_certificate:
   description: "Get a certificate by its ID. REQUIRED: cert_id."
@@ -580,8 +601,14 @@ npg_validate_nginx_config:
   parameters: []
 
 npg_list_redirect_hosts:
-  description: "List all redirect hosts."
-  parameters: []
+  description: "LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_redirect_host:
   description: "Get a redirect host by its ID. REQUIRED: host_id."
@@ -878,8 +905,14 @@ npg_get_dashboard_geoip_stats:
   parameters: []
 
 npg_list_access_lists:
-  description: "List all access lists (authentication/restriction lists)."
-  parameters: []
+  description: "LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_access_list:
   description: "Get an access list by its ID. REQUIRED: list_id."
@@ -1267,8 +1300,20 @@ npg_verify_challenge:
       required: true
 
 npg_list_banned_ips:
-  description: "List banned IP addresses."
-  parameters: []
+  description: "LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: filter
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_ban_ip:
   description: "Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address."
@@ -1386,8 +1431,11 @@ npg_toggle_exploit_rule:
       required: true
 
 npg_list_waf_rules:
-  description: "List all WAF (Web Application Firewall) rules."
-  parameters: []
+  description: "LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 600+ rule set). Zero-arg returns all rules."
+  parameters:
+    - name: proxy_host_id
+      type: string
+      required: false
 
 npg_get_waf_hosts:
   description: "Get WAF config for all proxy hosts."
@@ -1497,8 +1545,14 @@ npg_list_system_logs:
       required: false
 
 npg_list_backups:
-  description: "List all backups."
-  parameters: []
+  description: "LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_backup:
   description: "Get a backup by its ID. REQUIRED: backup_id."
@@ -2288,8 +2342,14 @@ npg_auth_sso_start:
       required: true
 
 npg_list_auth_providers:
-  description: "List ForwardAuth (Authelia, Authentik, custom) providers."
-  parameters: []
+  description: "LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_create_auth_provider:
   description: "CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (Docker-backed: provider_url resolved from container)."
@@ -2374,8 +2434,14 @@ npg_delete_auth_provider:
       required: true
 
 npg_list_ddns_records:
-  description: "List all DDNS records."
-  parameters: []
+  description: "LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_create_ddns_record:
   description: "CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool)."
@@ -2457,8 +2523,14 @@ npg_import_ddns_from_hosts:
       required: true
 
 npg_list_filter_subscriptions:
-  description: "List all filter subscriptions (remote IP/UA blocklists)."
-  parameters: []
+  description: "LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_subscribe_filter_catalog:
   description: "Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json')."

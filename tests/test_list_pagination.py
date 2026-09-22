@@ -241,3 +241,158 @@ class TestListSystemLogs:
                 {"source": "nginx", "level": "error", "limit": 100},
             )
         ]
+
+
+# ── Phase-2 batch: the 9 zero-arg list tools ─────────────────────────────
+# All honor page/per_page directly (limit -> per_page via _list_params_per_page).
+
+CERT_PATH = "/api/v1/certificates"
+
+
+class TestListCertificates:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_list_certificates())
+        assert result["success"] is True
+        assert recording.calls == [("GET", CERT_PATH, None)]
+
+    def test_page_limit_forwarded_as_per_page(self, recording):
+        _run(main_mod.npg_list_certificates(page=2, limit=50))
+        assert recording.calls == [("GET", CERT_PATH, {"page": 2, "per_page": 50})]
+
+    def test_all_filters_forwarded(self, recording):
+        _run(
+            main_mod.npg_list_certificates(
+                search="example",
+                status="issued",
+                provider="letsencrypt",
+                sort_by="domain",
+                sort_order="asc",
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                CERT_PATH,
+                {
+                    "search": "example",
+                    "status": "issued",
+                    "provider": "letsencrypt",
+                    "sort_by": "domain",
+                    "sort_order": "asc",
+                },
+            )
+        ]
+
+    def test_empty_search_not_sent(self, recording):
+        _run(main_mod.npg_list_certificates(search="   "))
+        assert recording.calls == [("GET", CERT_PATH, None)]
+
+    def test_negative_page_clean_error(self, recording):
+        result = _run(main_mod.npg_list_certificates(page=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestListBannedIps:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_list_banned_ips())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/banned-ips", None)]
+
+    def test_filter_and_host_forwarded(self, recording):
+        _run(
+            main_mod.npg_list_banned_ips(
+                filter="host", proxy_host_id="abc-uuid", page=1, limit=25
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/banned-ips",
+                {
+                    "page": 1,
+                    "per_page": 25,
+                    "filter": "host",
+                    "proxy_host_id": "abc-uuid",
+                },
+            )
+        ]
+
+    def test_blank_proxy_host_id_not_sent(self, recording):
+        _run(main_mod.npg_list_banned_ips(proxy_host_id="  "))
+        assert recording.calls == [("GET", "/api/v1/banned-ips", None)]
+
+
+class TestSimplePaginationList:
+    """page/limit-only tools: backups, redirect hosts, access lists,
+    auth providers, ddns records, filter subscriptions."""
+
+    @pytest.mark.parametrize(
+        "tool, path",
+        [
+            ("npg_list_backups", "/api/v1/backups"),
+            ("npg_list_redirect_hosts", "/api/v1/redirect-hosts"),
+            ("npg_list_access_lists", "/api/v1/access-lists"),
+            ("npg_list_auth_providers", "/api/v1/auth-providers"),
+            ("npg_list_ddns_records", "/api/v1/ddns-records"),
+            ("npg_list_filter_subscriptions", "/api/v1/filter-subscriptions"),
+        ],
+    )
+    def test_zero_arg_sends_no_params(self, recording, tool, path):
+        result = _run(getattr(main_mod, tool)())
+        assert result["success"] is True
+        assert recording.calls == [("GET", path, None)]
+
+    @pytest.mark.parametrize(
+        "tool, path",
+        [
+            ("npg_list_backups", "/api/v1/backups"),
+            ("npg_list_redirect_hosts", "/api/v1/redirect-hosts"),
+            ("npg_list_access_lists", "/api/v1/access-lists"),
+            ("npg_list_auth_providers", "/api/v1/auth-providers"),
+            ("npg_list_ddns_records", "/api/v1/ddns-records"),
+            ("npg_list_filter_subscriptions", "/api/v1/filter-subscriptions"),
+        ],
+    )
+    def test_page_limit_forwarded_as_per_page(self, recording, tool, path):
+        _run(getattr(main_mod, tool)(page=3, limit=10))
+        assert recording.calls == [("GET", path, {"page": 3, "per_page": 10})]
+
+    @pytest.mark.parametrize(
+        "tool, path",
+        [
+            ("npg_list_backups", "/api/v1/backups"),
+            ("npg_list_redirect_hosts", "/api/v1/redirect-hosts"),
+            ("npg_list_access_lists", "/api/v1/access-lists"),
+            ("npg_list_auth_providers", "/api/v1/auth-providers"),
+            ("npg_list_ddns_records", "/api/v1/ddns-records"),
+            ("npg_list_filter_subscriptions", "/api/v1/filter-subscriptions"),
+        ],
+    )
+    def test_negative_limit_clean_error(self, recording, tool, path):
+        result = _run(getattr(main_mod, tool)(limit=-2))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestListWafRules:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_list_waf_rules())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/waf/rules", None)]
+
+    def test_proxy_host_id_forwarded(self, recording):
+        _run(main_mod.npg_list_waf_rules(proxy_host_id="123e4567-e89b-12d3-a456-426614174000"))
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/waf/rules",
+                {"proxy_host_id": "123e4567-e89b-12d3-a456-426614174000"},
+            )
+        ]
+
+    def test_blank_proxy_host_id_not_sent(self, recording):
+        _run(main_mod.npg_list_waf_rules(proxy_host_id=""))
+        assert recording.calls == [("GET", "/api/v1/waf/rules", None)]
