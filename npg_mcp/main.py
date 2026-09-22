@@ -644,7 +644,7 @@ def _list_params_per_page(limit: int | None = None, offset: int | None = None, p
 
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (page size, mapped to API per_page), search (matches domain/forward host text), tags (list — repeatable 'tag' query param, AND semantics, API normalizes+validates each), domain (parent-domain bucket of the host's first domain name, e.g. 'sub.example.com' filters by 'example.com' — NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include pagination metadata (total, page, per_page, total_pages). REQUIRED: none — zero-arg call returns the full (unpaginated) list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
@@ -912,7 +912,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags: tri-state — omitted leaves tags unchanged, explicit [] clears all tags, non-empty list replaces them (API normalizes to lowercase, max 10, max 32 chars each). Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — only applied when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids (certificate_id, access_list_id, auth_provider_id, ddns_provider_id, forward container name/network): '' clears, omitted leaves; auth_bypass_paths: [] clears.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -1210,7 +1210,7 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET the COMPLETE config of MANY proxy hosts in one call — fleet-wide config audit (e.g. 'which hosts have WAF disabled?'). REQUIRED: host_ids (list, max 50). OPTIONAL: sections=[...] subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Per-host fan-out runs concurrently: data[host_id] = {success, data, sections_failed}; a nonexistent host (or any host whose core host GET fails) gets success:false + error and lands in hosts_failed — one bad host never aborts the batch. Sub-section failures stay in sections_failed. Over 50 ids raises ValueError; empty rejected; duplicates deduped.")
+@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Returns data[host_id]={success, data, sections_failed}; failed hosts land in hosts_failed — one bad host never aborts the batch. Duplicates deduped; empty rejected.")
 async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None) -> dict:
     try:
         _validate_required("host_ids", host_ids)
@@ -1454,7 +1454,7 @@ async def npg_export_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_import_proxy_host", description="IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone across hosts / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=false (default) returns a DRY-RUN plan (create body + sub-config requests) without executing; apply=true creates the host then applies each enabled sub-config (rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, uri_block, cloud_blocking). Inherit-state sections are skipped; instance-scoped UUID refs are flagged, never copied. skip_nginx=false runs nginx sync after apply. Unknown schema_version rejected; source host untouched.")
+@mcp.tool(name="npg_import_proxy_host", description="IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=false (default) = DRY-RUN plan without executing; apply=true creates the host + applies enabled sub-configs. Inherit-state sections skipped; instance-scoped UUID refs flagged, never copied. skip_nginx=false runs nginx sync after apply. Source host untouched.")
 async def npg_import_proxy_host(bundle: dict, domain_names: list[str], apply: bool = False, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("bundle", bundle)
@@ -2557,7 +2557,7 @@ async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, max_retries, find_time (seconds), ban_time (seconds, 0=permanent), fail_codes (comma-separated HTTP status codes, e.g. \"401,403\" — upstream rejects invalid codes like \"4o1\" with 400), action (block=log-and-ban, log=record only, notify=alert only without banning; upstream rejects other values with 400). REQUIRED: host_id.")
+@mcp.tool(name="npg_update_proxy_host_fail2ban", description="UPDATE fail2ban config (partial update — only provided fields change). Body: enabled, max_retries, find_time (sec), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes, e.g. \"401,403\"), action (block=log-and-ban, log=record only, notify=alert only; invalid values/codes rejected 400). REQUIRED: host_id.")
 async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | None = None, max_retries: int | None = None, find_time: int | None = None, ban_time: int | None = None, fail_codes: str | None = None, action: Literal["block", "log", "notify"] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2728,7 +2728,7 @@ async def npg_get_exploit_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. Required: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name (max 100 chars), pattern (validated regex/strict per pattern_type), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced). severity: info|warning|critical (default warning; legacy low/medium/high now return HTTP 400, upstream v2.51.0). Optional: description (kwargs extras rejected unless strict=false).")
+@mcp.tool(name="npg_create_exploit_rule", description="Create an exploit block rule. REQUIRED: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name (max 100 chars), pattern, pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced). severity: info|warning|critical (default warning). Optional: description; unknown kwargs rejected unless strict=false.")
 async def npg_create_exploit_rule(category: str, name: str, pattern: str, pattern_type: str, severity: str | None = None, description: str | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("category", category)
@@ -2835,7 +2835,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (HTTP status code, sent to the API as status_code), method (e.g. GET/POST), status_classes (list of 1xx-5xx class tokens, e.g. ['4xx']), exclude_status_codes (list of int), exclude_status_classes (list of 1xx-5xx tokens), limit (page size, the API maps it to per_page), offset (row offset, converted to page). All filter values are validated server-side — invalid tokens now return HTTP 400 naming the offending value instead of being silently dropped (upstream v2.51.0). REQUIRED: none — zero-arg call returns the full default log set.")
+@mcp.tool(name="npg_get_logs", description="GET access logs. Optional filters: host, status (sent to API as status_code), method, status_classes (['4xx'] class tokens), exclude_status_codes, exclude_status_classes, limit (maps to per_page), offset (converted to page). Filter values validated server-side — invalid tokens return 400 naming the offending value. Zero-arg returns the full default log set.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -3871,7 +3871,7 @@ async def npg_get_global_fail2ban() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update — pass only fields to change in kwargs; omitted fields are left as-is). kwargs fields: enabled: bool, max_retries: int (min 1), find_time: int (min 1, sec), ban_time: int (min 0, sec; 0=permanent), fail_codes: str (comma-separated HTTP codes), action: \"block\"|\"log\"|\"notify\". Unknown fields rejected unless strict=false. WARNINGS: (1) enabling is REFUSED with 400 while Trusted Proxies are unconfigured; (2) bans here apply to EVERY host — a false positive blocks all sites; (3) upstream default fail_codes \"400,444\" — adding 403/404 catches nothing extra (those codes only come from configured hosts).")
+@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify. Unknown fields rejected unless strict=false. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host — a false positive blocks all sites.")
 async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_kwargs("npg_update_global_fail2ban", kwargs, strict)
