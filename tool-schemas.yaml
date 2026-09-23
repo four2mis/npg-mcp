@@ -218,7 +218,7 @@ npg_create_proxy_host:
       required: false
 
 npg_update_proxy_host:
-  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears."
+  description: "UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears. DESTRUCTIVE: ddns_remove_provider=true (requires settings:write) also deletes provider-side DNS records when this update leaves the host DDNS-unmanaged — irreversible; omit keeps them (upstream default false)."
   parameters:
     - name: host_id
       type: integer | string
@@ -350,6 +350,9 @@ npg_update_proxy_host:
       type: boolean
       required: false
       default: false
+    - name: ddns_remove_provider
+      type: boolean
+      required: false
 
 npg_create_proxy_host_simple:
   description: "CREATE a proxy host with common settings. REQUIRED: domain_names, forward_host, forward_port. Optional: forward_scheme (default 'http'), ssl_enabled, ssl_forced, enabled, block_exploits, waf_enabled, waf_use_global (all default true). For cache/streaming/DDNS use npg_create_proxy_host."
@@ -714,7 +717,7 @@ npg_get_proxy_host_bot_filter:
       required: true
 
 npg_update_proxy_host_bot_filter:
-  description: "UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable)."
+  description: "UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -745,6 +748,9 @@ npg_update_proxy_host_bot_filter:
       required: false
     - name: custom_allowed_agents
       type: string
+      required: false
+    - name: skip_reload
+      type: boolean
       required: false
 
 npg_get_proxy_host_security_headers:
@@ -844,7 +850,7 @@ npg_get_proxy_host_uri_block:
       required: true
 
 npg_update_proxy_host_uri_block:
-  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id."
+  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -859,6 +865,9 @@ npg_update_proxy_host_uri_block:
       type: array<string>
       required: false
     - name: allow_private_ips
+      type: boolean
+      required: false
+    - name: skip_reload
       type: boolean
       required: false
 
@@ -1103,7 +1112,7 @@ npg_get_proxy_host_cloud_blocking:
       required: true
 
 npg_update_proxy_host_cloud_blocking:
-  description: "UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable)."
+  description: "UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -1118,6 +1127,9 @@ npg_update_proxy_host_cloud_blocking:
       type: boolean
       required: false
     - name: cloud_disable_global
+      type: boolean
+      required: false
+    - name: skip_reload
       type: boolean
       required: false
 
@@ -1141,7 +1153,7 @@ npg_get_proxy_host_geo:
       required: true
 
 npg_create_proxy_host_geo:
-  description: "CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots"
+  description: "CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -1176,6 +1188,9 @@ npg_create_proxy_host_geo:
       type: boolean
       required: false
       default: true
+    - name: skip_reload
+      type: boolean
+      required: false
 
 npg_update_proxy_host_geo:
   description: "UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable)."
@@ -1209,11 +1224,14 @@ npg_update_proxy_host_geo:
       required: false
 
 npg_delete_proxy_host_geo:
-  description: "DELETE geo restriction for a proxy host. REQUIRED: host_id."
+  description: "DELETE geo restriction for a proxy host. REQUIRED: host_id. skip_reload=true deletes without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: skip_reload
+      type: boolean
+      required: false
 
 npg_get_proxy_host_fail2ban:
   description: "GET fail2ban configuration for a proxy host. REQUIRED: host_id."
@@ -2591,11 +2609,14 @@ npg_update_ddns_record:
       required: false
 
 npg_delete_ddns_record:
-  description: "Delete a DDNS record by its ID. REQUIRED: record_id."
+  description: "DESTRUCTIVE: delete a DDNS record by ID. DEFAULT (remove_provider omitted or true) ALSO DELETES the live provider-side DNS record (Cloudflare/DuckDNS/Dynu) — irreversible. remove_provider=false keeps the provider record and removes only the NPG row. REQUIRED: record_id."
   parameters:
     - name: record_id
       type: integer | string
       required: true
+    - name: remove_provider
+      type: boolean
+      required: false
 
 npg_sync_ddns_records:
   description: "Sync all enabled DDNS records now (force immediate DNS update for all records)."

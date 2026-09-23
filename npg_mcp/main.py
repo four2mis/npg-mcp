@@ -912,7 +912,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears. DESTRUCTIVE: ddns_remove_provider=true (requires settings:write) also deletes provider-side DNS records when this update leaves the host DDNS-unmanaged — irreversible; omit keeps them (upstream default false).")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -957,6 +957,7 @@ async def npg_update_proxy_host(
     forward_container_network: str | None = None,
     tags: list[str] | None = None,
     skip_nginx: bool = False,
+    ddns_remove_provider: bool | None = None,
 ) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -1010,6 +1011,7 @@ async def npg_update_proxy_host(
         )
 
         params = {"skip_nginx": "true"} if skip_nginx else None
+        if ddns_remove_provider: params = {**(params or {}), "ddns_remove_provider": "true"}
         data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
@@ -2045,8 +2047,8 @@ async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_bot_filter", description="UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable).")
-async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, disable_global: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_bot_filter", description="UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | None = None, block_bad_bots: bool | None = None, block_ai_bots: bool | None = None, allow_search_engines: bool | None = None, block_suspicious_clients: bool | None = None, challenge_suspicious: bool | None = None, disable_global: bool | None = None, custom_blocked_agents: str | None = None, custom_allowed_agents: str | None = None, skip_reload: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2064,7 +2066,8 @@ async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | N
                 "custom_allowed_agents": "custom_allowed_agents",
             },
         )
-        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter", body)
+        params = {"skip_reload": "true"} if skip_reload else None
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/bot-filter", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2157,8 +2160,8 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id.")
-async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, skip_reload: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2171,7 +2174,8 @@ async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | No
                 "allow_private_ips": "allow_private_ips",
             },
         )
-        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body)
+        params = {"skip_reload": "true"} if skip_reload else None
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2460,8 +2464,8 @@ async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable).")
-async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None, cloud_disable_global: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_cloud_blocking", description="UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None, cloud_disable_global: bool | None = None, skip_reload: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2473,7 +2477,8 @@ async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_provi
             "allow_search_bots": allow_search_bots if allow_search_bots is not None else bool(current.get("allow_search_bots", False)),
             "cloud_disable_global": cloud_disable_global if cloud_disable_global is not None else bool(current.get("cloud_disable_global", False)),
         }
-        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers", body)
+        params = {"skip_reload": "true"} if skip_reload else None
+        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/blocked-cloud-providers", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2518,8 +2523,8 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots")
-async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True) -> dict:
+@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True, skip_reload: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         _validate_required("countries", countries)
@@ -2527,7 +2532,8 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
         # Non-standard: pre-seeded defaults dict (create semantics) + conditional — kept as-is (not _build_body).
         body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
         if allowed_ips is not None: body["allowed_ips"] = allowed_ips
-        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
+        params = {"skip_reload": "true"} if skip_reload else None
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2555,12 +2561,13 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_delete_proxy_host_geo", description="DELETE geo restriction for a proxy host. REQUIRED: host_id.")
-async def npg_delete_proxy_host_geo(host_id: str | int) -> dict:
+@mcp.tool(name="npg_delete_proxy_host_geo", description="DELETE geo restriction for a proxy host. REQUIRED: host_id. skip_reload=true deletes without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_delete_proxy_host_geo(host_id: str | int, skip_reload: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo")
+        params = {"skip_reload": "true"} if skip_reload else None
+        data = await _api(c.delete, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", params=params)
         return _mutate_result(data, f"Geo restriction for host {_id_str(host_id)} deleted")
     except Exception as e:
         return _error_result(e)
@@ -4306,12 +4313,13 @@ async def npg_update_ddns_record(record_id: str | int, hostname: str | None = No
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_delete_ddns_record", description="Delete a DDNS record by its ID. REQUIRED: record_id.")
-async def npg_delete_ddns_record(record_id: str | int) -> dict:
+@mcp.tool(name="npg_delete_ddns_record", description="DESTRUCTIVE: delete a DDNS record by ID. DEFAULT (remove_provider omitted or true) ALSO DELETES the live provider-side DNS record (Cloudflare/DuckDNS/Dynu) — irreversible. remove_provider=false keeps the provider record and removes only the NPG row. REQUIRED: record_id.")
+async def npg_delete_ddns_record(record_id: str | int, remove_provider: bool | None = None) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
-        data = await _api(c.delete, f"/api/v1/ddns-records/{_id_path(record_id)}")
+        params = {"remove_provider": "false"} if remove_provider is False else None
+        data = await _api(c.delete, f"/api/v1/ddns-records/{_id_path(record_id)}", params=params)
         return _mutate_result(data, f"DDNS record {_id_str(record_id)} deleted")
     except Exception as e:
         return _error_result(e)
