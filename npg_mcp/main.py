@@ -2239,11 +2239,15 @@ async def npg_get_dashboard_health() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_geoip_stats", description="GET GeoIP statistics by country for the dashboard.")
-async def npg_get_dashboard_geoip_stats() -> dict:
+@mcp.tool(name="npg_get_dashboard_geoip_stats", description="GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24).")
+async def npg_get_dashboard_geoip_stats(hours: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/dashboard/geoip-stats")
+        params: dict = {}
+        if hours is not None:
+            _validate_query_int("hours", hours)
+            params["hours"] = hours
+        data = await _api(c.get, "/api/v1/dashboard/geoip-stats", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -3028,47 +3032,102 @@ async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = Tru
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_stats", description="Get log statistics.")
-async def npg_get_log_stats() -> dict:
+@mcp.tool(name="npg_get_log_stats", description="GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats).")
+async def npg_get_log_stats(
+    log_type: Literal["access", "error", "modsec"] | None = None,
+    host: str | None = None,
+    client_ip: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    proxy_host_id: str | None = None,
+    block_reason: str | None = None,
+    search: str | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/logs/stats")
+        params: dict = {}
+        if log_type is not None:
+            params["log_type"] = log_type
+        if host is not None and str(host).strip():
+            params["host"] = str(host)
+        if client_ip is not None and str(client_ip).strip():
+            params["client_ip"] = str(client_ip)
+        if start_time is not None and str(start_time).strip():
+            params["start_time"] = str(start_time)
+        if end_time is not None and str(end_time).strip():
+            params["end_time"] = str(end_time)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        if block_reason is not None and str(block_reason).strip():
+            params["block_reason"] = str(block_reason)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        data = await _api(c.get, "/api/v1/logs/stats", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit, action, resource_type. REQUIRED: none — zero-arg call returns the full audit log set.")
+@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set.")
 async def npg_list_audit_logs(
     page: int | None = None,
     limit: int | None = None,
     action: str | None = None,
     resource_type: str | None = None,
+    offset: int | None = None,
+    search: str | None = None,
+    user_id: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params(limit=limit, page=page)
+        params = _list_params(limit=limit, page=page, offset=offset)
         if action is not None and str(action).strip():
             params["action"] = str(action)
         if resource_type is not None and str(resource_type).strip():
             params["resource_type"] = str(resource_type)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        if user_id is not None and str(user_id).strip():
+            params["user_id"] = str(user_id)
+        if start_time is not None and str(start_time).strip():
+            params["start_time"] = str(start_time)
+        if end_time is not None and str(end_time).strip():
+            params["end_time"] = str(end_time)
         data = await _api(c.get, "/api/v1/audit-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_system_logs", description="LIST system logs. Optional filters: source, level, limit. REQUIRED: none — zero-arg call returns the full system log set.")
+@mcp.tool(name="npg_list_system_logs", description="LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set.")
 async def npg_list_system_logs(
     source: str | None = None,
     level: str | None = None,
     limit: int | None = None,
+    container: str | None = None,
+    component: str | None = None,
+    search: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    offset: int | None = None,
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params(limit=limit)
+        params = _list_params(limit=limit, offset=offset)
         if source is not None and str(source).strip():
             params["source"] = str(source)
         if level is not None and str(level).strip():
             params["level"] = str(level)
+        if container is not None and str(container).strip():
+            params["container"] = str(container)
+        if component is not None and str(component).strip():
+            params["component"] = str(component)
+        if search is not None and str(search).strip():
+            params["search"] = str(search)
+        if start_time is not None and str(start_time).strip():
+            params["start_time"] = str(start_time)
+        if end_time is not None and str(end_time).strip():
+            params["end_time"] = str(end_time)
         data = await _api(c.get, "/api/v1/system-logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
@@ -3579,11 +3638,15 @@ async def npg_delete_log_file(filename: str) -> dict:
 
 # ── Certificates ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_expiring_certificates", description="Get certificates that are expiring soon.")
-async def npg_get_expiring_certificates() -> dict:
+@mcp.tool(name="npg_get_expiring_certificates", description="GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes).")
+async def npg_get_expiring_certificates(days: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/certificates/expiring")
+        params: dict = {}
+        if days is not None:
+            _validate_query_int("days", days)
+            params["days"] = days
+        data = await _api(c.get, "/api/v1/certificates/expiring", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -3791,20 +3854,38 @@ async def npg_get_dashboard_containers() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_stats", description="Get hourly statistics for the dashboard.")
-async def npg_get_dashboard_stats() -> dict:
+@mcp.tool(name="npg_get_dashboard_stats", description="GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host).")
+async def npg_get_dashboard_stats(
+    start: str | None = None,
+    end: str | None = None,
+    proxy_host_id: str | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/dashboard/stats/hourly")
+        params: dict = {}
+        if start is not None and str(start).strip():
+            params["start"] = str(start)
+        if end is not None and str(end).strip():
+            params["end"] = str(end)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        data = await _api(c.get, "/api/v1/dashboard/stats/hourly", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_health_history", description="Get system health history for the dashboard.")
-async def npg_get_dashboard_health_history() -> dict:
+@mcp.tool(name="npg_get_dashboard_health_history", description="GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100).")
+async def npg_get_dashboard_health_history(hours: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/dashboard/health/history")
+        params: dict = {}
+        if hours is not None:
+            _validate_query_int("hours", hours)
+            params["hours"] = hours
+        if limit is not None:
+            _validate_query_int("limit", limit)
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/dashboard/health/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4981,11 +5062,39 @@ async def npg_bulk_unban_ips(ids: list[str | int]) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ban_history", description="Get ban/unban event history.")
-async def npg_get_ban_history() -> dict:
+@mcp.tool(name="npg_get_ban_history", description="GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20).")
+async def npg_get_ban_history(
+    ip_address: str | None = None,
+    event_type: str | None = None,
+    source: str | None = None,
+    proxy_host_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    page: int | None = None,
+    limit: int | None = None,
+) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/banned-ips/history")
+        params: dict = {}
+        if ip_address is not None and str(ip_address).strip():
+            params["ip_address"] = str(ip_address)
+        if event_type is not None and str(event_type).strip():
+            params["event_type"] = str(event_type)
+        if source is not None and str(source).strip():
+            params["source"] = str(source)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        if start_date is not None and str(start_date).strip():
+            params["start_date"] = str(start_date)
+        if end_date is not None and str(end_date).strip():
+            params["end_date"] = str(end_date)
+        if page is not None:
+            _validate_query_int("page", page)
+            params["page"] = page
+        if limit is not None:
+            _validate_query_int("limit", limit)
+            params["per_page"] = limit
+        data = await _api(c.get, "/api/v1/banned-ips/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4999,12 +5108,19 @@ async def npg_get_ban_history_stats() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ban_history_for_ip", description="Get ban history for a specific IP address. REQUIRED: ip.")
-async def npg_get_ban_history_for_ip(ip: str) -> dict:
+@mcp.tool(name="npg_get_ban_history_for_ip", description="GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20).")
+async def npg_get_ban_history_for_ip(ip: str, page: int | None = None, limit: int | None = None) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
-        data = await _api(c.get, f"/api/v1/banned-ips/history/ip/{_id_path(ip)}")
+        params: dict = {}
+        if page is not None:
+            _validate_query_int("page", page)
+            params["page"] = page
+        if limit is not None:
+            _validate_query_int("limit", limit)
+            params["per_page"] = limit
+        data = await _api(c.get, f"/api/v1/banned-ips/history/ip/{_id_path(ip)}", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -5208,11 +5324,15 @@ async def npg_get_waf_global_exclusions() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_global_history", description="Get the global WAF policy change history.")
-async def npg_get_waf_global_history() -> dict:
+@mcp.tool(name="npg_get_waf_global_history", description="GET the global WAF policy change history. Optional: limit (max entries returned).")
+async def npg_get_waf_global_history(limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/waf/global/history")
+        params: dict = {}
+        if limit is not None:
+            _validate_query_int("limit", limit)
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/waf/global/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -5237,12 +5357,16 @@ async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_host_history", description="Get the WAF policy change history for a proxy host. REQUIRED: host_id.")
-async def npg_get_waf_host_history(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_waf_host_history", description="GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned).")
+async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        data = await _api(c.get, f"/api/v1/waf/hosts/{_id_path(host_id)}/history")
+        params: dict = {}
+        if limit is not None:
+            _validate_query_int("limit", limit)
+            params["limit"] = limit
+        data = await _api(c.get, f"/api/v1/waf/hosts/{_id_path(host_id)}/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

@@ -547,3 +547,334 @@ class TestListWafRules:
     def test_blank_proxy_host_id_not_sent(self, recording):
         _run(main_mod.npg_list_waf_rules(proxy_host_id=""))
         assert recording.calls == [("GET", "/api/v1/waf/rules", None)]
+
+
+# ── Phase-3 batch: time-window/filter params on read/diagnostic tools ────
+# All params None-defaulted: zero-arg calls stay byte-identical (no params).
+# Datetime strings are forwarded verbatim; ints validated with _validate_query_int.
+
+
+class TestGetLogStats:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_log_stats())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/logs/stats", None)]
+
+    def test_time_window_forwarded_verbatim(self, recording):
+        _run(
+            main_mod.npg_get_log_stats(
+                start_time="2026-09-16T00:00:00Z", end_time="2026-09-23T00:00:00Z"
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs/stats",
+                {
+                    "start_time": "2026-09-16T00:00:00Z",
+                    "end_time": "2026-09-23T00:00:00Z",
+                },
+            )
+        ]
+
+    def test_all_filters_sent(self, recording):
+        _run(
+            main_mod.npg_get_log_stats(
+                log_type="access",
+                host="sub.example.com",
+                client_ip="1.2.3.4",
+                proxy_host_id="123e4567-e89b-12d3-a456-426614174000",
+                block_reason="waf",
+                search="admin",
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs/stats",
+                {
+                    "log_type": "access",
+                    "host": "sub.example.com",
+                    "client_ip": "1.2.3.4",
+                    "proxy_host_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "block_reason": "waf",
+                    "search": "admin",
+                },
+            )
+        ]
+
+    def test_blank_strings_not_sent(self, recording):
+        _run(main_mod.npg_get_log_stats(host="  ", search=""))
+        assert recording.calls == [("GET", "/api/v1/logs/stats", None)]
+
+
+class TestGetExpiringCertificates:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_expiring_certificates())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/certificates/expiring", None)]
+
+    def test_days_forwarded(self, recording):
+        _run(main_mod.npg_get_expiring_certificates(days=365))
+        assert recording.calls == [
+            ("GET", "/api/v1/certificates/expiring", {"days": 365})
+        ]
+
+    def test_negative_days_clean_error(self, recording):
+        result = _run(main_mod.npg_get_expiring_certificates(days=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestGetDashboardStats:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_dashboard_stats())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/dashboard/stats/hourly", None)]
+
+    def test_window_and_host_forwarded(self, recording):
+        _run(
+            main_mod.npg_get_dashboard_stats(
+                start="2026-09-16T00:00:00Z",
+                end="2026-09-23T00:00:00Z",
+                proxy_host_id="123e4567-e89b-12d3-a456-426614174000",
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/dashboard/stats/hourly",
+                {
+                    "start": "2026-09-16T00:00:00Z",
+                    "end": "2026-09-23T00:00:00Z",
+                    "proxy_host_id": "123e4567-e89b-12d3-a456-426614174000",
+                },
+            )
+        ]
+
+    def test_blank_strings_not_sent(self, recording):
+        _run(main_mod.npg_get_dashboard_stats(start=" ", proxy_host_id=""))
+        assert recording.calls == [("GET", "/api/v1/dashboard/stats/hourly", None)]
+
+
+class TestGetDashboardHealthHistory:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_dashboard_health_history())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/dashboard/health/history", None)]
+
+    def test_hours_and_limit_forwarded(self, recording):
+        _run(main_mod.npg_get_dashboard_health_history(hours=24, limit=50))
+        assert recording.calls == [
+            ("GET", "/api/v1/dashboard/health/history", {"hours": 24, "limit": 50})
+        ]
+
+    def test_negative_hours_clean_error(self, recording):
+        result = _run(main_mod.npg_get_dashboard_health_history(hours=-5))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestGetDashboardGeoipStats:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_dashboard_geoip_stats())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/dashboard/geoip-stats", None)]
+
+    def test_hours_forwarded(self, recording):
+        _run(main_mod.npg_get_dashboard_geoip_stats(hours=168))
+        assert recording.calls == [
+            ("GET", "/api/v1/dashboard/geoip-stats", {"hours": 168})
+        ]
+
+    def test_negative_hours_clean_error(self, recording):
+        result = _run(main_mod.npg_get_dashboard_geoip_stats(hours=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestGetBanHistory:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_ban_history())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/banned-ips/history", None)]
+
+    def test_filters_and_paging_sent(self, recording):
+        _run(
+            main_mod.npg_get_ban_history(
+                ip_address="1.2.3.4",
+                event_type="ban",
+                source="fail2ban",
+                proxy_host_id="123e4567-e89b-12d3-a456-426614174000",
+                start_date="2026-09-16",
+                end_date="2026-09-23",
+                page=2,
+                limit=10,
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/banned-ips/history",
+                {
+                    "ip_address": "1.2.3.4",
+                    "event_type": "ban",
+                    "source": "fail2ban",
+                    "proxy_host_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "start_date": "2026-09-16",
+                    "end_date": "2026-09-23",
+                    "page": 2,
+                    "per_page": 10,
+                },
+            )
+        ]
+
+    def test_limit_maps_to_per_page(self, recording):
+        _run(main_mod.npg_get_ban_history(limit=5))
+        assert recording.calls == [
+            ("GET", "/api/v1/banned-ips/history", {"per_page": 5})
+        ]
+
+    def test_negative_page_clean_error(self, recording):
+        result = _run(main_mod.npg_get_ban_history(page=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+    def test_blank_strings_not_sent(self, recording):
+        _run(main_mod.npg_get_ban_history(ip_address=" ", source=""))
+        assert recording.calls == [("GET", "/api/v1/banned-ips/history", None)]
+
+
+class TestGetBanHistoryForIp:
+    def test_required_ip_only(self, recording):
+        _run(main_mod.npg_get_ban_history_for_ip(ip="1.2.3.4"))
+        assert recording.calls == [
+            ("GET", "/api/v1/banned-ips/history/ip/1.2.3.4", None)
+        ]
+
+    def test_paging_sent(self, recording):
+        _run(main_mod.npg_get_ban_history_for_ip(ip="1.2.3.4", page=2, limit=10))
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/banned-ips/history/ip/1.2.3.4",
+                {"page": 2, "per_page": 10},
+            )
+        ]
+
+    def test_negative_limit_clean_error(self, recording):
+        result = _run(main_mod.npg_get_ban_history_for_ip(ip="1.2.3.4", limit=-3))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestListAuditLogsPhase3:
+    def test_new_filters_sent(self, recording):
+        _run(
+            main_mod.npg_list_audit_logs(
+                search="login",
+                user_id="123e4567-e89b-12d3-a456-426614174000",
+                start_time="2026-09-16T00:00:00Z",
+                end_time="2026-09-23T00:00:00Z",
+                offset=10,
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/audit-logs",
+                {
+                    "offset": 10,
+                    "search": "login",
+                    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "start_time": "2026-09-16T00:00:00Z",
+                    "end_time": "2026-09-23T00:00:00Z",
+                },
+            )
+        ]
+
+    def test_negative_offset_clean_error(self, recording):
+        result = _run(main_mod.npg_list_audit_logs(offset=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestListSystemLogsPhase3:
+    def test_new_filters_sent(self, recording):
+        _run(
+            main_mod.npg_list_system_logs(
+                container="npg-proxy",
+                component="api",
+                search="reload",
+                start_time="2026-09-16T00:00:00Z",
+                end_time="2026-09-23T00:00:00Z",
+                offset=5,
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/system-logs",
+                {
+                    "offset": 5,
+                    "container": "npg-proxy",
+                    "component": "api",
+                    "search": "reload",
+                    "start_time": "2026-09-16T00:00:00Z",
+                    "end_time": "2026-09-23T00:00:00Z",
+                },
+            )
+        ]
+
+    def test_negative_offset_clean_error(self, recording):
+        result = _run(main_mod.npg_list_system_logs(offset=-2))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestWafHistory:
+    def test_global_history_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_waf_global_history())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/waf/global/history", None)]
+
+    def test_global_history_limit_forwarded(self, recording):
+        _run(main_mod.npg_get_waf_global_history(limit=25))
+        assert recording.calls == [("GET", "/api/v1/waf/global/history", {"limit": 25})]
+
+    def test_global_history_negative_limit_clean_error(self, recording):
+        result = _run(main_mod.npg_get_waf_global_history(limit=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+    def test_host_history_limit_forwarded(self, recording):
+        _run(
+            main_mod.npg_get_waf_host_history(
+                host_id="123e4567-e89b-12d3-a456-426614174000", limit=10
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/waf/hosts/123e4567-e89b-12d3-a456-426614174000/history",
+                {"limit": 10},
+            )
+        ]
+
+    def test_host_history_zero_arg_sends_no_params(self, recording):
+        _run(main_mod.npg_get_waf_host_history(host_id="123e4567-e89b-12d3-a456-426614174000"))
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/waf/hosts/123e4567-e89b-12d3-a456-426614174000/history",
+                None,
+            )
+        ]

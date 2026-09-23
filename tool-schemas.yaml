@@ -910,8 +910,11 @@ npg_get_dashboard_health:
   parameters: []
 
 npg_get_dashboard_geoip_stats:
-  description: "GET GeoIP statistics by country for the dashboard."
-  parameters: []
+  description: "GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24)."
+  parameters:
+    - name: hours
+      type: integer
+      required: false
 
 npg_list_access_lists:
   description: "LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
@@ -1626,11 +1629,35 @@ npg_update_log_settings:
       default: true
 
 npg_get_log_stats:
-  description: "Get log statistics."
-  parameters: []
+  description: "GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats)."
+  parameters:
+    - name: log_type
+      type: string
+      required: false
+    - name: host
+      type: string
+      required: false
+    - name: client_ip
+      type: string
+      required: false
+    - name: start_time
+      type: string
+      required: false
+    - name: end_time
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: block_reason
+      type: string
+      required: false
+    - name: search
+      type: string
+      required: false
 
 npg_list_audit_logs:
-  description: "LIST audit log entries. Optional filters: page, limit, action, resource_type. REQUIRED: none — zero-arg call returns the full audit log set."
+  description: "LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set."
   parameters:
     - name: page
       type: integer
@@ -1644,9 +1671,24 @@ npg_list_audit_logs:
     - name: resource_type
       type: string
       required: false
+    - name: offset
+      type: integer
+      required: false
+    - name: search
+      type: string
+      required: false
+    - name: user_id
+      type: string
+      required: false
+    - name: start_time
+      type: string
+      required: false
+    - name: end_time
+      type: string
+      required: false
 
 npg_list_system_logs:
-  description: "LIST system logs. Optional filters: source, level, limit. REQUIRED: none — zero-arg call returns the full system log set."
+  description: "LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set."
   parameters:
     - name: source
       type: string
@@ -1655,6 +1697,24 @@ npg_list_system_logs:
       type: string
       required: false
     - name: limit
+      type: integer
+      required: false
+    - name: container
+      type: string
+      required: false
+    - name: component
+      type: string
+      required: false
+    - name: search
+      type: string
+      required: false
+    - name: start_time
+      type: string
+      required: false
+    - name: end_time
+      type: string
+      required: false
+    - name: offset
       type: integer
       required: false
 
@@ -2080,8 +2140,11 @@ npg_delete_log_file:
       required: true
 
 npg_get_expiring_certificates:
-  description: "Get certificates that are expiring soon."
-  parameters: []
+  description: "GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes)."
+  parameters:
+    - name: days
+      type: integer
+      required: false
 
 npg_get_certificate_history:
   description: "GET the certificate issuance/renewal history log. No parameters. Returns past renewals and issuance events per certificate — use npg_get_expiring_certificates to check upcoming expiry dates instead."
@@ -2208,12 +2271,27 @@ npg_get_dashboard_containers:
   parameters: []
 
 npg_get_dashboard_stats:
-  description: "Get hourly statistics for the dashboard."
-  parameters: []
+  description: "GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host)."
+  parameters:
+    - name: start
+      type: string
+      required: false
+    - name: end
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
 
 npg_get_dashboard_health_history:
-  description: "Get system health history for the dashboard."
-  parameters: []
+  description: "GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100)."
+  parameters:
+    - name: hours
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_cloudflare_tunnel:
   description: "Get Cloudflare Tunnel configuration."
@@ -3059,19 +3137,49 @@ npg_bulk_unban_ips:
       required: true
 
 npg_get_ban_history:
-  description: "Get ban/unban event history."
-  parameters: []
+  description: "GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20)."
+  parameters:
+    - name: ip_address
+      type: string
+      required: false
+    - name: event_type
+      type: string
+      required: false
+    - name: source
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: start_date
+      type: string
+      required: false
+    - name: end_date
+      type: string
+      required: false
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_ban_history_stats:
   description: "Get ban/unban history statistics."
   parameters: []
 
 npg_get_ban_history_for_ip:
-  description: "Get ban history for a specific IP address. REQUIRED: ip."
+  description: "GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20)."
   parameters:
     - name: ip
       type: string
       required: true
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_ip_traffic_stats:
   description: "Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default)."
@@ -3166,8 +3274,11 @@ npg_get_waf_global_exclusions:
   parameters: []
 
 npg_get_waf_global_history:
-  description: "Get the global WAF policy change history."
-  parameters: []
+  description: "GET the global WAF policy change history. Optional: limit (max entries returned)."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
 
 npg_disable_waf_global_rule:
   description: "Disable a CRS rule for EVERY host (globally). REQUIRED: rule_id."
@@ -3184,11 +3295,14 @@ npg_enable_waf_global_rule:
       required: true
 
 npg_get_waf_host_history:
-  description: "Get the WAF policy change history for a proxy host. REQUIRED: host_id."
+  description: "GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned)."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: limit
+      type: integer
+      required: false
 
 npg_disable_waf_rule_by_host:
   description: "Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API."
