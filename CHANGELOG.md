@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.34] - 2026-09-23
+
+### What changed
+- Exposed upstream time-window and filter parameters on 12 read/diagnostic tools (commit 72cdf64), all None-defaulted so zero-arg calls send no params and behave byte-identically to before: `npg_get_dashboard_geoip_stats` (hours), `npg_get_dashboard_health_history` (hours, limit), `npg_get_dashboard_stats` (start, end, proxy_host_id), `npg_get_expiring_certificates` (days), `npg_get_log_stats` (log_type, host, client_ip, start_time, end_time, proxy_host_id, block_reason, search — note the API defaults the stats window to the last 24h without an explicit start/end), `npg_get_ban_history` (ip_address, event_type, source, proxy_host_id, start_date, end_date, page, limit), `npg_get_ban_history_for_ip` (page, limit), `npg_get_waf_global_history` (limit), `npg_get_waf_host_history` (limit), `npg_list_audit_logs` (offset, search, user_id, start_time, end_time), and `npg_list_system_logs` (container, component, search, start_time, end_time, offset). Blank-string filters are dropped rather than sent. All tool descriptions rewritten in the same commit per the signature⇒description rule.
+- Added 331 lines of body-construction tests (`tests/test_list_pagination.py`): zero-arg sends no params, verbatim time-window forwarding, filter mapping, blank-string suppression, and negative-number clean-error coverage for the 12 changed tools. Ruff lint fixes for the mutation-query-param tests (commit e9f303c, no behavior change).
+- Verified against the test stack (npg-test-mcp @ 127.0.0.1:8082, image local/npg-mcp:72cdf64 built from the workspace checkout and confirmed equal to container image ID): 385/385 pytest passed, 293 tools registered / 0 duplicates, ruff clean, docs drift check exit 0, all 12 changed tools param-exercised live plus 43 regression tools; test stack pinned back to the published image afterwards (pristine, prod untouched).
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.33] - 2026-09-23
 
 ### What changed
