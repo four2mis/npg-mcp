@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.33] - 2026-09-23
+
+### What changed
+- Exposed upstream mutation side-effect controls (commit ab604de): `skip_reload` on the 5 sub-config mutators (`npg_update_proxy_host_bot_filter`, `npg_update_proxy_host_uri_block`, `npg_update_proxy_host_cloud_blocking`, `npg_create_proxy_host_geo`, `npg_delete_proxy_host_geo`), `ddns_remove_provider` on `npg_update_proxy_host`, and a `remove_provider` opt-out on `npg_delete_ddns_record`. All default to current behavior, so existing callers are unaffected. Verified against the test stack (npg-test-mcp @ 127.0.0.1:8082, image local/npg-mcp:ab604de matching workspace commit): 352/352 pytest green (19 new mutation-param tests), 293 tools / 0 duplicates, live round-trips for all 5 skip_reload mutators plus both DDNS delete modes, throwaway host cleaned up.
+- `npg_get_logs` now exposes the upstream `/logs` keyset cursor plus 32 upstream filters (commit 73f06dd): `log_type`, time range, severity, `block_reason`, `bot_category`, `rule_id`, and more — full parity with the upstream logs API instead of just page/limit.
+- Added `page`/`per_page` plus upstream filters to the 9 zero-arg list tools (commit 39cb315): `npg_list_certificates`, `npg_list_banned_ips`, and friends now support server-side pagination, search, status/provider filters, and sorting instead of always returning the full unpaginated set.
+- Description trim pass (commit e8b1d2f): 8 oversized tool descriptions (670/669/650/618/584/550/456/451 chars) cut under the 400–460 band, preserving REQUIRED params and enum hints. No signature changes.
+- swagger.yaml synced to upstream v2.58.0 (commit d621d6a, local-only reference file). Tier-count docs corrected to match `tier_allowed()` — 134/246/293 (commit b4df8bf).
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.32] - 2026-09-20
 
 ### What changed
