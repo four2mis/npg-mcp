@@ -86,51 +86,58 @@ def _params_of(recording, method, path_fragment):
 
 
 class TestBotFilterSkipReload:
+    HOST = "11111111-1111-1111-1111-111111111111"
+
     def test_skip_reload_true_sends_param(self, recording):
         result = _run(main_mod.npg_update_proxy_host_bot_filter(
-            host_id="11111111-1111-1111-1111-111111111111", enabled=True, skip_reload=True))
+            host_id=self.HOST, enabled=True, skip_reload=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/bot-filter") == {"skip_reload": "true"}
 
     def test_omitted_sends_no_params_regression(self, recording):
         result = _run(main_mod.npg_update_proxy_host_bot_filter(
-            host_id="11111111-1111-1111-1111-111111111111", enabled=True))
+            host_id=self.HOST, enabled=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/bot-filter") is None
 
     def test_false_sends_no_params(self, recording):
         result = _run(main_mod.npg_update_proxy_host_bot_filter(
-            host_id="11111111-1111-1111-1111-111111111111", enabled=True, skip_reload=False))
+            host_id=self.HOST, enabled=True, skip_reload=False))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/bot-filter") is None
 
 
 class TestUriBlockSkipReload:
+    HOST = "11111111-1111-1111-1111-111111111111"
+
     def test_skip_reload_true_sends_param(self, recording):
         result = _run(main_mod.npg_update_proxy_host_uri_block(
-            host_id="11111111-1111-1111-1111-111111111111", enabled=True, skip_reload=True))
+            host_id=self.HOST, enabled=True, skip_reload=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/uri-block") == {"skip_reload": "true"}
 
     def test_omitted_sends_no_params_regression(self, recording):
         result = _run(main_mod.npg_update_proxy_host_uri_block(
-            host_id="11111111-1111-1111-1111-111111111111", enabled=True))
+            host_id=self.HOST, enabled=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/uri-block") is None
 
 
 class TestCloudBlockingSkipReload:
+    HOST = "11111111-1111-1111-1111-111111111111"
+
     def test_skip_reload_true_sends_param(self, recording):
         result = _run(main_mod.npg_update_proxy_host_cloud_blocking(
-            host_id="11111111-1111-1111-1111-111111111111", blocked_providers=["aws"], skip_reload=True))
+            host_id=self.HOST, blocked_providers=["aws"], skip_reload=True))
         assert result["success"] is True
         # GET first (read-modify-write), then PUT with the query param.
         assert recording.calls[0][0] == "GET"
-        assert _params_of(recording, "PUT", "/blocked-cloud-providers") == {"skip_reload": "true"}
+        assert _params_of(
+            recording, "PUT", "/blocked-cloud-providers") == {"skip_reload": "true"}
 
     def test_omitted_sends_no_params_regression(self, recording):
         result = _run(main_mod.npg_update_proxy_host_cloud_blocking(
-            host_id="11111111-1111-1111-1111-111111111111", blocked_providers=["aws"]))
+            host_id=self.HOST, blocked_providers=["aws"]))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/blocked-cloud-providers") is None
 
@@ -152,7 +159,8 @@ class TestGeoSkipReload:
         assert _params_of(recording, "POST", "/geo") is None
 
     def test_delete_skip_reload_true_sends_param(self, recording):
-        result = _run(main_mod.npg_delete_proxy_host_geo(host_id=self.HOST, skip_reload=True))
+        result = _run(main_mod.npg_delete_proxy_host_geo(
+            host_id=self.HOST, skip_reload=True))
         assert result["success"] is True
         assert _params_of(recording, "DELETE", "/geo") == {"skip_reload": "true"}
 
@@ -166,33 +174,35 @@ class TestUpdateProxyHostDdnsRemoveProvider:
     HOST = "11111111-1111-1111-1111-111111111111"
 
     def test_true_sends_param(self, recording):
-        result = _run(main_mod.npg_update_proxy_host(host_id=self.HOST, forward_port=8081,
-                                                     ddns_remove_provider=True))
+        result = _run(main_mod.npg_update_proxy_host(
+            host_id=self.HOST, forward_port=8081, ddns_remove_provider=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/api/v1/proxy-hosts/" + self.HOST) == {
             "ddns_remove_provider": "true"}
 
     def test_true_coexists_with_skip_nginx(self, recording):
-        result = _run(main_mod.npg_update_proxy_host(host_id=self.HOST, forward_port=8081,
-                                                     skip_nginx=True, ddns_remove_provider=True))
+        result = _run(main_mod.npg_update_proxy_host(
+            host_id=self.HOST, forward_port=8081,
+            skip_nginx=True, ddns_remove_provider=True))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/api/v1/proxy-hosts/" + self.HOST) == {
             "skip_nginx": "true", "ddns_remove_provider": "true"}
 
     def test_omitted_sends_no_params_regression(self, recording):
-        result = _run(main_mod.npg_update_proxy_host(host_id=self.HOST, forward_port=8081))
+        result = _run(main_mod.npg_update_proxy_host(
+            host_id=self.HOST, forward_port=8081))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/api/v1/proxy-hosts/" + self.HOST) is None
 
     def test_false_sends_no_param(self, recording):
-        result = _run(main_mod.npg_update_proxy_host(host_id=self.HOST, forward_port=8081,
-                                                     ddns_remove_provider=False))
+        result = _run(main_mod.npg_update_proxy_host(
+            host_id=self.HOST, forward_port=8081, ddns_remove_provider=False))
         assert result["success"] is True
         assert _params_of(recording, "PUT", "/api/v1/proxy-hosts/" + self.HOST) is None
 
     def test_param_never_leaks_into_body(self, recording):
-        result = _run(main_mod.npg_update_proxy_host(host_id=self.HOST, forward_port=8081,
-                                                     ddns_remove_provider=True))
+        result = _run(main_mod.npg_update_proxy_host(
+            host_id=self.HOST, forward_port=8081, ddns_remove_provider=True))
         assert result["success"] is True
         for m, _path, body, _params in recording.calls:
             if m == "PUT":
@@ -203,9 +213,11 @@ class TestDeleteDdnsRecordRemoveProvider:
     RID = "22222222-2222-2222-2222-222222222222"
 
     def test_false_keeps_provider_record(self, recording):
-        result = _run(main_mod.npg_delete_ddns_record(record_id=self.RID, remove_provider=False))
+        result = _run(main_mod.npg_delete_ddns_record(
+            record_id=self.RID, remove_provider=False))
         assert result["success"] is True
-        assert _params_of(recording, "DELETE", "/ddns-records/") == {"remove_provider": "false"}
+        assert _params_of(
+            recording, "DELETE", "/ddns-records/") == {"remove_provider": "false"}
 
     def test_default_deletes_at_provider_regression(self, recording):
         result = _run(main_mod.npg_delete_ddns_record(record_id=self.RID))
@@ -213,6 +225,7 @@ class TestDeleteDdnsRecordRemoveProvider:
         assert _params_of(recording, "DELETE", "/ddns-records/") is None
 
     def test_true_sends_nothing_upstream_default(self, recording):
-        result = _run(main_mod.npg_delete_ddns_record(record_id=self.RID, remove_provider=True))
+        result = _run(main_mod.npg_delete_ddns_record(
+            record_id=self.RID, remove_provider=True))
         assert result["success"] is True
         assert _params_of(recording, "DELETE", "/ddns-records/") is None
