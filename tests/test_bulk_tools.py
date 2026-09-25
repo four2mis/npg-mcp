@@ -301,3 +301,128 @@ class TestBulkRenewCertificates:
         assert result["data"][1]["success"] is False
         assert "cert_id is required" in result["data"][1]["error"]
         assert result["data"][2]["success"] is True
+
+
+class TestBulkSetProxyHostsEnabled:
+    def test_puts_enabled_true_per_host(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=["77777777-7777-7777-7777-777777777777",
+                          "88888888-8888-8888-8888-888888888888"],
+                enabled=True,
+            )
+        )
+        assert result["success"] is True
+        assert result["hosts_failed"] == []
+        assert len(recording.calls) == 2
+        assert all(method == "PUT" for method, _, _, _ in recording.calls)
+        for (method, path, body, params), expected_id in zip(
+            recording.calls, ["77777777-7777-7777-7777-777777777777",
+                              "88888888-8888-8888-8888-888888888888"]
+        ):
+            assert path == f"/api/v1/proxy-hosts/{expected_id}"
+            # Minimal partial-update body: exactly {"enabled": bool}, nothing else.
+            assert body == {"enabled": True}
+            # skip_nginx defaults to True -> query param mirrors npg_update_proxy_host.
+            assert params == {"skip_nginx": "true"}
+        assert result["data"] == [
+            {"host_id": "77777777-7777-7777-7777-777777777777", "success": True,
+             "result": {"id": "77777777-7777-7777-7777-777777777777", "updated": True}},
+            {"host_id": "88888888-8888-8888-8888-888888888888", "success": True,
+             "result": {"id": "88888888-8888-8888-8888-888888888888", "updated": True}},
+        ]
+
+    def test_puts_enabled_false_body(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=["99999999-9999-9999-9999-999999999999"], enabled=False
+            )
+        )
+        assert result["success"] is True
+        assert recording.calls[0][2] == {"enabled": False}
+
+    def test_skip_nginx_false_sends_no_params(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=["aaaa"], enabled=True, skip_nginx=False
+            )
+        )
+        assert result["success"] is True
+        assert recording.calls[0][3] is None
+
+    def test_one_bad_host_does_not_abort_batch(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=["ok-host", "fail-host", "ok-2"], enabled=False
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == 3  # every host was attempted
+        assert result["data"][0]["success"] is True
+        assert result["data"][1]["success"] is False
+        assert "404" in result["data"][1]["error"]
+        assert result["data"][2]["success"] is True
+        assert result["hosts_failed"] == ["fail-host"]
+
+    def test_duplicates_deduped_first_seen_wins(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=["host-1", "host-1", "host-2"], enabled=True
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == 2  # host-1 PUT once
+        assert recording.calls[0][1] == "/api/v1/proxy-hosts/host-1"
+        assert recording.calls[1][1] == "/api/v1/proxy-hosts/host-2"
+        assert result["hosts_failed"] == []
+
+    def test_int_host_ids_coerced_to_string_paths(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(host_ids=[1, 2], enabled=True)
+        )
+        assert result["success"] is True
+        assert recording.calls[0][1] == "/api/v1/proxy-hosts/1"
+        assert recording.calls[0][2] == {"enabled": True}
+        assert result["data"][0]["host_id"] == "1"
+
+    def test_empty_host_ids_rejected(self):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(host_ids=[], enabled=True)
+        )
+        assert result["success"] is False
+        assert "host_ids is required" in result["error"]
+
+    def test_cap_raises_value_error_before_any_call(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=_many_ids(_BULK_HOST_LIMIT + 1), enabled=True
+            )
+        )
+        assert result["success"] is False
+        assert f"exceeds the limit of {_BULK_HOST_LIMIT}" in result["error"]
+        assert recording.calls == []  # nothing was sent
+
+    def test_at_cap_is_allowed(self, recording):
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(
+                host_ids=_many_ids(_BULK_HOST_LIMIT), enabled=True
+            )
+        )
+        assert result["success"] is True
+        assert len(recording.calls) == _BULK_HOST_LIMIT
+
+    def test_invalid_individual_host_id_reported_per_host(self, recording):
+        # A blank/None host_id in the middle must be reported as a per-host
+        # error while the valid entries still run (never aborts the batch).
+        from typing import cast
+
+        bad_ids: list[str | int] = cast(list[str | int], ["ok-host", None, "ok-2"])
+        result = _run(
+            main_mod.npg_bulk_set_proxy_hosts_enabled(host_ids=bad_ids, enabled=True)
+        )
+        assert result["success"] is True
+        assert result["data"][0]["success"] is True
+        assert result["data"][1]["success"] is False
+        assert "host_id is required" in result["data"][1]["error"]
+        assert result["data"][2]["success"] is True
+        assert result["hosts_failed"] == ["None"]  # _id_str(None) display form

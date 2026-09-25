@@ -474,6 +474,20 @@ npg_bulk_delete_proxy_hosts:
       type: array<st> | int]
       required: true
 
+npg_bulk_set_proxy_hosts_enabled:
+  description: "BULK ENABLE/DISABLE proxy hosts in one call. REQUIRED: host_ids (list, max 50), enabled (bool). Per-host result; one failure doesn't abort. Duplicates deduped; empty rejected. skip_nginx=true (default) persists without nginx regen — call npg_sync_proxy_hosts once after; skip_nginx=false regens+reloads per host. Disabling hosts takes them offline at once (reversible)."
+  parameters:
+    - name: host_ids
+      type: array<st> | int]
+      required: true
+    - name: enabled
+      type: boolean
+      required: true
+    - name: skip_nginx
+      type: boolean
+      required: false
+      default: true
+
 npg_bulk_get_proxy_host_full:
   description: "GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Returns data[host_id]={success, data, sections_failed}; failed hosts land in hosts_failed — one bad host never aborts the batch. Duplicates deduped; empty rejected."
   parameters:

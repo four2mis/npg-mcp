@@ -1212,6 +1212,64 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
     except Exception as e:
         return _error_result(e)
 
+@mcp.tool(name="npg_bulk_set_proxy_hosts_enabled", description="BULK ENABLE/DISABLE proxy hosts in one call. REQUIRED: host_ids (list, max 50), enabled (bool). Per-host result; one failure doesn't abort. Duplicates deduped; empty rejected. skip_nginx=true (default) persists without nginx regen — call npg_sync_proxy_hosts once after; skip_nginx=false regens+reloads per host. Disabling hosts takes them offline at once (reversible).")
+async def npg_bulk_set_proxy_hosts_enabled(host_ids: list[str | int], enabled: bool, skip_nginx: bool = True) -> dict:
+    try:
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(host_ids)})"
+            )
+        c = _get_client()
+
+        # Dedupe preserving first-seen order, keyed on the URL-encoded form
+        # (_id_path) like npg_bulk_get_proxy_host_full — quote-variant
+        # spellings of one id must not PUT the same host twice. The raw
+        # spelling is kept for the response's host_id display field.
+        seen: set[str] = set()
+        ordered: list[str | int] = []
+        for host_id in host_ids:
+            key = _id_path(host_id)
+            if key not in seen:
+                seen.add(key)
+                ordered.append(host_id)
+
+        # Per-host worker with per-entry error isolation (same as the other
+        # bulk mutators). Body is the minimal partial update — exactly
+        # {"enabled": bool}, never a full-replace body. skip_nginx is a QUERY
+        # param on PUT /proxy-hosts/{id} (mirrors npg_update_proxy_host),
+        # so a batch never triggers per-host nginx regen/reload; the caller
+        # runs npg_sync_proxy_hosts once at the end.
+        params = {"skip_nginx": "true"} if skip_nginx else None
+
+        async def _set_one(host_id) -> dict:
+            entry: dict = {"host_id": _id_str(host_id)}
+            try:
+                # Validate the RAW id (not the display string) so a None /
+                # blank entry is rejected instead of PUT to a garbage path.
+                _validate_id("host_id", host_id)
+                data = await _api(c.put,
+                    f"/api/v1/proxy-hosts/{_id_path(host_id)}",
+                    {"enabled": enabled},
+                    params=params,
+                )
+                entry["success"] = True
+                entry["result"] = data
+            except Exception as e:
+                entry["success"] = False
+                entry["error"] = str(e)
+            return entry
+
+        # Semaphore-capped gather — at most _BULK_WRITE_CONCURRENCY PUTs in
+        # flight; order preserved so the response list matches host_ids.
+        results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
+                                        (_set_one(h) for h in ordered))
+        hosts_failed = sorted(entry["host_id"] for entry in results if not entry["success"])
+        return {"success": True, "data": results, "hosts_failed": hosts_failed}
+    except Exception as e:
+        return _error_result(e)
+
 @mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Returns data[host_id]={success, data, sections_failed}; failed hosts land in hosts_failed — one bad host never aborts the batch. Duplicates deduped; empty rejected.")
 async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None) -> dict:
     try:
