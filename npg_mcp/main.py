@@ -912,7 +912,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update - only passed fields change). REQUIRED: host_id. tags tri-state: omit=unchanged, []=clear all, list=replaces. Optional WAF: waf_enabled, waf_mode ('detection'|'blocking' — applies only when waf_use_global=false), waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips nginx regen. Nullable ids: '' clears, omit leaves; auth_bypass_paths: [] clears. DESTRUCTIVE: ddns_remove_provider=true (requires settings:write) also deletes provider-side DNS records when this update leaves the host DDNS-unmanaged — irreversible; omit keeps them (upstream default false).")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. WAF: waf_mode (detection|blocking; applies only when waf_use_global=false), waf_enabled, waf_use_global, waf_paranoia_level, waf_anomaly_threshold. skip_nginx=true skips regen. Nullable ids: ''=clear, omit=keep. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
