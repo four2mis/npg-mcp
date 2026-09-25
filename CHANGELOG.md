@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.35] - 2026-09-25
+
+### What changed
+- `npg_update_proxy_host` description trimmed from 624 to 451 chars to fit the 460-char CI description band, preserving the `host_id` REQUIRED mention, tags tri-state semantics, the `waf_mode` only-applies-when-`waf_use_global=false` gate, and nullable-id `''`-clears behavior (commit 32ef397).
+- README prose tier counts updated from 134/247/294 to 135/248/295 to reflect the two new tools added in this release (commit a5fc983).
+- Ruff W292 trailing-newline lint fix in tests; no behavior change (commit e8fd45e).
+- Release verified against the test stack (npg-test-mcp @ 127.0.0.1:8082, local image built from workspace HEAD): 17/17 live checks passed — served description confirmed at 451 chars with all safety semantics, `npg_get_health` healthy, bulk enable/disable round-trips on a throwaway host, tags replace/clear verified via GET, 4 unrelated read tools unaffected; static checks: 401 pytest passed, ruff clean, docs drift check in sync, 295 tools registered with 0 duplicates, container package sha256s identical to workspace HEAD.
+
+### What's new
+- New tool `npg_get_health` (GET /api/v1/health): origin-root liveness probe returning overall health status plus per-dependency (db, cache) detail — commit 629db40.
+- New tool `npg_bulk_set_proxy_hosts_enabled` (POST /api/v1/proxy-hosts/bulk-enabled): batch enable/disable up to 50 hosts per call with dedupe, per-entry error isolation, and an optional `skip_nginx` query param mirroring `npg_update_proxy_host` — commit 5f82041.
+
+### Breaking changes
+- (none)
+
 ## [0.5.34] - 2026-09-23
 
 ### What changed
