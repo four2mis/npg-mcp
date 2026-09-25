@@ -3247,6 +3247,10 @@ npg_apply_settings_preset:
       type: string
       required: true
 
+npg_get_health:
+  description: "GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot."
+  parameters: []
+
 npg_get_health_detailed:
   description: "GET a detailed health snapshot (detailed version of health check)."
   parameters: []

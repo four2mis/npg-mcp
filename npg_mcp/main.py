@@ -5256,6 +5256,15 @@ async def npg_apply_settings_preset(preset: str) -> dict:
 
 # ── System Extras ──────────────────────────────────────────────────────
 
+@mcp.tool(name="npg_get_health", description="GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot.")
+async def npg_get_health() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/health")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
 @mcp.tool(name="npg_get_health_detailed", description="GET a detailed health snapshot (detailed version of health check).")
 async def npg_get_health_detailed() -> dict:
     c = _get_client()
