@@ -5438,6 +5438,17 @@ async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None)
     except Exception as e:
         return _error_result(e)
 
+@mcp.tool(name="npg_get_waf_event_rules", description="GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope.")
+async def npg_get_waf_event_rules(log_id: str | int, at: str) -> dict:
+    try:
+        _validate_id("log_id", log_id)
+        _validate_required("at", at)
+        c = _get_client()
+        data = await _api(c.get, f"/api/v1/waf/events/{_id_path(log_id)}/rules", params={"at": at})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
 @mcp.tool(name="npg_disable_waf_rule_by_host", description="Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API.")
 async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> dict:
     try:
