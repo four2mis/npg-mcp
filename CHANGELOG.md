@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.36] - 2026-09-27
+
+### What changed
+- Synced the wrapper with upstream NPG v2.59.0 (commit cf6450c): refreshed `swagger.yaml` to the upstream v2.59.0 tag (delta from v2.58.0 is exactly +1 operation) and raised the tool-surface guardrails in `tests/test_health.py` / `tests/test_toolsets.py` to 296 tools with the derived `NPG_TOOL_LEVEL` tier counts (read 136 / standard 249 / full 296).
+- Regenerated the three generated doc artifacts — `tool-schemas.yaml`, `README.md`, `README.ko.md` — so the new tool is documented, and corrected the stale `NPG_TOOL_LEVEL` tier counts in the README prose (commit 1a85a06). Until this landed, the publish workflow's "Check documentation drift" validate job failed (`tool-schemas.yaml missing 1 tools: ['npg_get_waf_event_rules']`, README.md and README.ko.md totals 295 vs 296), which would have made the release push produce no tag, no GitHub release and no GHCR image.
+- Release verified at `1a85a06` against the test stack only (npg-test-mcp @ 127.0.0.1:8082), using a local image built from the workspace HEAD commit and confirmed byte-identical to it (`main.py` sha256 `4db5bdae…`, `client.py` sha256 `048ae0c4…`, container image ID `sha256:2eabfef3…`): 401 pytest passed, AST parse clean, 296 tools registered with 0 duplicate names, `regenerate_all_docs.py --check` exit 0, the new tool reachable over the real MCP wire path, and 3 unrelated read tools (`npg_get_health`, `npg_list_proxy_hosts`, `npg_get_waf_global_rules`) unaffected on NPG 2.59.0. Upstream NPG was not touched.
+
+### What's new
+- New tool `npg_get_waf_event_rules` (GET /api/v1/waf/events/{logId}/rules, upstream #306): returns the WAF rule(s) that contributed to one specific security event. REQUIRED: `log_id` (the event id) and `at` (the event timestamp) — `at` selects the TimescaleDB chunk the event lives in, so an out-of-chunk timestamp returns upstream 404 "WAF event not found"; empty `log_id`/`at` are rejected locally before any API call. Verified live against a genuine SQL-injection event injected on the disposable test stack: the call returned the owning `proxy_host_id` plus `rules[]` (rule_id 942100, message, severity, category, `excluded`).
+
+### Breaking changes
+- (none)
+
 ## [0.5.35] - 2026-09-25
 
 ### What changed
