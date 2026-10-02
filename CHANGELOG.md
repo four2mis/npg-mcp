@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.37] - 2026-10-02
+
+### What changed
+- Corrected stale `NPG_TOOL_LEVEL` tier counts in `.env.example` (135/248/295 → 136/249/296) to match `tier_allowed()` after the v0.5.36 tool addition (commit d3c1277). Until this landed, the `--check-env` tier verification reported a mismatch even though the tests and generated docs were already consistent.
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [0.5.36] - 2026-09-27
 
 ### What changed
