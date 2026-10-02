@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.38] - 2026-10-02
+
+### What changed
+- Trimmed 6 oversized tool descriptions to fit the 460-char CI description band (289-388 chars each): `npg_match_filter_subscriptions`, `npg_import_proxy_host`, `npg_get_logs`, `npg_update_proxy_host`, `npg_bulk_get_proxy_host_full`, `npg_update_global_fail2ban` (commit 27a53bb). Required-parameter mentions, enum lists and DESTRUCTIVE/semantic notes were preserved; only the prose padding was cut.
+- `npg_update_global_fail2ban` description was stale in a sixth place: it still claimed a `ban_history` mode that the tool's signature does not carry — removed along with the trim.
+
+### What's new
+- New tool `npg_match_filter_subscriptions(ip, user_agent)` wrapping `GET /api/v1/filter-subscriptions/match` (upstream NPG v2.59.0, PR #230) (commit e30a9f3). Checks one IP and/or one user-agent against every enabled filter subscription. Both params default to `''`; passing both empty is rejected locally before any API call; an invalid IP passes through (upstream 400 with its own descriptive message). The response separates `ip_matches` / `user_agent_matches`, with `matched_value` and `reason` surfaced per match. Tier: read-level (tier counts 136/250/297).
+
+### Breaking changes
+- (none)
+
 ## [0.5.37] - 2026-10-02
 
 ### What changed
