@@ -4639,6 +4639,23 @@ async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | 
         return _error_result(e)
 
 
+@mcp.tool(name="npg_match_filter_subscriptions", description="MATCH an IP and/or user-agent against ALL subscribed filter lists to find WHICH subscription blocked a client (access-log filter_subscription rows only say THAT a list matched, never which one). Optional: ip, user_agent — pass at least one (client-side error when both are empty). Returns ip_matches[] and user_agent_matches[] with the matching subscriptions. Read-only. Upstream validates ip as an IPv4/IPv6 address (invalid values return HTTP 400) — pass verbatim.")
+async def npg_match_filter_subscriptions(ip: str | None = None, user_agent: str | None = None) -> dict:
+    try:
+        if not (ip or user_agent):
+            raise ValueError("ip or user_agent is required (got: both empty)")
+        params: dict = {}
+        if ip:
+            params["ip"] = ip
+        if user_agent:
+            params["user_agent"] = user_agent
+        c = _get_client()
+        data = await _api(c.get, "/api/v1/filter-subscriptions/match", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+
 # ── Exploit Rules Extras ───────────────────────────────────────────────
 
 @mcp.tool(name="npg_get_exploit_rules_hosts", description="List proxy hosts that have exploit blocking enabled.")
