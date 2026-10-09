@@ -170,10 +170,15 @@ class TestUpdateProxyHostSimple:
 
 class TestProbeUpstream:
     def test_posts_to_test_proxy_host_route_with_no_body(self, recording):
-        result = _run(main_mod.npg_probe_upstream("a7a057e9-6b31-4780-8d66-cfb920918284"))
+        host_id = "a7a057e9-6b31-4780-8d66-cfb920918284"
+        result = _run(main_mod.npg_probe_upstream(host_id))
         assert result == {"success": True, "data": {"id": "created"}}
         assert recording.calls == [
-            ("POST", "/api/v1/test/proxy-host/a7a057e9-6b31-4780-8d66-cfb920918284", None)
+            (
+                "POST",
+                "/api/v1/test/proxy-host/a7a057e9-6b31-4780-8d66-cfb920918284",
+                None,
+            )
         ]
 
     def test_int_host_id_coerced_to_str(self, recording):
