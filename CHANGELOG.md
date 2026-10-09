@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.40] - 2026-10-09
+
+### What changed
+- Added `npg_probe_upstream` (commit f18b108): a fast, upstream-only connectivity probe wrapping `POST /api/v1/test/proxy-host/{id}` that checks whether the origin server is reachable without running the full end-to-end test chain. It returns a structured error-as-data result (not an exception) when the upstream is dead, so agents can distinguish "backend down" from "tool broken". Signature and description shipped together in the same commit (CI description-sync gate honored).
+- Clarified `npg_test_proxy_host` semantics (commit f18b108): its description now explicitly frames the full e2e test vs the fast upstream-only probe, so callers pick the right diagnostic tool.
+- Enriched 50 thin tool descriptions (commit c381740): the <60-char no-arg GETs now carry return-shape, workflow pointers, and DESTRUCTIVE/safety warnings — description-only change, no signature changes, verified in sync by the CI drift gate.
+- Exposed swagger-supported pagination on 2 list tools (commit 4320591): `npg_list_dns_providers` and `npg_get_certificate_history` gained a `page` param (`int | None = None`, None sends nothing so behavior is byte-identical before/after), matching upstream NPG v2.60.0 swagger for pagination parity.
+
+### What's new
+- New tool `npg_probe_upstream(host_id)`: fast upstream-only connectivity probe (upstream NPG's lightweight `POST /test/proxy-host/{id}` path vs the full e2e `npg_test_proxy_host`). Tier counts updated in the same commit (read=136, standard=251, full=298); `--check-env` verification passes.
+
+### Breaking changes
+- (none)
+
 ## [0.5.39] - 2026-10-09
 
 ### What changed
