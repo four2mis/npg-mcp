@@ -2382,11 +2382,12 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
 
 # ── DNS Providers ─────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_dns_providers", description="List all DNS providers configured for DNS-01 challenges.")
-async def npg_list_dns_providers() -> dict:
+@mcp.tool(name="npg_list_dns_providers", description="LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back.")
+async def npg_list_dns_providers(page: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/dns-providers")
+        params = _list_params_per_page(page=page)
+        data = await _api(c.get, "/api/v1/dns-providers", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -3709,11 +3710,12 @@ async def npg_get_expiring_certificates(days: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. No parameters. Returns past renewals and issuance events per certificate — use npg_get_expiring_certificates to check upcoming expiry dates instead.")
-async def npg_get_certificate_history() -> dict:
+@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. Optional: page (upstream paginated — default page 1). Use npg_get_expiring_certificates for upcoming expiry dates.")
+async def npg_get_certificate_history(page: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/certificates/history")
+        params = _list_params_per_page(page=page)
+        data = await _api(c.get, "/api/v1/certificates/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

@@ -996,8 +996,11 @@ npg_delete_access_list:
       required: true
 
 npg_list_dns_providers:
-  description: "List all DNS providers configured for DNS-01 challenges."
-  parameters: []
+  description: "LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back."
+  parameters:
+    - name: page
+      type: integer
+      required: false
 
 npg_get_dns_provider:
   description: "Get a DNS provider by its ID. REQUIRED: provider_id."
@@ -2161,8 +2164,11 @@ npg_get_expiring_certificates:
       required: false
 
 npg_get_certificate_history:
-  description: "GET the certificate issuance/renewal history log. No parameters. Returns past renewals and issuance events per certificate — use npg_get_expiring_certificates to check upcoming expiry dates instead."
-  parameters: []
+  description: "GET the certificate issuance/renewal history log. Optional: page (upstream paginated — default page 1). Use npg_get_expiring_certificates for upcoming expiry dates."
+  parameters:
+    - name: page
+      type: integer
+      required: false
 
 npg_upload_certificate:
   description: "Upload a certificate file. Required: domain_names, cert_content, key_content."
@@ -2971,24 +2977,111 @@ npg_get_dns_provider_default:
   parameters: []
 
 npg_post_log:
-  description: "Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags."
+  description: "INSERT a log entry manually (CreateLog model). REQUIRED: log_type — one of access|error|modsec (default access). Optional fields are type-specific: error logs use severity (debug..emerg) + error_message; modsec logs use rule_id/rule_message/attack_type/action_taken/block_reason; access logs use host, client_ip, request_method, request_uri, status_code, http_user_agent, etc. NOTE: upstream has NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead; out-of-enum log_type is rejected locally (upstream would 500)."
   parameters:
-    - name: level
-      type: string
-      required: true
-    - name: message
-      type: string
-      required: true
-    - name: source
-      type: string
-      required: false
-    - name: component
-      type: string
-      required: false
     - name: log_type
       type: string
       required: false
       default: "access"
+    - name: timestamp
+      type: string
+      required: false
+    - name: host
+      type: string
+      required: false
+    - name: client_ip
+      type: string
+      required: false
+    - name: geo_country
+      type: string
+      required: false
+    - name: geo_country_code
+      type: string
+      required: false
+    - name: geo_city
+      type: string
+      required: false
+    - name: geo_asn
+      type: string
+      required: false
+    - name: geo_org
+      type: string
+      required: false
+    - name: request_method
+      type: string
+      required: false
+    - name: request_uri
+      type: string
+      required: false
+    - name: request_protocol
+      type: string
+      required: false
+    - name: status_code
+      type: integer
+      required: false
+    - name: body_bytes_sent
+      type: integer
+      required: false
+    - name: request_time
+      type: number
+      required: false
+    - name: upstream_response_time
+      type: number
+      required: false
+    - name: upstream_addr
+      type: string
+      required: false
+    - name: upstream_status
+      type: string
+      required: false
+    - name: http_referer
+      type: string
+      required: false
+    - name: http_user_agent
+      type: string
+      required: false
+    - name: http_x_forwarded_for
+      type: string
+      required: false
+    - name: severity
+      type: string
+      required: false
+    - name: error_message
+      type: string
+      required: false
+    - name: rule_id
+      type: integer
+      required: false
+    - name: rule_message
+      type: string
+      required: false
+    - name: rule_severity
+      type: string
+      required: false
+    - name: rule_data
+      type: string
+      required: false
+    - name: attack_type
+      type: string
+      required: false
+    - name: action_taken
+      type: string
+      required: false
+    - name: block_reason
+      type: string
+      required: false
+    - name: bot_category
+      type: string
+      required: false
+    - name: exploit_rule
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: raw_log
+      type: string
+      required: false
 
 npg_cleanup_logs:
   description: "Delete nginx access logs older than the configured retention period."

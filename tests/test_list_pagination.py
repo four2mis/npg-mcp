@@ -878,3 +878,37 @@ class TestWafHistory:
                 None,
             )
         ]
+
+
+class TestListDnsProviders:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_list_dns_providers())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/dns-providers", None)]
+
+    def test_page_forwarded(self, recording):
+        _run(main_mod.npg_list_dns_providers(page=3))
+        assert recording.calls == [("GET", "/api/v1/dns-providers", {"page": 3})]
+
+    def test_negative_page_clean_error(self, recording):
+        result = _run(main_mod.npg_list_dns_providers(page=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
+
+class TestGetCertificateHistory:
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_certificate_history())
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/certificates/history", None)]
+
+    def test_page_forwarded(self, recording):
+        _run(main_mod.npg_get_certificate_history(page=2))
+        assert recording.calls == [("GET", "/api/v1/certificates/history", {"page": 2})]
+
+    def test_negative_page_clean_error(self, recording):
+        result = _run(main_mod.npg_get_certificate_history(page=-2))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
