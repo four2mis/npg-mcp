@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.39] - 2026-10-09
+
+### What changed
+- Fixed `npg_post_log`: the tool sent phantom request fields (`level`, `message`, `source`, `component`) that upstream NPG's `CreateLog` model silently discards, so logged data was silently lost. It now sends the real upstream `CreateLog` fields (`message`, `severity`, `error_message`, plus the `rule_*` / `access` match fields), and `log_type` (`debug`|`info`|`warning`|`error`|`critical`) is enum-validated locally before any API call — empty or out-of-enum values are rejected by the wrapper instead of producing an opaque upstream error. Signature and description changed together in commit `d1a70b6` (CI description-sync gate honored); full verification against the test stack with fresh `verify-*` data across all 3 `log_type` paths confirmed the fields now persist on read-back, and a 5-tool regression sweep passed (verify task `t_6b53aad9`).
+- Synced `swagger.yaml` to upstream NPG v2.60.0 (commit `f1ff5b4`): docs-only delta (0 path/schema/method changes; upstream fixes are API-internal), so tool signatures are unchanged.
+
+### What's new
+- (none) — no new tools; the tool surface stays at 297 tools with tier counts unchanged (136 read / 250 standard / 297 full).
+
+### Breaking changes
+- `npg_post_log` parameter surface changed: the phantom `level` / `source` / `component` params are gone from the schema. Callers should pass `message` + `severity` (+ optional `error_message` and `rule_*` / `access` fields); `log_type` now only accepts the upstream enum.
+
 ## [0.5.38] - 2026-10-02
 
 ### What changed
