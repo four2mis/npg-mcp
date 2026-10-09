@@ -4833,16 +4833,49 @@ async def npg_get_dns_provider_default() -> dict:
 
 # ── Logs Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_post_log", description="Insert a log entry manually. REQUIRED: level, message. Optional: source, component, tags.")
-async def npg_post_log(level: str, message: str, source: str | None = None, component: str | None = None, log_type: str = "access") -> dict:
+@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). REQUIRED: log_type — one of access|error|modsec (default access). Optional fields are type-specific: error logs use severity (debug..emerg) + error_message; modsec logs use rule_id/rule_message/attack_type/action_taken/block_reason; access logs use host, client_ip, request_method, request_uri, status_code, http_user_agent, etc. NOTE: upstream has NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead; out-of-enum log_type is rejected locally (upstream would 500).")
+async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
     try:
-        _validate_required("level", level)
-        _validate_required("message", message)
+        _validate_required("log_type", log_type)
+        if log_type not in ("access", "error", "modsec"):
+            raise ValueError("log_type must be one of: access, error, modsec")
         c = _get_client()
-        # Non-standard: pre-seeded required fields + conditional — kept as-is (not _build_body).
-        body = {"level": level, "message": message, "log_type": log_type}
-        if source is not None: body["source"] = source
-        if component is not None: body["component"] = component
+        body = _build_body(locals(), {
+            "log_type": "log_type",
+            "timestamp": "timestamp",
+            "host": "host",
+            "client_ip": "client_ip",
+            "geo_country": "geo_country",
+            "geo_country_code": "geo_country_code",
+            "geo_city": "geo_city",
+            "geo_asn": "geo_asn",
+            "geo_org": "geo_org",
+            "request_method": "request_method",
+            "request_uri": "request_uri",
+            "request_protocol": "request_protocol",
+            "status_code": "status_code",
+            "body_bytes_sent": "body_bytes_sent",
+            "request_time": "request_time",
+            "upstream_response_time": "upstream_response_time",
+            "upstream_addr": "upstream_addr",
+            "upstream_status": "upstream_status",
+            "http_referer": "http_referer",
+            "http_user_agent": "http_user_agent",
+            "http_x_forwarded_for": "http_x_forwarded_for",
+            "severity": "severity",
+            "error_message": "error_message",
+            "rule_id": "rule_id",
+            "rule_message": "rule_message",
+            "rule_severity": "rule_severity",
+            "rule_data": "rule_data",
+            "attack_type": "attack_type",
+            "action_taken": "action_taken",
+            "block_reason": "block_reason",
+            "bot_category": "bot_category",
+            "exploit_rule": "exploit_rule",
+            "proxy_host_id": "proxy_host_id",
+            "raw_log": "raw_log",
+        })
         data = await _api(c.post, "/api/v1/logs", body)
         return {"success": True, "data": data}
     except Exception as e:
