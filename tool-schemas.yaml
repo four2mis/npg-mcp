@@ -35,14 +35,14 @@ npg_get_proxy_host:
       required: true
 
 npg_get_proxy_host_by_domain:
-  description: "Get a proxy host by its domain name."
+  description: "LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here)."
   parameters:
     - name: domain
       type: string
       required: true
 
 npg_get_proxy_host_full:
-  description: "GET the COMPLETE config of one proxy host in one call — composes 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed"
+  description: "GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section."
   parameters:
     - name: host_id
       type: integer | string
@@ -423,7 +423,7 @@ npg_update_proxy_host_simple:
       required: false
 
 npg_delete_proxy_host:
-  description: "Delete a proxy host by its ID. REQUIRED: host_id."
+  description: "PERMANENTLY delete a proxy host by ID. REQUIRED: host_id. DESTRUCTIVE: removes the host row, its generated nginx config and per-host sub-configs (geo, rate limit, challenge, etc.), then reloads nginx. Verify the domain is gone afterwards with npg_get_proxy_host_by_domain (success:false = deleted)."
   parameters:
     - name: host_id
       type: integer | string
@@ -444,7 +444,7 @@ npg_regenerate_config:
       required: true
 
 npg_sync_proxy_hosts:
-  description: "Sync all proxy host configs and reload nginx."
+  description: "SYNC every enabled proxy host's nginx config (regenerate, nginx -t, reload once) — the REQUIRED follow-up after creating/modifying proxy hosts. Returns per-host results; a per-host failure does not fail the batch. Validate-only via npg_validate_nginx_config."
   parameters: []
 
 npg_clone_proxy_host:
@@ -606,7 +606,7 @@ npg_reload_nginx:
   parameters: []
 
 npg_sync_nginx:
-  description: "Sync all configs and reload nginx."
+  description: "SYNC all proxy host configs and reload nginx (POST proxy-hosts/sync: regenerate, nginx -t, reload — returns per-host results; a per-host failure does not fail the whole call). Call after any proxy-host mutation; validate-only via npg_validate_nginx_config."
   parameters: []
 
 npg_test_nginx:
@@ -886,7 +886,7 @@ npg_update_proxy_host_uri_block:
       required: false
 
 npg_get_settings:
-  description: "Get global NPG settings."
+  description: "GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset."
   parameters: []
 
 npg_update_settings:
@@ -920,7 +920,7 @@ npg_get_dashboard:
   parameters: []
 
 npg_get_dashboard_health:
-  description: "Get system health status."
+  description: "GET a system health snapshot (nginx status/connections, DB, CPU/memory/disk). One sample — history via npg_get_dashboard_health_history, deep diagnostics via npg_get_health_detailed."
   parameters: []
 
 npg_get_dashboard_geoip_stats:
@@ -1071,7 +1071,7 @@ npg_list_cloud_providers:
   parameters: []
 
 npg_get_cloud_provider:
-  description: "Get a cloud provider by its slug."
+  description: "GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region."
   parameters:
     - name: slug
       type: string
@@ -1118,7 +1118,7 @@ npg_update_cloud_provider:
       default: true
 
 npg_delete_cloud_provider:
-  description: "Delete a cloud provider by its slug."
+  description: "PERMANENTLY delete a cloud provider (IP-range DB entry) by its slug — no confirmation. List slugs with npg_list_cloud_providers. NOTE: deleting a provider other than the built-in catalogue entries removes its ranges from cloud blocking."
   parameters:
     - name: slug
       type: string
@@ -1154,11 +1154,11 @@ npg_update_proxy_host_cloud_blocking:
       required: false
 
 npg_get_geoip_status:
-  description: "Get GeoIP database update status."
+  description: "GET GeoIP database status (enabled, active/inactive/updating/error, country_db/asn_db presence, last_updated). After npg_update_geoip, poll this until it leaves 'updating'."
   parameters: []
 
 npg_update_geoip:
-  description: "Update GeoIP databases."
+  description: "TRIGGER a GeoIP database update now (country/ASN DBs). Track the run with npg_get_geoip_status and npg_get_geoip_history."
   parameters: []
 
 npg_list_countries:
@@ -1369,7 +1369,7 @@ npg_ban_ip:
       default: 3600
 
 npg_unban_ip:
-  description: "Unban an IP by its ID. REQUIRED: ip_id."
+  description: "REMOVE a ban. REQUIRED: ip_id (the ban row's ID from npg_list_banned_ips — not the IP string). To shorten instead of lifting, use npg_update_ban_duration."
   parameters:
     - name: ip_id
       type: integer | string
@@ -1393,15 +1393,15 @@ npg_update_ban_duration:
       required: true
 
 npg_get_bots_known:
-  description: "Get list of known bot user-agent signatures."
+  description: "GET the known bot user-agent signatures (good and bad) the bot filter matches against — reference when reading a bot-filter config or npg_get_logs bot entries."
   parameters: []
 
 npg_get_security_headers_presets:
-  description: "Get available security header presets."
+  description: "LIST the built-in security header presets (moderate/relaxed/strict) — exactly these names are accepted by npg_apply_security_header_preset."
   parameters: []
 
 npg_list_exploit_rules:
-  description: "List exploit block rules."
+  description: "LIST the exploit block rules (the block_exploits feature's rule catalog). Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host."
   parameters: []
 
 npg_get_exploit_rule:
@@ -1476,11 +1476,11 @@ npg_list_waf_rules:
       required: false
 
 npg_get_waf_hosts:
-  description: "Get WAF config for all proxy hosts."
+  description: "GET the WAF config for every proxy host (per-host effective view). One host deep-dive via npg_get_waf_host_config; rules via npg_list_waf_rules."
   parameters: []
 
 npg_get_waf_host_config:
-  description: "Get WAF config for a specific proxy host. REQUIRED: host_id."
+  description: "GET a proxy host's WAF config. REQUIRED: host_id. NOTE: returns the EFFECTIVE (resolved) config — global values are merged in; for the host's STORED per-host WAF values use npg_get_proxy_host. Verify rules state with npg_get_waf_host_config after npg_disable_waf_rule."
   parameters:
     - name: host_id
       type: integer | string
@@ -1631,7 +1631,7 @@ npg_get_logs:
       required: false
 
 npg_get_log_settings:
-  description: "Get log settings."
+  description: "GET log retention settings (retention_days, max_logs_per_type, auto_cleanup_enabled) — the cut-off npg_cleanup_logs uses. Update with npg_update_log_settings."
   parameters: []
 
 npg_update_log_settings:
@@ -1746,14 +1746,14 @@ npg_list_backups:
       required: false
 
 npg_get_backup:
-  description: "Get a backup by its ID. REQUIRED: backup_id."
+  description: "GET one backup row by its ID. REQUIRED: backup_id. This is also how you poll npg_create_backup until status leaves in_progress. Download the archive with npg_download_backup."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
 
 npg_create_backup:
-  description: "Create a new backup."
+  description: "CREATE a backup — returns immediately with status in_progress; the archive is written in the background. Poll with npg_get_backup(backup_id) until completed/failed, retrieve with npg_download_backup(backup_id), enumerate with npg_list_backups."
   parameters: []
 
 npg_delete_backup:
@@ -1764,14 +1764,14 @@ npg_delete_backup:
       required: true
 
 npg_restore_backup:
-  description: "Restore from a backup. Required: backup_id."
+  description: "RESTORE NPG state from a backup. Required: backup_id (from npg_list_backups). DESTRUCTIVE: verifies SHA-256, imports the DB, then restores files and regenerates nginx configs; upstream returns 206 when only part succeeded — inspect the result body, not just the status."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
 
 npg_list_api_tokens:
-  description: "List all API tokens."
+  description: "LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens."
   parameters: []
 
 npg_get_api_token:
@@ -1823,7 +1823,7 @@ npg_delete_api_token:
       required: true
 
 npg_list_notification_channels:
-  description: "List all notification channels."
+  description: "LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel."
   parameters: []
 
 npg_create_notification_channel:
@@ -1929,7 +1929,7 @@ npg_detect_telegram_chats:
       required: false
 
 npg_list_users:
-  description: "List all users."
+  description: "LIST user accounts (no secrets in responses). Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles)."
   parameters: []
 
 npg_get_user:
@@ -1977,14 +1977,14 @@ npg_end_user_sessions:
       required: true
 
 npg_delete_user:
-  description: "Delete a user by their ID. REQUIRED: user_id."
+  description: "PERMANENTLY delete a user account by ID. REQUIRED: user_id. Cascades the account's API tokens and sessions. Guards: cannot delete your own account or the last superuser. List accounts with npg_list_users."
   parameters:
     - name: user_id
       type: integer | string
       required: true
 
 npg_list_roles:
-  description: "List all roles."
+  description: "LIST roles for RBAC (built-ins first, then by name). Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user."
   parameters: []
 
 npg_create_role:
@@ -2025,7 +2025,7 @@ npg_delete_role:
       required: true
 
 npg_list_sso_providers:
-  description: "List all SSO providers."
+  description: "LIST configured SSO (OIDC) providers. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider."
   parameters: []
 
 npg_create_sso_provider:
@@ -2124,7 +2124,7 @@ npg_test_sso_provider:
       required: false
 
 npg_list_log_files:
-  description: "List all log files."
+  description: "LIST raw nginx log files on disk (access/error, rotated entries newest first). View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file."
   parameters: []
 
 npg_download_log_file:
@@ -2150,7 +2150,7 @@ npg_rotate_log_file:
   parameters: []
 
 npg_delete_log_file:
-  description: "Delete a log file by its filename."
+  description: "PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Enumerate with npg_list_log_files."
   parameters:
     - name: filename
       type: string
@@ -2184,7 +2184,7 @@ npg_upload_certificate:
       required: true
 
 npg_list_uri_blocks:
-  description: "List all URI blocks (global and per-host)."
+  description: "LIST the global URI block config plus each proxy host's URI block summary. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule."
   parameters: []
 
 npg_bulk_add_uri_block_rule:
@@ -2205,7 +2205,7 @@ npg_bulk_add_uri_block_rule:
       required: false
 
 npg_get_global_uri_block:
-  description: "GET global URI block configuration."
+  description: "GET the global URI block configuration (enabled, rules, exception_ips, allow_private_ips). Update with npg_update_global_uri_block; list all (global+per-host) with npg_list_uri_blocks."
   parameters: []
 
 npg_update_global_uri_block:
@@ -2257,7 +2257,7 @@ npg_get_upstream_health:
       required: true
 
 npg_list_cloud_providers_by_region:
-  description: "List cloud providers filtered by region."
+  description: "LIST enabled cloud providers grouped by region (us/eu/cn/kr; optional region= to keep one bucket). Compact summaries (ip_count, no ranges) — full objects via npg_list_cloud_providers."
   parameters:
     - name: region
       type: string
@@ -2272,11 +2272,11 @@ npg_get_docker_containers:
   parameters: []
 
 npg_check_update:
-  description: "Check for available NPG updates."
+  description: "CHECK for a newer NPG release (GET system-settings/update/check — this is the v0.3.19 reroute; older docs calling /update/check are stale). Result is cached upstream; a failed lookup returns 200 with check_failed=true, not an error."
   parameters: []
 
 npg_test_acme:
-  description: "Test ACME configuration for DNS provider."
+  description: "VALIDATE the stored ACME configuration (POST system-settings/acme/test — this is the v0.3.19 reroute; older docs calling /acme/test are stale). Local consistency check only — contacts no ACME server. Returns status disabled/pending/ok."
   parameters:
     - name: dns_provider_id
       type: integer | string
@@ -2329,11 +2329,11 @@ npg_update_cloudflare_tunnel:
       default: true
 
 npg_get_cloudflare_tunnel_status:
-  description: "Get Cloudflare Tunnel status."
+  description: "GET Cloudflare Tunnel connector runtime status (disabled/connected/starting/error + connection count), cached ~15s upstream. Always succeeds — failures come back as a state. Config itself via npg_get_cloudflare_tunnel."
   parameters: []
 
 npg_get_global_security_headers:
-  description: "GET global security headers configuration."
+  description: "GET the global security headers default that hosts inherit (HSTS, X-Frame-Options, CSP, etc.). Update with npg_update_global_security_headers; per-host override via npg_update_proxy_host_security_headers."
   parameters: []
 
 npg_update_global_security_headers:
@@ -2371,7 +2371,7 @@ npg_update_global_security_headers:
       required: false
 
 npg_get_global_bot_filter:
-  description: "GET global bot filter configuration."
+  description: "GET the global bot filter default that hosts inherit (enabled, block_bad_bots, block_ai_bots, etc.). Update with npg_update_global_bot_filter; per-host override via npg_update_proxy_host_bot_filter."
   parameters: []
 
 npg_update_global_bot_filter:
@@ -2403,7 +2403,7 @@ npg_update_global_bot_filter:
       required: false
 
 npg_get_global_cloud_providers:
-  description: "GET global cloud providers configuration."
+  description: "GET the global cloud provider blocking default (blocked_providers, challenge_mode, allow_search_bots). Update with npg_update_global_cloud_providers (full replace — send all 3 fields)."
   parameters: []
 
 npg_update_global_cloud_providers:
@@ -2420,7 +2420,7 @@ npg_update_global_cloud_providers:
       required: false
 
 npg_get_global_geo:
-  description: "GET global GeoIP restriction configuration."
+  description: "GET the global GeoIP restriction default that hosts inherit (enabled, mode, countries, allowed_ips, allow_private_ips). Update with npg_update_global_geo; per-host override via npg_create/update_proxy_host_geo."
   parameters: []
 
 npg_update_global_geo:
@@ -2449,7 +2449,7 @@ npg_update_global_geo:
       required: false
 
 npg_get_global_rate_limit:
-  description: "GET global rate limit configuration."
+  description: "GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit."
   parameters: []
 
 npg_update_global_rate_limit:
@@ -2493,7 +2493,7 @@ npg_update_global_fail2ban:
       default: true
 
 npg_get_global_waf:
-  description: "GET global WAF configuration."
+  description: "GET the global WAF default (enabled, mode, paranoia_level, anomaly_threshold) that hosts inherit when waf_use_global=true. Update with npg_update_global_waf."
   parameters: []
 
 npg_update_global_waf:
@@ -2531,7 +2531,7 @@ npg_upload_restore_backup:
       default: "base64"
 
 npg_get_backup_stats:
-  description: "Get backup statistics."
+  description: "GET backup statistics (counts, sizes, latest run). Related: npg_list_backups to enumerate, npg_create_backup to start one."
   parameters: []
 
 npg_get_auth_status:
@@ -2911,7 +2911,7 @@ npg_remove_exploit_rule_global_exclusion:
       required: true
 
 npg_delete_certificate_errors:
-  description: "Bulk-delete all certificates in error status."
+  description: "DESTRUCTIVE: DELETE every certificate currently in error status in one call (no per-cert confirmation). Enumerate what will go first via npg_list_certificates(status='error')."
   parameters: []
 
 npg_clear_certificate_error:
@@ -2969,7 +2969,7 @@ npg_update_challenge_config:
       required: false
 
 npg_get_challenge_stats:
-  description: "GET CAPTCHA challenge statistics."
+  description: "GET CAPTCHA challenge statistics aggregated over a FIXED 24-hour window upstream (not configurable). Config via npg_get_challenge_config."
   parameters: []
 
 npg_get_dns_provider_default:
@@ -3112,7 +3112,7 @@ npg_get_log_autocomplete_methods:
   parameters: []
 
 npg_get_log_filter_presets:
-  description: "List saved log filter presets."
+  description: "LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs."
   parameters: []
 
 npg_create_log_filter_preset:
@@ -3162,7 +3162,7 @@ npg_get_system_log_stats:
   parameters: []
 
 npg_get_system_settings_logs:
-  description: "Get the container log collector configuration."
+  description: "GET the container log collector configuration (what the system-logs pipeline ingests). Update with npg_update_system_settings_logs; raw nginx log files via npg_list_log_files."
   parameters: []
 
 npg_update_system_settings_logs:
@@ -3187,7 +3187,7 @@ npg_get_audit_log_resource_types:
   parameters: []
 
 npg_get_audit_log_api_tokens:
-  description: "List recent API token usage across all tokens."
+  description: "LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Single-token view via npg_get_api_token_usage."
   parameters: []
 
 npg_set_proxy_host_favorite:
@@ -3282,7 +3282,7 @@ npg_get_ban_history:
       required: false
 
 npg_get_ban_history_stats:
-  description: "Get ban/unban history statistics."
+  description: "GET ban/unban history statistics (counts by event type/source). Enumerate events with npg_get_ban_history, one IP with npg_get_ban_history_for_ip."
   parameters: []
 
 npg_get_ban_history_for_ip:
@@ -3391,7 +3391,7 @@ npg_get_waf_global_rules:
   parameters: []
 
 npg_get_waf_global_exclusions:
-  description: "List the globally disabled CRS rules."
+  description: "LIST the CRS rules disabled for every host (global WAF exclusions). Toggle a rule globally with npg_disable_waf_global_rule / npg_enable_waf_global_rule."
   parameters: []
 
 npg_get_waf_global_history:
@@ -3467,7 +3467,7 @@ npg_get_api_token_usage:
       required: true
 
 npg_get_waf_test_patterns:
-  description: "List the built-in WAF attack test patterns."
+  description: "LIST the 12 built-in WAF attack patterns (hard-coded, no DB). Each entry's id is the attack_type value for npg_test_waf_pattern; fire all of them with npg_test_waf_all_patterns."
   parameters: []
 
 npg_test_waf_pattern:
