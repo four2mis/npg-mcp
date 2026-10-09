@@ -168,6 +168,30 @@ class TestUpdateProxyHostSimple:
         assert "host_id is required" in result["error"]
 
 
+class TestProbeUpstream:
+    def test_posts_to_test_proxy_host_route_with_no_body(self, recording):
+        result = _run(main_mod.npg_probe_upstream("a7a057e9-6b31-4780-8d66-cfb920918284"))
+        assert result == {"success": True, "data": {"id": "created"}}
+        assert recording.calls == [
+            ("POST", "/api/v1/test/proxy-host/a7a057e9-6b31-4780-8d66-cfb920918284", None)
+        ]
+
+    def test_int_host_id_coerced_to_str(self, recording):
+        result = _run(main_mod.npg_probe_upstream(42))
+        assert result["success"] is True
+        assert recording.calls == [("POST", "/api/v1/test/proxy-host/42", None)]
+
+    def test_url_unsafe_id_is_encoded(self, recording):
+        result = _run(main_mod.npg_probe_upstream("bad/id"))
+        assert result["success"] is True
+        assert recording.calls == [("POST", "/api/v1/test/proxy-host/bad%2Fid", None)]
+
+    def test_validation_errors_flow_through(self):
+        result = _run(main_mod.npg_probe_upstream(""))
+        assert result["success"] is False
+        assert "host_id is required" in result["error"]
+
+
 class TestFullProxyHostCertIdCoercion:
     """npg_create_proxy_host / npg_update_proxy_host must coerce int ssl_cert_id
     to str like npg_update_proxy_host_simple does (id_fields regression tests)."""

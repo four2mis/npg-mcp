@@ -1099,7 +1099,7 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_proxy_host", description="Test upstream connectivity for a proxy host. REQUIRED: host_id.")
+@mcp.tool(name="npg_test_proxy_host", description="RUN the full end-to-end test through a proxy host (POST /proxy-hosts/{id}/test): live GET with SSL, HTTP/2-3, cache and security-header findings plus DDNS. REQUIRED: host_id. For a fast upstream-only reachability probe use npg_probe_upstream.")
 async def npg_test_proxy_host(host_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -1957,6 +1957,17 @@ async def npg_test_nginx() -> dict:
         if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
             return _mutate_result(data)
         return {"success": True, "data": {"status": data.get("status", "ok"), "message": data.get("message")}}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_probe_upstream", description="PROBE only the proxy host's upstream connectivity (POST /test/proxy-host/{id}) — fast 5s HEAD/dial, no SSL/cache/header findings. REQUIRED: host_id. Returns 200 with status ok|error even when the upstream is unreachable (connection failure is DATA, not a tool error). For the full end-to-end test (SSL, HTTP2-3, cache, security headers, DDNS) use npg_test_proxy_host instead.")
+async def npg_probe_upstream(host_id: str | int) -> dict:
+    """Lightweight upstream-only connectivity probe (5s timeout)."""
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        data = await _api(c.post, f"/api/v1/test/proxy-host/{_id_path(host_id)}")
+        return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
