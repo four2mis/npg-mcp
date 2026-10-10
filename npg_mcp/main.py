@@ -3657,36 +3657,41 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
 
 # ── Log Files ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files on disk (access/error, rotated entries newest first). View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file.")
-async def npg_list_log_files() -> dict:
+@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files on disk (access/error, rotated entries newest first). Optional: location ('local' default, or 'archive' — upstream responds 409 when the archive is not mounted/available), limit (1-1000; without it every file is returned), offset (>=0). Response includes usage (disk use/projection) and archive status blocks. View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file.")
+async def npg_list_log_files(location: str = "local", limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/system-settings/log-files")
+        params: dict = {"location": location}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        data = await _api(c.get, "/api/v1/system-settings/log-files", params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename. Returns the raw log content.")
-async def npg_download_log_file(filename: str) -> dict:
+@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content.")
+async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
         c = _get_client()
-        data = await _api(c.get_text, f"/api/v1/system-settings/log-files/{_id_path(filename)}/download")
+        data = await _api(c.get_text, f"/api/v1/system-settings/log-files/{_id_path(filename)}/download", params={"location": location})
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_view_log_file", description="View the contents of a log file. REQUIRED: filename.")
-async def npg_view_log_file(filename: str, lines: int = 100) -> dict:
+@mcp.tool(name="npg_view_log_file", description="View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s.")
+async def npg_view_log_file(filename: str, lines: int = 100, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
         c = _get_client()
-        data = await _api(c.get, f"/api/v1/system-settings/log-files/{_id_path(filename)}/view", params={"lines": lines})
+        data = await _api(c.get, f"/api/v1/system-settings/log-files/{_id_path(filename)}/view", params={"lines": lines, "location": location})
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_rotate_log_file", description="ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file.")
+@mcp.tool(name="npg_rotate_log_file", description="ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Upstream also rotates hourly on its own. Response is {status: completed|skipped, reason: empty|already_rotated|busy} — 200 with status=skipped is not an error (e.g. reason=busy means a rotation was already running). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file.")
 async def npg_rotate_log_file() -> dict:
     c = _get_client()
     try:
@@ -3695,13 +3700,71 @@ async def npg_rotate_log_file() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_delete_log_file", description="PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Enumerate with npg_list_log_files.")
-async def npg_delete_log_file(filename: str) -> dict:
+@mcp.tool(name="npg_delete_log_file", description="PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Optional: location ('local' default or 'archive'). Enumerate with npg_list_log_files.")
+async def npg_delete_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
         c = _get_client()
-        data = await _api(c.delete, f"/api/v1/system-settings/log-files/{_id_path(filename)}")
+        data = await _api(c.delete, f"/api/v1/system-settings/log-files/{_id_path(filename)}", params={"location": location})
         return _mutate_result(data, f"Log file {filename} deleted")
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_check_log_archive", description="CHECK the raw log archive directory (NPG_RAW_LOG_ARCHIVE_DIR, default /archive): mounted, filesystem type/size, marker file, and a write test (a temporary file, removed again). Writes no marker. status is 'ready' only for a directory this install initialised; other values: disabled, not_mounted, not_initialized, foreign, unwritable, insufficient_space, stalled, log_dir. Upstream responds 409 when no archive is available in this build. Takes no parameters.")
+async def npg_check_log_archive() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.post, "/api/v1/system-settings/log-files/archive/check")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_init_log_archive", description="INITIALISE the raw log archive directory for this install: write test, then the marker file (.npg-raw-log-archive), replacing a marker another install wrote. NPG writes nothing to the archive before this. Afterwards switch archiving on via npg_update_system_settings(kwargs={'raw_log_archive_enabled': True}) — refused with 400 unless the directory is ready (verify first with npg_check_log_archive). DESTRUCTIVE-ish: overwrites any foreign marker. Upstream responds 400 when not mounted/not writable, 503 when the share does not answer. Takes no parameters.")
+async def npg_init_log_archive() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.post, "/api/v1/system-settings/log-files/archive/init")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_run_log_archive", description="MOVE settled rotated raw logs to the archive directory now — wakes the archive mover and answers at once (202; the mover also runs hourly after scheduled rotation). Only settled rotated files move: compressed when compression is on, untouched for a settle window (default 10m). Safe even when archiving is disabled or the archive is unmounted — the response reports the current archive status. Upstream responds 409 when no archive is available in this build. Takes no parameters.")
+async def npg_run_log_archive() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.post, "/api/v1/system-settings/log-files/archive/run")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_raw_log_reclaim", description="GET the status of the raw log reclaim job (removes the raw_log copies of access/error lines kept inside old compressed log history, one compressed day at a time — WAF events keep theirs, all other columns unchanged). status: idle|running|paused|done|failed; supported=false means this database cannot run the job. Optional: estimate (only 'true'/'1' accepted) — also measures what is left to reclaim and the database disk free space (cached 10 minutes). Without estimate the call is cheap enough to poll every few seconds while the job runs.")
+async def npg_get_raw_log_reclaim(estimate: str | None = None) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if estimate is not None:
+            params["estimate"] = estimate
+        data = await _api(c.get, "/api/v1/system-settings/log-storage/raw-reclaim", params=params)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_start_raw_log_reclaim", description="START (or resume) the raw log reclaim job. DESTRUCTIVE and IRREVERSIBLE for the database copy: the verbatim access/error line is removed from compressed log days (Basic-auth user, upstream timings, ASN value, error-line prefix are lost there; the raw log files keep them). Each day runs a VACUUM FULL (~1 minute for a large day) during which queries on that day wait. Optional: max_chunks (int 1-2147483647) — work on at most this many days in this request; omit = all. Upstream responds 409 already_running, 400 for max_chunks out of range, 412 when it cannot start (unsupported database, free space unknown, or insufficient space with free_bytes/required_free_bytes). Poll with npg_get_raw_log_reclaim, pause with npg_stop_raw_log_reclaim.")
+async def npg_start_raw_log_reclaim(max_chunks: int | None = None) -> dict:
+    c = _get_client()
+    try:
+        body = {"max_chunks": max_chunks} if max_chunks is not None else {}
+        data = await _api(c.post, "/api/v1/system-settings/log-storage/raw-reclaim/start", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_stop_raw_log_reclaim", description="PAUSE the raw log reclaim job: records 'paused', cancels the statement in flight (its transaction rolls back so the day keeps its state) — safe, a no-op (still 200) when nothing runs. Start continues later with npg_start_raw_log_reclaim. Takes no parameters.")
+async def npg_stop_raw_log_reclaim() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.post, "/api/v1/system-settings/log-storage/raw-reclaim/stop")
+        return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 

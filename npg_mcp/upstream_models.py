@@ -65,6 +65,7 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         "audit_log_retention_days",
         "raw_log_enabled", "raw_log_retention_days", "raw_log_max_size_mb",
         "raw_log_rotate_count", "raw_log_compress_rotated",
+        "raw_log_archive_enabled", "raw_log_archive_retention_days",  # v2.61.0
         "bot_filter_default_enabled", "bot_filter_default_block_bad_bots",
         "bot_filter_default_block_ai_bots",
         "bot_filter_default_allow_search_engines",

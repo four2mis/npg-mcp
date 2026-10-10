@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.60.1
+  version: 2.61.0
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -1387,6 +1387,20 @@ paths:
       responses:
         '200':
           description: Settings updated
+        '400':
+          description: >-
+            A value this request changes is out of range (for example
+            raw_log_retention_days outside 1-3650), a trusted-proxy entry is
+            invalid, or raw_log_archive_enabled is switched on while the archive
+            directory is not ready (the body then also carries "archive"). The
+            body carries the reason in "error".
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
   /system-settings/geoip/status:
     get:
       tags: [GeoIP]
@@ -2913,8 +2927,9 @@ paths:
           in: query
           description: |
             Opaque keyset token from a previous response's `next_cursor`. Honoured only
-            for the default sort; any explicit `sort_by` other than created_at falls
-            back to offset pagination and the cursor is ignored.
+            for the default sort, created_at descending (`sort_by=timestamp` descending
+            uses it too); any other explicit sort falls back to offset pagination and
+            the cursor is ignored.
           schema:
             type: string
         - name: log_type
@@ -3191,8 +3206,11 @@ paths:
         - name: sort_by
           in: query
           description: |
-            Unrecognised values fall back to created_at DESC. Only created_at supports
-            cursor pagination; the others switch the query to offset pagination.
+            Unrecognised values fall back to created_at DESC. `timestamp` is served by
+            the created_at order: created_at is when the row was stored, seconds after
+            the request's timestamp, so only requests from the same moment can change
+            places. Only created_at and timestamp support cursor pagination (descending);
+            the others switch the query to offset pagination.
           schema:
             type: string
             enum: [created_at, timestamp, body_bytes_sent, request_time, status_code, client_ip, host]
@@ -5712,6 +5730,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: >-
+            The channel could not be created or read back, for example because
+            the database cannot be reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
           description: Notification tables are missing — check the migration log
           content:
@@ -6010,9 +6036,10 @@ paths:
       summary: Detailed health snapshot
       description: |
         Authenticated read-only diagnostics: hypertable/compression telemetry, cache
-        readiness, log-collector flush freshness and pipeline canary state. All
-        sub-queries share a 5 second budget, so a stuck DB or Redis degrades fields
-        rather than hanging the request.
+        readiness, log-collector flush freshness, pipeline canary state and disk
+        levels (DiskGuard; levels, percentages and bytes only). All sub-queries
+        share a 5 second budget, so a stuck DB or Redis degrades fields rather than
+        hanging the request.
       security:
         - BearerAuth: []
       responses:
@@ -6959,12 +6986,13 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct hosts seen in logs
+      description: Values seen in the last 24 hours.
       security:
         - BearerAuth: []
       parameters:
         - name: q
           in: query
-          description: Substring filter; omit for the most common values.
+          description: Substring filter; omit for the first values in alphabetical order.
           schema:
             type: string
         - name: limit
@@ -6986,6 +7014,7 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct client IPs seen in logs
+      description: Values seen in the last 24 hours.
       security:
         - BearerAuth: []
       parameters:
@@ -7012,6 +7041,7 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct User-Agents seen in logs
+      description: Values seen in the last 24 hours.
       security:
         - BearerAuth: []
       parameters:
@@ -7038,6 +7068,7 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct request URIs seen in logs
+      description: Values seen in the last 24 hours.
       security:
         - BearerAuth: []
       parameters:
@@ -7064,7 +7095,7 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct countries seen in logs
-      description: Takes no parameters — unlike the other autocomplete endpoints it accepts neither `q` nor `limit`, and it returns counts rather than bare strings.
+      description: Values seen in the last 24 hours. Takes no parameters — unlike the other autocomplete endpoints it accepts neither `q` nor `limit`, and it returns counts rather than bare strings.
       security:
         - BearerAuth: []
       responses:
@@ -7080,7 +7111,7 @@ paths:
     get:
       tags: [Logs]
       summary: Distinct HTTP methods seen in logs
-      description: Takes no parameters.
+      description: Values seen in the last 24 hours. Takes no parameters.
       security:
         - BearerAuth: []
       responses:
@@ -7300,11 +7331,35 @@ paths:
       tags: [Logs]
       summary: List raw nginx log files on disk
       description: |
-        Symlinks (stdout/stderr) are skipped. `raw_log_enabled` reflects whether nginx
-        is writing files at all; when the log directory is unreadable the endpoint still
-        returns 200 with an empty list.
+        Only raw log files are listed (access_raw.log, error_raw.log and their rotated
+        copies); symlinks and other files are skipped. The live files come first, then
+        the newest rotation first. `raw_log_enabled` reflects whether nginx is writing
+        files at all; when the log directory is unreadable the endpoint still returns 200
+        with an empty list. `usage` carries the disk use measured from the files, which
+        the raw log page projects with the retention being edited.
       security:
         - BearerAuth: []
+      parameters:
+        - name: location
+          in: query
+          description: local (default) or archive (the archive directory, see the archive endpoints)
+          schema:
+            type: string
+            enum: [local, archive]
+            default: local
+        - name: limit
+          in: query
+          description: Page size. Without it every file is returned.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Log files, newest first
@@ -7312,6 +7367,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogFilesResponse'
+        '400':
+          description: limit or offset out of range, or an unknown location
+        '409':
+          description: location=archive while the archive is not mounted or not available; carries "archive" (RawLogArchiveStatus)
+        '503':
+          description: location=archive while the archive share does not answer; carries "archive" (RawLogArchiveStatus)
   /system-settings/log-files/{filename}/download:
     get:
       tags: [Logs]
@@ -7322,9 +7383,18 @@ paths:
         - name: filename
           in: path
           required: true
-          description: Bare filename. Values containing `/` or `..` are rejected.
+          description: >-
+            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
+        - name: location
+          in: query
+          description: local (default) or archive (the archive directory, see the archive endpoints)
+          schema:
+            type: string
+            enum: [local, archive]
+            default: local
       responses:
         '200':
           description: File contents as an attachment
@@ -7337,6 +7407,10 @@ paths:
           description: Invalid filename, or the target is a symlink
         '404':
           description: File not found
+        '409':
+          description: location=archive while the archive is not available
+        '503':
+          description: location=archive while the archive share does not answer
   /system-settings/log-files/{filename}/view:
     get:
       tags: [Logs]
@@ -7349,9 +7423,18 @@ paths:
         - name: filename
           in: path
           required: true
-          description: Bare filename. Values containing `/` or `..` are rejected.
+          description: >-
+            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
+        - name: location
+          in: query
+          description: local (default) or archive (the archive directory, see the archive endpoints)
+          schema:
+            type: string
+            enum: [local, archive]
+            default: local
         - name: lines
           in: query
           description: Values outside 1-1000 are ignored and 100 is used.
@@ -7378,40 +7461,130 @@ paths:
           description: Invalid filename
         '404':
           description: File not found
+        '409':
+          description: location=archive while the archive is not available
+        '503':
+          description: location=archive while the archive share does not answer
+        '504':
+          description: Reading the file took longer than 60 seconds
   /system-settings/log-files/{filename}:
     delete:
       tags: [Logs]
       summary: Delete a rotated log file
       description: |
-        The active `access.log` and `error.log` cannot be deleted, nor can symlinks.
+        The live `access_raw.log` and `error_raw.log` cannot be deleted (nginx keeps
+        writing to an unlinked file), nor can symlinks or files that are not raw logs.
       security:
         - BearerAuth: []
       parameters:
         - name: filename
           in: path
           required: true
-          description: Bare filename. Values containing `/` or `..` are rejected.
+          description: >-
+            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
+        - name: location
+          in: query
+          description: local (default) or archive (the archive directory, see the archive endpoints)
+          schema:
+            type: string
+            enum: [local, archive]
+            default: local
       responses:
         '204':
           description: File deleted
         '400':
-          description: Invalid filename, active log file, or symlink
+          description: Invalid filename, a live log file, or a symlink
         '404':
           description: File not found
+        '409':
+          description: location=archive while the archive is not ready (not mounted, or not initialised by this install)
+        '503':
+          description: location=archive while the archive share does not answer
+  /system-settings/log-files/archive/check:
+    post:
+      tags: [Logs]
+      summary: Check the raw log archive directory
+      description: |
+        Probes the archive directory (NPG_RAW_LOG_ARCHIVE_DIR, default /archive, bound
+        on the api service) as if archiving were on: mounted, filesystem type and size,
+        marker file, and a write test (one temporary file, removed again). Writes no
+        marker. status is ready only for a directory this install initialised.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The probe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawLogArchiveStatus'
+        '409':
+          description: No archive is available in this build
+  /system-settings/log-files/archive/init:
+    post:
+      tags: [Logs]
+      summary: Use the archive directory for this install
+      description: |
+        Write test, then the marker file (.npg-raw-log-archive) naming this install,
+        replacing one another install wrote. NPG never creates the directory and writes
+        nothing to the archive before this. Switch archiving on afterwards with
+        raw_log_archive_enabled in PUT /system-settings.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Initialised; the probe as Check reports it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawLogArchiveStatus'
+        '400':
+          description: Not mounted or not writable; carries "archive" (RawLogArchiveStatus)
+        '503':
+          description: The share does not answer; carries "archive"
+  /system-settings/log-files/archive/run:
+    post:
+      tags: [Logs]
+      summary: Move settled rotated raw logs to the archive now
+      description: |
+        Wakes the archive mover and answers at once. The mover also runs every hour
+        after the scheduled rotation. Only settled rotated files move: compressed when
+        compression is on, untouched for NPG_RAW_LOG_ARCHIVE_SETTLE (default 10m).
+      security:
+        - BearerAuth: []
+      responses:
+        '202':
+          description: A pass was requested; the current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawLogArchiveStatus'
+        '409':
+          description: No archive is available in this build
   /system-settings/log-files/rotate:
     post:
       tags: [Logs]
       summary: Trigger log rotation now
       description: |
-        Regenerates the logrotate config and runs `logrotate -f`. Requires raw log files
-        to be enabled.
+        Regenerates the logrotate config and runs `logrotate -f` in the nginx container.
+        Requires raw log files to be enabled.
+
+        Besides this, the API rotates by itself at the top of every hour: forced at
+        00:00, and otherwise only a file past raw_log_max_size_mb (or not yet rotated
+        that day). Rotated files older than raw_log_retention_days are deleted at a
+        rotation. A manual request does not wait for a rotation already running: it
+        answers 200 with status "skipped" and reason "busy".
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Rotation completed
+          description: >-
+            Rotation completed, or skipped with a reason: empty (nothing to
+            rotate), already_rotated (a rotation ran this same second) or busy
+            (a rotation is already running).
           content:
             application/json:
               schema:
@@ -7419,12 +7592,133 @@ paths:
                 properties:
                   status:
                     type: string
+                    enum: [completed, skipped]
+                  reason:
+                    type: string
+                    enum: [empty, already_rotated, busy]
                   message:
                     type: string
         '400':
           description: Raw log files are not enabled
         '500':
           description: logrotate failed (response carries its output in "details")
+  /system-settings/log-storage/raw-reclaim:
+    get:
+      tags: [Logs]
+      summary: Status of the raw log reclaim
+      description: |
+        The opt-in job that removes the raw_log copies of access and error lines kept
+        inside old compressed log history (compressed days at least two days old), one
+        day at a time. WAF (ModSecurity) events keep theirs, and every other column is
+        unchanged. Without `estimate=1` this reads only the job's own state and is cheap
+        enough to poll; the card polls every 5 seconds while it runs.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: estimate
+          in: query
+          required: false
+          description: >-
+            `1` also measures what is left to reclaim and the free space on the database
+            disk. The measurement is cached for 10 minutes, and renewed sooner once a day
+            finishes.
+          schema:
+            type: string
+            enum: ['1', 'true']
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogRawReclaimStatus'
+  /system-settings/log-storage/raw-reclaim/start:
+    post:
+      tags: [Logs]
+      summary: Start (or resume) the raw log reclaim
+      description: |
+        Irreversible for the database copy: the verbatim access/error line is removed
+        from compressed days, including what has no column of its own (Basic-auth user
+        name, upstream connect/header timings, nginx's ASN value, the error-line prefix).
+        It remains only in the raw log files, for their retention.
+
+        Plans the work, checks the free space on the database disk against the first day
+        (twice its size without raw_log, plus 1 GiB) and starts a background runner; a
+        paused or failed job continues where it stopped, and a day that failed gets one
+        more try after every other day. A failed day keeps its state and its error until
+        the run gets to it: a refused start, or one whose max_chunks ends first, leaves it
+        as it was, and a run resumed after an API restart does not retry it. Each day
+        takes a short UPDATE, a wait for older transactions to end, and a VACUUM FULL
+        during which queries on that day wait (about a minute for a large day). The job
+        waits while the database disk is critical and pauses 30 seconds between days
+        (`NPG_RAW_RECLAIM_PAUSE`).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_chunks:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                  description: Work on at most this many days in this request; absent means all.
+      responses:
+        '202':
+          description: Started, or finished at once when no day had raw_log left to remove
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogRawReclaimStatus'
+        '400':
+          description: max_chunks is below 1 or above 2147483647
+        '409':
+          description: Already running (code `already_running`)
+        '412':
+          description: |
+            Cannot start now. `code` is `unsupported` (with `reason`: timescaledb_missing,
+            catalog_changed, not_hypertable, compression_disabled or
+            segmentby_without_log_type), `free_space_unknown` (the database disk cannot be
+            measured, e.g. NPG_DISK_GUARD_DISABLED) or `insufficient_space` (with
+            `free_bytes` and `required_free_bytes`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    enum: [unsupported, free_space_unknown, insufficient_space]
+                  reason:
+                    type: string
+                  free_bytes:
+                    type: integer
+                    format: int64
+                  required_free_bytes:
+                    type: integer
+                    format: int64
+  /system-settings/log-storage/raw-reclaim/stop:
+    post:
+      tags: [Logs]
+      summary: Pause the raw log reclaim
+      description: |
+        Records `paused` and cancels the statement in flight; its transaction rolls back,
+        so the day keeps the state it had. Start continues later. A no-op (still 200)
+        when nothing runs.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Job status after stopping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogRawReclaimStatus'
   /system-settings/logs:
     get:
       tags: [Logs]
@@ -11564,6 +11858,14 @@ components:
           type: array
           items:
             type: string
+        access_log_enabled:
+          type: boolean
+          default: true
+          description: >-
+            Also print every access log line to the npg-proxy container output
+            (docker logs). Only that copy is switched: access_raw.log and the
+            database access logs the log viewer, dashboard and security
+            features use are written either way.
     SystemSettings:
       type: object
       properties:
@@ -11620,6 +11922,56 @@ components:
           type: string
         acme_staging:
           type: boolean
+        raw_log_enabled:
+          type: boolean
+          description: >-
+            Raw nginx log files (access_raw.log / error_raw.log). Mandatory since
+            v2.17.1: false is accepted and stored as true.
+        raw_log_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          default: 7
+          description: >-
+            Rotated raw log files older than this are deleted at the next
+            rotation (logrotate maxage). A changed value outside the range is
+            rejected with 400; a stored value sent back unchanged is accepted.
+        raw_log_max_size_mb:
+          type: integer
+          minimum: 10
+          maximum: 10240
+          default: 100
+          description: >-
+            The live raw log is rotated at the next hourly check once it is
+            larger than this, besides the daily rotation at 00:00.
+        raw_log_rotate_count:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 5
+          deprecated: true
+          description: >-
+            Ignored: retention is by age (raw_log_retention_days). Still
+            accepted, stored and backed up for older clients.
+        raw_log_compress_rotated:
+          type: boolean
+          default: true
+          description: >-
+            gzip rotated raw logs. The newest rotated file is compressed at the
+            next rotation (delaycompress).
+        raw_log_archive_enabled:
+          type: boolean
+          default: false
+          description: >-
+            Move settled rotated raw logs to the archive directory. Switching it
+            on is refused with 400 unless the directory is ready (initialised by
+            this install and writable); see /system-settings/log-files/archive/check.
+        raw_log_archive_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          default: 365
+          description: Archived files older than this, by the time in their name, are deleted.
     Dashboard:
       type: object
       description: Main dashboard summary returned by GET /dashboard
@@ -11700,6 +12052,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserAgentStat'
+        storage:
+          $ref: '#/components/schemas/StorageStatus'
     Backup:
       type: object
       properties:
@@ -13539,7 +13893,11 @@ components:
             - nginx.reload_failed
             - auth.login_failed
             - ip.banned
+            - ip.detected
             - sso.login_refused
+            - disk.space_low
+            - disk.space_critical
+            - disk.space_recovered
         severity:
           type: string
           enum: [error, warning, info]
@@ -13976,6 +14334,218 @@ components:
             ssl_early_data_inferred:
               type: boolean
               description: Inferred from the nginx.conf template, not stored in settings
+        disk:
+          $ref: '#/components/schemas/StorageHealth'
+    StorageStatus:
+      type: object
+      description: |
+        DiskGuard's live view of the filesystems NPG writes to, as GET /dashboard
+        returns it (never cached). Absent until the first measurement, about a
+        minute after boot, and when the guard is disabled (NPG_DISK_GUARD_DISABLED).
+        GET /health/detailed returns the reduced StorageHealth instead.
+      properties:
+        level:
+          type: string
+          enum: [ok, low, critical]
+          description: The worst filesystem's level
+        thresholds:
+          $ref: '#/components/schemas/StorageThresholds'
+        filesystems:
+          type: array
+          description: One entry per physical filesystem, fullest first.
+          items:
+            $ref: '#/components/schemas/FilesystemUsage'
+        stalled:
+          type: array
+          description: |
+            Roles whose filesystem did not answer statfs within 3 seconds (a hung
+            network mount). They have no numbers until the mount answers.
+          items:
+            $ref: '#/components/schemas/StalledFilesystem'
+        database:
+          type: object
+          properties:
+            measured:
+              type: boolean
+            container:
+              type: string
+              example: npg-db
+            data_dir:
+              type: string
+              example: /var/lib/postgresql/data
+            reason:
+              type: string
+              enum: [db_container_not_found, db_external, db_exec_failed, docker_unavailable]
+              description: |
+                Why the database disk is not measured. With measured=true,
+                db_exec_failed means the container could not be asked but a volume
+                verified to share its disk answered.
+        emergency:
+          $ref: '#/components/schemas/EmergencyCompressionStatus'
+        measured_at:
+          type: string
+          format: date-time
+    StorageThresholds:
+      type: object
+      description: Used-space percentages from NPG_DISK_WARN_PERCENT, NPG_DISK_CRITICAL_PERCENT and NPG_DISK_RECOVER_PERCENT
+      properties:
+        warn_percent:
+          type: number
+          example: 85
+        critical_percent:
+          type: number
+          example: 90
+        recover_percent:
+          type: number
+          example: 80
+    FilesystemUsage:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Most important role on the filesystem; the alert subject
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [db, nginx_logs, archive, backups, docker]
+        path:
+          type: string
+          example: 'npg-db:/var/lib/postgresql/data'
+        source:
+          type: string
+          enum: [statfs, docker_exec, docker_exec_df]
+        total_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        avail_bytes:
+          type: integer
+          format: int64
+          description: Free to non-root writers (df Available)
+        used_percent:
+          type: number
+          description: used/(used+avail)*100, as df prints it
+        level:
+          type: string
+          enum: [ok, low, critical]
+        growth_per_day_bytes:
+          type: integer
+          format: int64
+          description: Net change over the last 24h; absent until there is a day of history
+        days_to_full:
+          type: number
+          description: At the current growth; absent when the disk is not growing
+        measured_at:
+          type: string
+          format: date-time
+    StalledFilesystem:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [nginx_logs, archive, backups, docker]
+        path:
+          type: string
+        since:
+          type: string
+          format: date-time
+    EmergencyCompressionStatus:
+      type: object
+      description: |
+        Early compression of closed log chunks while the database disk is at or
+        above the critical line (lossless; nothing is deleted).
+      properties:
+        mode:
+          type: string
+          enum: ['on', 'off', dryrun]
+          description: NPG_DISK_EMERGENCY_COMPRESS
+        state:
+          type: string
+          enum: [idle, running, done, blocked]
+        reason:
+          type: string
+          enum: [nothing_to_compress, dry_run, insufficient_space, policy_running, another_pass_running, chunks_busy, db_disk_unmeasured, compress_failed, error, stopped]
+        chunks_done:
+          type: integer
+        chunks_total:
+          type: integer
+        freed_bytes:
+          type: integer
+          format: int64
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    StorageHealth:
+      type: object
+      description: |
+        StorageStatus without paths, container names or the data directory: GET
+        /health/detailed is readable by any session and by API tokens of any scope.
+      properties:
+        level:
+          type: string
+          enum: [ok, low, critical]
+        thresholds:
+          $ref: '#/components/schemas/StorageThresholds'
+        filesystems:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilesystemHealth'
+        stalled_roles:
+          type: array
+          items:
+            type: string
+        database:
+          type: object
+          properties:
+            measured:
+              type: boolean
+            reason:
+              type: string
+              enum: [db_container_not_found, db_external, db_exec_failed, docker_unavailable]
+        emergency:
+          $ref: '#/components/schemas/EmergencyCompressionStatus'
+        measured_at:
+          type: string
+          format: date-time
+    FilesystemHealth:
+      type: object
+      description: FilesystemUsage without path and source
+      properties:
+        key:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [db, nginx_logs, archive, backups, docker]
+        level:
+          type: string
+          enum: [ok, low, critical]
+        used_percent:
+          type: number
+        total_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        avail_bytes:
+          type: integer
+          format: int64
+        growth_per_day_bytes:
+          type: integer
+          format: int64
+        days_to_full:
+          type: number
+        measured_at:
+          type: string
+          format: date-time
     HypertableStats:
       type: object
       properties:
@@ -14041,7 +14611,9 @@ components:
         disk_usage:
           type: number
           format: double
-          description: Percent
+          description: |
+            Percent of the primary disk: the database's filesystem when DiskGuard
+            measures it, else the API container's "/" (Docker's storage)
         disk_total:
           type: integer
           format: int64
@@ -14050,6 +14622,7 @@ components:
           format: int64
         disk_path:
           type: string
+          description: The disk the disk_* fields describe, e.g. "npg-db:/var/lib/postgresql/data" or "/"
         uptime_seconds:
           type: integer
           format: int64
@@ -15393,27 +15966,200 @@ components:
         modified_at:
           type: string
           format: date-time
+        rotated_at:
+          type: string
+          format: date-time
+          description: Rotation time from the file name; absent for the live files
         is_compressed:
           type: boolean
           description: True for .gz/.bz2 files
         log_type:
           type: string
-          description: Derived from the filename prefix — access, error, or unknown
+          description: Derived from the filename prefix — access or error
+        is_active:
+          type: boolean
+          description: access_raw.log or error_raw.log, which nginx is writing; cannot be deleted
+        location:
+          type: string
+          enum: [local, archive]
     LogFilesResponse:
       type: object
       properties:
         files:
           type: array
+          description: One page of files (every file when no limit was given)
           items:
             $ref: '#/components/schemas/LogFileInfo'
         total_size:
           type: integer
           format: int64
+          description: Size of every file in the location, not only this page
         total_count:
           type: integer
+          description: Number of files in the location, not only this page
         raw_log_enabled:
           type: boolean
           description: Whether nginx is configured to write raw log files at all
+        location:
+          type: string
+          enum: [local, archive]
+        limit:
+          type: integer
+          description: The page size asked for; absent when every file was returned
+        offset:
+          type: integer
+        usage:
+          $ref: '#/components/schemas/RawLogUsage'
+        archive:
+          $ref: '#/components/schemas/RawLogArchiveStatus'
+    RawLogUsage:
+      type: object
+      description: |
+        Disk use of the raw logs, measured from the files. avg_daily_bytes averages the
+        finished rotated files (compressed ones when compression is on) of the last 7
+        local days before today, or of the days since the oldest rotated file when there
+        is less history. A projection is avg_daily_bytes x retention + live_bytes +
+        pending_bytes; while the archive is in use, rotated files leave the log disk once
+        settled.
+      properties:
+        basis:
+          type: string
+          enum: [last_7_days, history, none]
+          description: none when no rotated file has finished yet
+        basis_days:
+          type: integer
+        avg_daily_bytes:
+          type: integer
+          format: int64
+        live_bytes:
+          type: integer
+          format: int64
+          description: access_raw.log and error_raw.log now
+        pending_bytes:
+          type: integer
+          format: int64
+          description: Rotated files not finished yet (with compression, the newest one)
+        local_bytes:
+          type: integer
+          format: int64
+        local_files:
+          type: integer
+        archive_bytes:
+          type: integer
+          format: int64
+        archive_files:
+          type: integer
+        retention_days:
+          type: integer
+        compressed:
+          type: boolean
+        archive_enabled:
+          type: boolean
+          description: raw_log_archive_enabled
+        archive_retention_days:
+          type: integer
+        archive_in_use:
+          type: boolean
+          description: |
+            Archiving is on and the archive status is ready, so settled rotated files leave
+            the log disk. While archiving is on but the archive cannot take them (not
+            mounted, full, stalled, ...) they stay on the log disk and follow the local
+            retention, and the projections count them there.
+        projected_local_bytes:
+          type: integer
+          format: int64
+          description: Projection with the saved settings
+        projected_archive_bytes:
+          type: integer
+          format: int64
+        local_fs_type:
+          type: string
+          description: Filesystem holding the log directory (ext4, xfs, ...), when known
+        local_total_bytes:
+          type: integer
+          format: int64
+        local_free_bytes:
+          type: integer
+          format: int64
+          description: Space available to nginx on the log filesystem
+        archive_total_bytes:
+          type: integer
+          format: int64
+        archive_free_bytes:
+          type: integer
+          format: int64
+    RawLogArchiveStatus:
+      type: object
+      description: |
+        The raw log archive directory. Nothing is written to it before an operator
+        initialises it (marker file); when it is missing, not ours, unwritable, full or
+        hung, rotated files stay local and follow the local retention.
+      properties:
+        enabled:
+          type: boolean
+          description: raw_log_archive_enabled
+        dir:
+          type: string
+          description: The archive directory inside the API container (NPG_RAW_LOG_ARCHIVE_DIR)
+        status:
+          type: string
+          enum: [disabled, not_mounted, not_initialized, foreign, unwritable, insufficient_space, stalled, ready, log_dir]
+          description: |
+            not_mounted: the directory does not exist in the container. not_initialized: no
+            marker (never initialised, or the share is not mounted and an empty mount point
+            is bound). foreign: initialised by another install (or before a backup was
+            restored here). stalled: the share stopped answering. log_dir: the directory is
+            the nginx log directory (by any path, a bind mount included) or one of its
+            parents, or shows it through another mount (an overlay or a share of the same
+            folder: a file created in the log directory appears there); it is never
+            initialised or written to.
+        mounted:
+          type: boolean
+          description: A directory other than the log directory exists in the API container (false for not_mounted and log_dir)
+        marker:
+          type: string
+          enum: [missing, ours, foreign, unreadable]
+        writable:
+          type: boolean
+          description: Result of the write test (check and init only)
+        fs_type:
+          type: string
+          description: Filesystem type of the directory (nfs, cifs, ext4, ...), when known
+        total_bytes:
+          type: integer
+          format: int64
+        free_bytes:
+          type: integer
+          format: int64
+        detail:
+          type: string
+        retention_days:
+          type: integer
+          description: raw_log_archive_retention_days
+        checked_at:
+          type: string
+          format: date-time
+          description: |
+            When the directory was last looked at. A pass in progress or a stall is
+            reported as of the request, and dated then.
+        last_move_at:
+          type: string
+          format: date-time
+        last_moved:
+          type: integer
+        last_pruned:
+          type: integer
+        last_error:
+          type: string
+        pending_files:
+          type: integer
+          description: Settled local files waiting to move
+        stalled_since:
+          type: string
+          format: date-time
+        running:
+          type: boolean
+          description: A pass is moving files right now
     CloneProxyHost:
       type: object
       description: |
@@ -17762,3 +18508,105 @@ components:
           type: integer
         total_pages:
           type: integer
+    LogRawReclaimStatus:
+      type: object
+      description: >-
+        The raw log reclaim job: removing the raw_log copies of access and error lines
+        kept in old compressed log history.
+      properties:
+        status:
+          type: string
+          enum: [idle, running, paused, done, failed]
+        supported:
+          type: boolean
+          description: false when this database cannot run the job; see unsupported_reason.
+        unsupported_reason:
+          type: string
+          enum: [timescaledb_missing, catalog_changed, not_hypertable, compression_disabled, segmentby_without_log_type]
+        requested_at:
+          type: string
+          format: date-time
+        requested_by:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        max_chunks:
+          type: integer
+        resume_at:
+          type: string
+          format: date-time
+          description: Set while a run interrupted by an API restart waits to resume.
+        chunks_total:
+          type: integer
+          description: >-
+            Days the job has recorded (every day it found raw_log to remove in), except
+            unfinished ones that retention has dropped since.
+        chunks_done:
+          type: integer
+        chunks_pending:
+          type: integer
+        chunks_skipped:
+          type: integer
+          description: Days left alone because they no longer qualify (e.g. partially compressed).
+        chunks_failed:
+          type: integer
+          description: >-
+            Days left alone after three failed attempts, or after losing the database
+            connection three times in a row; the next start gives each one more try after
+            every other day.
+        bytes_before:
+          type: integer
+          format: int64
+          description: Compressed size of the finished days before.
+        bytes_after:
+          type: integer
+          format: int64
+        reclaimed_bytes:
+          type: integer
+          format: int64
+        remaining_raw_bytes:
+          type: integer
+          format: int64
+          description: raw_log still held by planned days that are not finished.
+        estimated_reclaimable_bytes:
+          type: integer
+          format: int64
+          description: Access/error raw_log in compressed days old enough (from estimate=1).
+        modsec_raw_bytes:
+          type: integer
+          format: int64
+          description: WAF (ModSecurity) raw_log in those days, which is kept.
+        estimate_chunks:
+          type: integer
+        estimated_at:
+          type: string
+          format: date-time
+        current_chunk:
+          type: object
+          properties:
+            range_start:
+              type: string
+              format: date-time
+            range_end:
+              type: string
+              format: date-time
+            step:
+              type: string
+              enum: [waiting_disk, waiting_lock, nulling, waiting, vacuum, pausing]
+            since:
+              type: string
+              format: date-time
+        free_bytes:
+          type: integer
+          format: int64
+          description: Free space on the database disk at the last measurement; absent when unknown.
+        required_free_bytes:
+          type: integer
+          format: int64
+          description: What the next day needs, twice its size without raw_log plus 1 GiB.
+        last_error:
+          type: string
