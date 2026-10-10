@@ -2131,18 +2131,32 @@ npg_test_sso_provider:
       required: false
 
 npg_list_log_files:
-  description: "LIST raw nginx log files on disk (access/error, rotated entries newest first). View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file."
-  parameters: []
+  description: "LIST raw nginx log files on disk (access/error, rotated entries newest first). Optional: location ('local' default, or 'archive' — upstream responds 409 when the archive is not mounted/available), limit (1-1000; without it every file is returned), offset (>=0). Response includes usage (disk use/projection) and archive status blocks. View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file."
+  parameters:
+    - name: location
+      type: string
+      required: false
+      default: "local"
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_download_log_file:
-  description: "Download a log file by its filename. Returns the raw log content."
+  description: "Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content."
   parameters:
     - name: filename
       type: string
       required: true
+    - name: location
+      type: string
+      required: false
+      default: "local"
 
 npg_view_log_file:
-  description: "View the contents of a log file. REQUIRED: filename."
+  description: "View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s."
   parameters:
     - name: filename
       type: string
@@ -2151,17 +2165,55 @@ npg_view_log_file:
       type: integer
       required: false
       default: 100
+    - name: location
+      type: string
+      required: false
+      default: "local"
 
 npg_rotate_log_file:
-  description: "ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file."
+  description: "ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Upstream also rotates hourly on its own. Response is {status: completed|skipped, reason: empty|already_rotated|busy} — 200 with status=skipped is not an error (e.g. reason=busy means a rotation was already running). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file."
   parameters: []
 
 npg_delete_log_file:
-  description: "PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Enumerate with npg_list_log_files."
+  description: "PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Optional: location ('local' default or 'archive'). Enumerate with npg_list_log_files."
   parameters:
     - name: filename
       type: string
       required: true
+    - name: location
+      type: string
+      required: false
+      default: "local"
+
+npg_check_log_archive:
+  description: "CHECK the raw log archive directory (NPG_RAW_LOG_ARCHIVE_DIR, default /archive): mounted, filesystem type/size, marker file, and a write test (a temporary file, removed again). Writes no marker. status is 'ready' only for a directory this install initialised; other values: disabled, not_mounted, not_initialized, foreign, unwritable, insufficient_space, stalled, log_dir. Upstream responds 409 when no archive is available in this build. Takes no parameters."
+  parameters: []
+
+npg_init_log_archive:
+  description: "INITIALISE the raw log archive directory for this install: write test, then the marker file (.npg-raw-log-archive), replacing a marker another install wrote. NPG writes nothing to the archive before this. Afterwards switch archiving on via npg_update_system_settings(kwargs={'raw_log_archive_enabled': True}) — refused with 400 unless the directory is ready (verify first with npg_check_log_archive). DESTRUCTIVE-ish: overwrites any foreign marker. Upstream responds 400 when not mounted/not writable, 503 when the share does not answer. Takes no parameters."
+  parameters: []
+
+npg_run_log_archive:
+  description: "MOVE settled rotated raw logs to the archive directory now — wakes the archive mover and answers at once (202; the mover also runs hourly after scheduled rotation). Only settled rotated files move: compressed when compression is on, untouched for a settle window (default 10m). Safe even when archiving is disabled or the archive is unmounted — the response reports the current archive status. Upstream responds 409 when no archive is available in this build. Takes no parameters."
+  parameters: []
+
+npg_get_raw_log_reclaim:
+  description: "GET the status of the raw log reclaim job (removes the raw_log copies of access/error lines kept inside old compressed log history, one compressed day at a time — WAF events keep theirs, all other columns unchanged). status: idle|running|paused|done|failed; supported=false means this database cannot run the job. Optional: estimate (only 'true'/'1' accepted) — also measures what is left to reclaim and the database disk free space (cached 10 minutes). Without estimate the call is cheap enough to poll every few seconds while the job runs."
+  parameters:
+    - name: estimate
+      type: string
+      required: false
+
+npg_start_raw_log_reclaim:
+  description: "START (or resume) the raw log reclaim job. DESTRUCTIVE and IRREVERSIBLE for the database copy: the verbatim access/error line is removed from compressed log days (Basic-auth user, upstream timings, ASN value, error-line prefix are lost there; the raw log files keep them). Each day runs a VACUUM FULL (~1 minute for a large day) during which queries on that day wait. Optional: max_chunks (int 1-2147483647) — work on at most this many days in this request; omit = all. Upstream responds 409 already_running, 400 for max_chunks out of range, 412 when it cannot start (unsupported database, free space unknown, or insufficient space with free_bytes/required_free_bytes). Poll with npg_get_raw_log_reclaim, pause with npg_stop_raw_log_reclaim."
+  parameters:
+    - name: max_chunks
+      type: integer
+      required: false
+
+npg_stop_raw_log_reclaim:
+  description: "PAUSE the raw log reclaim job: records 'paused', cancels the statement in flight (its transaction rolls back so the day keeps its state) — safe, a no-op (still 200) when nothing runs. Start continues later with npg_start_raw_log_reclaim. Takes no parameters."
+  parameters: []
 
 npg_get_expiring_certificates:
   description: "GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes)."

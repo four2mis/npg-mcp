@@ -169,7 +169,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | 카테고리 | 도구 |
 |----------|-------|
 | **프록시 호스트(Proxy Hosts)** | 45 tools |
-| **로그(Logs)** | 32 tools |
+| **로그(Logs)** | 38 tools |
 | **보안 및 WAF(Security & WAF)** | 30 tools |
 | **DNS 제공자(DNS Providers)** | 15 tools |
 | **인증(Authentication)** | 9 tools |

@@ -169,7 +169,7 @@ This server exposes **304 MCP tools** across 27 categories. Tool names, descript
 | Category | Tools |
 |----------|-------|
 | **Proxy Hosts** | 45 tools |
-| **Logs** | 32 tools |
+| **Logs** | 38 tools |
 | **Security & WAF** | 30 tools |
 | **DNS Providers** | 15 tools |
 | **Authentication** | 9 tools |
