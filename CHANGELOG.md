@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.41] - 2026-10-11
+
+### What changed
+- Synced the MCP wrapper with upstream NPG v2.61.0 (commit 9b85230): added 6 log-lifecycle tools, added `location`/`limit`/`offset` params to the 4 log-file tools, and exposed the `raw_log_archive` settings group through `npg_update_system_settings`'s kwargs whitelist (new field in `upstream_models.py`).
+- Extended the 4 raw log-file tools (commits in 9b85230): `npg_list_log_files` gained optional `location` ('local' default or 'archive') / `limit` (1-1000) / `offset` params; `npg_view_log_file`, `npg_download_log_file`, and `npg_delete_log_file` gained optional `location`; descriptions updated with upstream behavior (409 when archive not mounted, raw-name-only 400, 504 on >60s reads, rotation skip reasons).
+- Synced `swagger.yaml` to upstream v2.61.0 (commit 9b85230, ~900-line delta) and to intermediate v2.60.1 (commit e2b6103) — docs-only, no tool-surface impact from the swagger changes themselves.
+- Tier counts updated for the 6 new tools in the same commit (read=138, standard=257, full=304); `--check-env` tier verification passes.
+
+### What's new
+- New tool `npg_check_log_archive`: CHECK the raw log archive directory (mounted, filesystem type, marker-file state).
+- New tool `npg_init_log_archive`: INITIALISE the archive directory for this install (write test + marker file).
+- New tool `npg_run_log_archive`: MOVE settled rotated raw logs to the archive now (async, answers at once).
+- New tool `npg_get_raw_log_reclaim`: GET the status of the raw log reclaim job (DB-side raw-log copy removal).
+- New tool `npg_start_raw_log_reclaim`: START (or resume) the reclaim job — DESTRUCTIVE and irreversible for the DB copy.
+- New tool `npg_stop_raw_log_reclaim`: PAUSE the reclaim job (cancels in-flight statement, records 'paused').
+
+### Breaking changes
+- (none) — all 6 tools are new, the log-file tool params are optional (`None` sends nothing), and settings kwargs were extended additively.
+
 ## [0.5.40] - 2026-10-09
 
 ### What changed
