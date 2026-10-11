@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.43] - 2026-10-12
+
+### What changed
+- Synced `swagger.yaml` to upstream NPG v2.61.1 (commit dbb6a9a): 145 insertions / 16 deletions covering validation annotations and docs only — no route, method, or schema changes, so no tool surface impact. The one v2.61.1 behavioral change (POST /api/v1/logs validation 500→400 on invalid values, upstream #325) was already reflected in the `npg_post_log` description shipped in v0.5.42.
+- Verified at commit dbb6a9a against the isolated test stack (recreated npg-test-mcp from local image pinned to that SHA): 304 tools / no duplicates, live MCP wire surface check passed, `npg_post_log` 400-contract confirmed live (invalid log_type → local validation error; valid → created; test-stack audit log shows upstream 400), 5-tool regression sample all success, pytest 417 passed, doc-drift and tier checks green.
+
+### What's new
+- Nothing — docs-only swagger sync.
+
+### Breaking changes
+- (none)
+
 ## [0.5.42] - 2026-10-11
 
 ### What changed
