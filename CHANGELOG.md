@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.42] - 2026-10-11
+
+### What changed
+- `npg_post_log` description updated for upstream NPG v2.61.1 (issue #325): invalid log values (bad log_type enum, status_code outside 100-599, client_ip not a single address, host >500 chars, geo_country_code >2 chars, exploit_rule >50 chars, NUL in any string) now return upstream HTTP 400 naming the field, instead of 500. Description-only change — no signature change, no tool count change.
+
+### What's new
+- Nothing — cosmetic description sync with upstream v2.61.1.
+
+### Breaking changes
+- None.
+
 ## [0.5.41] - 2026-10-11
 
 ### What changed
