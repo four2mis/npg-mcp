@@ -759,7 +759,7 @@ async def npg_list_proxy_hosts(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_proxy_host_groups", description="LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Optional: limit/offset — MCP-side window on the tags list only (upstream aggregates everything regardless; paging is applied MCP-side, domains/upstreams/status counts are always complete). Zero-arg returns everything unpaginated. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters.")
+@mcp.tool(name="npg_list_proxy_host_groups", description="LIST filter groups for npg_list_proxy_hosts: tag counts, distinct domains, distinct upstreams, enabled/disabled counts. Optional: limit/offset — MCP-side window on the tags list only (other counts always complete). Read-only; feed the values back as npg_list_proxy_hosts filters.")
 async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -2910,7 +2910,7 @@ async def npg_get_security_headers_presets() -> dict:
 
 # ── Exploit Rules ─────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules (the block_exploits feature's rule catalog, grouped by category). Optional: limit/offset — MCP-side slice of the rules list in EACH category object (categories are preserved; paging is applied MCP-side — upstream ignores paging query params). Zero-arg returns all rules. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host.")
+@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules, grouped by category (block_exploits rule catalog). Optional: limit/offset — MCP-side slice of each category's rules list (upstream ignores paging). Zero-arg returns all. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host.")
 async def npg_list_exploit_rules(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -3753,7 +3753,7 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
 
 # ── Log Files ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files on disk (access/error, rotated entries newest first). Optional: location ('local' default, or 'archive' — upstream responds 409 when the archive is not mounted/available), limit (1-1000; without it every file is returned), offset (>=0). Response includes usage (disk use/projection) and archive status blocks. View content with npg_view_log_file(filename), download with npg_download_log_file, delete rotated files with npg_delete_log_file.")
+@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file.")
 async def npg_list_log_files(location: str = "local", limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -3767,7 +3767,7 @@ async def npg_list_log_files(location: str = "local", limit: int | None = None, 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content capped at 256 KB (_LOG_DOWNLOAD_MAX_BYTES): content at or below the cap is returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes (full size), returned_bytes and a hint to page through the remainder with npg_view_log_file(filename, lines=..., location=...). Small downloads are unchanged from older versions.")
+@mcp.tool(name="npg_download_log_file", description="Download a log file by filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Content is capped at 256 KB: at-or-below returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes, returned_bytes and a hint to page the rest via npg_view_log_file.")
 async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
@@ -3789,7 +3789,7 @@ async def npg_view_log_file(filename: str, lines: int = 100, location: str = "lo
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_rotate_log_file", description="ROTATE all raw log files now — triggers log rotation globally, regenerating the logrotate config and force-rotating every raw log file. Takes NO parameters (rotates all logs, not a single file). Upstream also rotates hourly on its own. Response is {status: completed|skipped, reason: empty|already_rotated|busy} — 200 with status=skipped is not an error (e.g. reason=busy means a rotation was already running). Requires raw log files to be enabled in System Settings — upstream returns HTTP 500 'logrotate failed' when they are disabled. Related: npg_list_log_files, npg_view_log_file, npg_delete_log_file.")
+@mcp.tool(name="npg_rotate_log_file", description="ROTATE all raw log files now — regenerates the logrotate config, force-rotates every raw log (no parameters; upstream also rotates hourly). Response {status: completed|skipped, reason: empty|already_rotated|busy} — 200 with status=skipped is NOT an error. HTTP 500 'logrotate failed' when raw log files are disabled in System Settings.")
 async def npg_rotate_log_file() -> dict:
     c = _get_client()
     try:
@@ -3808,7 +3808,7 @@ async def npg_delete_log_file(filename: str, location: str = "local") -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_check_log_archive", description="CHECK the raw log archive directory (NPG_RAW_LOG_ARCHIVE_DIR, default /archive): mounted, filesystem type/size, marker file, and a write test (a temporary file, removed again). Writes no marker. status is 'ready' only for a directory this install initialised; other values: disabled, not_mounted, not_initialized, foreign, unwritable, insufficient_space, stalled, log_dir. Upstream responds 409 when no archive is available in this build. Takes no parameters.")
+@mcp.tool(name="npg_check_log_archive", description="CHECK the raw log archive dir (NPG_RAW_LOG_ARCHIVE_DIR, default /archive): mount, fs type/size, marker, write test (writes nothing). status is 'ready' only when this install initialised it; others: disabled/not_mounted/not_initialized/foreign/unwritable/insufficient_space/stalled/log_dir. Upstream 409 when no archive support in this build. No parameters.")
 async def npg_check_log_archive() -> dict:
     c = _get_client()
     try:
@@ -3817,7 +3817,7 @@ async def npg_check_log_archive() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_init_log_archive", description="INITIALISE the raw log archive directory for this install: write test, then the marker file (.npg-raw-log-archive), replacing a marker another install wrote. NPG writes nothing to the archive before this. Afterwards switch archiving on via npg_update_system_settings(kwargs={'raw_log_archive_enabled': True}) — refused with 400 unless the directory is ready (verify first with npg_check_log_archive). DESTRUCTIVE-ish: overwrites any foreign marker. Upstream responds 400 when not mounted/not writable, 503 when the share does not answer. Takes no parameters.")
+@mcp.tool(name="npg_init_log_archive", description="INITIALISE the raw log archive dir for this install: write test + marker file (.npg-raw-log-archive; overwrites foreign markers). Nothing is archived before this. Then enable via npg_update_system_settings(kwargs={'raw_log_archive_enabled': True}) — refused 400 unless ready (verify with npg_check_log_archive). Upstream 400 not mounted/writable, 503 share unresponsive. No params.")
 async def npg_init_log_archive() -> dict:
     c = _get_client()
     try:
@@ -3826,7 +3826,7 @@ async def npg_init_log_archive() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_run_log_archive", description="MOVE settled rotated raw logs to the archive directory now — wakes the archive mover and answers at once (202; the mover also runs hourly after scheduled rotation). Only settled rotated files move: compressed when compression is on, untouched for a settle window (default 10m). Safe even when archiving is disabled or the archive is unmounted — the response reports the current archive status. Upstream responds 409 when no archive is available in this build. Takes no parameters.")
+@mcp.tool(name="npg_run_log_archive", description="MOVE settled rotated raw logs to the archive now (202; mover also runs hourly after scheduled rotation; only files past the settle window move, compressed when enabled). Safe when archiving is disabled or unmounted — the response reports archive status. Upstream 409 when no archive support in this build. No parameters.")
 async def npg_run_log_archive() -> dict:
     c = _get_client()
     try:
@@ -3835,7 +3835,7 @@ async def npg_run_log_archive() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_raw_log_reclaim", description="GET the status of the raw log reclaim job (removes the raw_log copies of access/error lines kept inside old compressed log history, one compressed day at a time — WAF events keep theirs, all other columns unchanged). status: idle|running|paused|done|failed; supported=false means this database cannot run the job. Optional: estimate (only 'true'/'1' accepted) — also measures what is left to reclaim and the database disk free space (cached 10 minutes). Without estimate the call is cheap enough to poll every few seconds while the job runs.")
+@mcp.tool(name="npg_get_raw_log_reclaim", description="GET the raw log reclaim job's status (job strips verbatim access/error lines from compressed log history; WAF events keep theirs). status: idle|running|paused|done|failed; supported=false = this DB cannot run it. Optional: estimate ('true'/'1') adds remaining work + DB free space (cached 10 min); without it, cheap enough to poll every few seconds.")
 async def npg_get_raw_log_reclaim(estimate: str | None = None) -> dict:
     c = _get_client()
     try:
@@ -3847,7 +3847,7 @@ async def npg_get_raw_log_reclaim(estimate: str | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_start_raw_log_reclaim", description="START (or resume) the raw log reclaim job. DESTRUCTIVE and IRREVERSIBLE for the database copy: the verbatim access/error line is removed from compressed log days (Basic-auth user, upstream timings, ASN value, error-line prefix are lost there; the raw log files keep them). Each day runs a VACUUM FULL (~1 minute for a large day) during which queries on that day wait. Optional: max_chunks (int 1-2147483647) — work on at most this many days in this request; omit = all. Upstream responds 409 already_running, 400 for max_chunks out of range, 412 when it cannot start (unsupported database, free space unknown, or insufficient space with free_bytes/required_free_bytes). Poll with npg_get_raw_log_reclaim, pause with npg_stop_raw_log_reclaim.")
+@mcp.tool(name="npg_start_raw_log_reclaim", description="START the raw log reclaim job. DESTRUCTIVE + IRREVERSIBLE for the DB copy: verbatim access/error lines are removed from compressed log days (raw log files keep them); VACUUM FULL per day (~1 min) blocks that day's queries. Optional max_chunks caps days per request. Errors: 409 already_running, 400 max_chunks range, 412 cannot start. Track via npg_get_raw_log_reclaim / npg_stop_raw_log_reclaim.")
 async def npg_start_raw_log_reclaim(max_chunks: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -3908,7 +3908,7 @@ async def npg_upload_certificate(domain_names: list[str], cert_content: str, key
 
 # ── URI Blocks ─────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus each proxy host's URI block summary. Optional: limit/offset — MCP-side slice of the per-host summary list (paging applied MCP-side — upstream ignores paging query params; global config always complete). Zero-arg returns everything. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule.")
+@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus per-host URI block summaries. Optional: limit/offset — MCP-side slice of the per-host summary list (upstream ignores paging; global config always complete). Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule.")
 async def npg_list_uri_blocks(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -5008,7 +5008,7 @@ async def npg_get_dns_provider_default() -> dict:
 
 # ── Logs Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). REQUIRED: log_type — one of access|error|modsec (default access). Optional fields are type-specific: error logs use severity (debug..emerg) + error_message; modsec logs use rule_id/rule_message/attack_type/action_taken/block_reason; access logs use host, client_ip, request_method, request_uri, status_code, http_user_agent, etc. NOTE: upstream has NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead; invalid values (bad log_type enum, status_code outside 100-599, client_ip range, host >500 chars, NUL in strings) now return upstream HTTP 400 naming the field (v2.61.1, #325 — was 500).")
+@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). REQUIRED: log_type — access|error|modsec (default access). Optional fields are type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
 async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
     try:
         _validate_required("log_type", log_type)
