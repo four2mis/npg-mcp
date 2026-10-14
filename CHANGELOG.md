@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.44] - 2026-10-14
+
+### What changed
+- `npg_download_log_file` now enforces a 256 KB size cap on raw log downloads (commit 41a44a0): oversized files return the first 262144 bytes plus `truncated`/`total_bytes`/`returned_bytes` metadata and a hint pointing at `npg_view_log_file`, instead of streaming a multi-megabyte body through the MCP wire. Untruncated small downloads behave as before.
+- MCP-side `limit`/`offset` pagination was extended to the 10 remaining unpaginated list tools — `npg_list_waf_rules`, `npg_list_exploit_rules`, `npg_list_users`, `npg_list_roles`, `npg_list_sso_providers`, `npg_list_api_tokens`, `npg_list_notification_channels`, `npg_list_cloud_providers`, `npg_list_uri_blocks`, `npg_list_proxy_host_groups` (commit 363d63f). These tools now return explicit paging metadata (`applied`, `unit`, `offset`, `total`, `returned`) so agents can page deterministically instead of pasting entire tables into context.
+- Trimmed 12 oversized tool descriptions to ≤398 chars (commit 3ab206c): the 8 planned tools plus 4 further offenders found post-0.5.43. Descriptions were rewritten, not shortened for its own sake — required params, side effects, and next-step hints were preserved within the length budget.
+- Verified at commit 3ab206c against the isolated test stack with a local image pinned to that exact SHA: 304 tools / 0 duplicates, all 12 trimmed descriptions served live at ≤398 chars over the MCP wire, doc drift check exit 0, description-param check clean across all 304 tools, 12/12 body-construction checks pass, 440 pytest tests pass, and a live regression sweep (list/download/pagination/dashboard/logs/users) all PASS — including the new 256 KB download cap (truncated:true, 641104 total, 262144 returned).
+
+### What's new
+- New capability: 256 KB download cap with truncation metadata on `npg_download_log_file` — protects MCP clients from oversized raw access-log payloads.
+- New capability: explicit MCP-side paging on 10 additional list tools (limit/offset + paging metadata).
+
+### Breaking changes
+- (none)
+
 ## [0.5.43] - 2026-10-12
 
 ### What changed
