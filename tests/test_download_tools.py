@@ -7,7 +7,10 @@ Covers:
   download return encoding=base64 payloads that decode back to the original
   archive bytes.
 * text/* responses still return plain data (no base64 marker).
-* npg_download_log_file remains on get_text() (plain-text passthrough).
+* npg_download_log_file remains on get_text() (plain-text passthrough), with a
+  256 KB size cap (_LOG_DOWNLOAD_MAX_BYTES): oversized logs return the first
+  cap bytes + truncation metadata; at-or-below-cap content is byte-identical
+  to the pre-cap behavior.
 
 Every HTTP call is mocked with respx — there is NO real network access.
 """
@@ -157,3 +160,44 @@ class TestDownloadToolsBase64RoundTrip:
         assert result["success"] is True
         assert result["data"] == raw.decode()
         assert "encoding" not in result
+
+
+class TestDownloadLogFileTruncation:
+    """npg_download_log_file caps raw text at _LOG_DOWNLOAD_MAX_BYTES."""
+
+    def _run(self, monkeypatch, text):
+        fake = NPGClient(base_url=BASE, token="ng_t")
+
+        def _fake_get_text(path, params=None):
+            assert path == "/api/v1/system-settings/log-files/access.log/download"
+            assert params == {"location": "local"}
+            return text
+
+        fake.get_text = _fake_get_text
+        monkeypatch.setattr(main_mod, "_get_client", lambda: fake)
+        import asyncio
+        return asyncio.run(main_mod.npg_download_log_file("access.log"))
+
+    def test_oversized_log_truncated_with_metadata(self, monkeypatch):
+        cap = main_mod._LOG_DOWNLOAD_MAX_BYTES
+        big = "x" * (cap + 1000)
+        result = self._run(monkeypatch, big)
+
+        assert result["success"] is True
+        assert result["truncated"] is True
+        assert result["total_bytes"] == len(big)
+        assert result["returned_bytes"] == cap
+        assert result["data"] == "x" * cap  # first cap chars only
+        assert "npg_view_log_file" in result["hint"]
+
+    def test_small_log_passthrough_unchanged(self, monkeypatch):
+        small = "GET / 200\n" * 10
+        result = self._run(monkeypatch, small)
+
+        # Byte-compat with the pre-cap shape: no truncation keys at all.
+        assert result == {"success": True, "data": small}
+
+    def test_at_cap_boundary_not_truncated(self, monkeypatch):
+        exact = "y" * main_mod._LOG_DOWNLOAD_MAX_BYTES
+        result = self._run(monkeypatch, exact)
+        assert result == {"success": True, "data": exact}

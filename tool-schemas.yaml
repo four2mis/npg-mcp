@@ -2199,7 +2199,7 @@ npg_list_log_files:
       required: false
 
 npg_download_log_file:
-  description: "Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content."
+  description: "Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content capped at 256 KB (_LOG_DOWNLOAD_MAX_BYTES): content at or below the cap is returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes (full size), returned_bytes and a hint to page through the remainder with npg_view_log_file(filename, lines=..., location=...). Small downloads are unchanged from older versions."
   parameters:
     - name: filename
       type: string

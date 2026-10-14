@@ -523,6 +523,14 @@ _BULK_HOST_LIMIT = 50
 # exhausting quotas for the whole deployment.
 _BULK_CERT_LIMIT = 20
 
+# Cap on raw text returned inside one npg_download_log_file tool result. A
+# multi-MB access log inside a single MCP response is a JSON-RPC framing / SSE
+# parsing hazard and instantly floods any agent's context window. Responses at
+# or below the cap pass through unchanged; larger ones return the first cap
+# bytes plus truncation metadata (see the tool's description). Paging deeper
+# into the remainder is what npg_view_log_file(offset/lines) is for.
+_LOG_DOWNLOAD_MAX_BYTES = 262144  # 256 KB
+
 
 def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) -> dict:
     """Build an API request body dict from local variables, keeping only non-None values.
@@ -3759,12 +3767,14 @@ async def npg_list_log_files(location: str = "local", limit: int | None = None, 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content.")
+@mcp.tool(name="npg_download_log_file", description="Download a log file by its filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Returns the raw log content capped at 256 KB (_LOG_DOWNLOAD_MAX_BYTES): content at or below the cap is returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes (full size), returned_bytes and a hint to page through the remainder with npg_view_log_file(filename, lines=..., location=...). Small downloads are unchanged from older versions.")
 async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
         c = _get_client()
         data = await _api(c.get_text, f"/api/v1/system-settings/log-files/{_id_path(filename)}/download", params={"location": location})
+        if isinstance(data, str) and len(data) > _LOG_DOWNLOAD_MAX_BYTES:
+            return {"success": True, "data": data[:_LOG_DOWNLOAD_MAX_BYTES], "truncated": True, "total_bytes": len(data), "returned_bytes": _LOG_DOWNLOAD_MAX_BYTES, "hint": "Content truncated at 256 KB; page through the remainder with npg_view_log_file(filename, lines=..., location=...)"}
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
