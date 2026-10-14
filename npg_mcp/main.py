@@ -642,6 +642,85 @@ def _list_params_per_page(limit: int | None = None, offset: int | None = None, p
     return params
 
 
+def _mcp_slice_response(data, limit: int | None, offset: int | None, unit: str = "items", key: str = "data") -> tuple[object, dict | None]:
+    """MCP-side limit/offset paging for list endpoints whose upstream API
+    ignores pagination query params (verified per-endpoint against the live
+    API: the response is byte-identical with and without ?limit=&offset=).
+
+    Applies the page to the upstream result locally: ``data[key]`` when the
+    response is a dict holding a list under ``key`` (or the whole value when
+    the upstream returns a bare list). Category-grouped payloads (dicts with
+    a ``categories`` list whose entries each hold a ``rules`` list — the
+    exploit-rules and waf/rules shape) get the same window applied to EVERY
+    category's rules with categories preserved. ``data`` is copied, never
+    mutated.
+    Returns ``(sliced_data, paging_meta)`` — paging_meta is None when neither
+    param was provided so zero-arg responses stay byte-identical. Negative
+    or non-int values raise ValueError (surfaces as a clean error envelope
+    before any HTTP call).
+    """
+    if limit is None and offset is None:
+        return data, None
+    _validate_query_int("limit", limit)
+    _validate_query_int("offset", offset)
+    start = offset if offset is not None else 0
+    end = start + limit if limit is not None else None
+    meta_base = {"applied": "mcp-side (upstream returns the full list)", "unit": unit, "offset": start}
+
+    def _win(arr):
+        return arr[start:end] if end is not None else arr[start:]
+
+    # Category-grouped payloads (exploit-rules, waf/rules): slice the rules
+    # list inside every category object, preserve the outer structure.
+    if isinstance(data, dict) and isinstance(data.get("categories"), list):
+        out = dict(data)
+        sliced_total = 0
+        full_total = 0
+        cats = []
+        for cat in data["categories"]:
+            if isinstance(cat, dict) and isinstance(cat.get("rules"), list):
+                c2 = dict(cat)
+                full_total += len(cat["rules"])
+                c2["rules"] = _win(cat["rules"])
+                sliced_total += len(c2["rules"])
+                cats.append(c2)
+            else:
+                cats.append(cat)
+        out["categories"] = cats
+        return out, {**meta_base, "total": full_total, "returned": sliced_total}
+    if isinstance(data, dict) and isinstance(data.get(key), list):
+        arr = data[key]
+        out = dict(data)
+        out[key] = _win(arr)
+        return out, {**meta_base, "total": len(arr), "returned": len(out[key])}
+    if isinstance(data, list):
+        page = _win(data)
+        return page, {**meta_base, "total": len(data), "returned": len(page)}
+    return data, {**meta_base, "applied": "none (unexpected upstream shape)"}
+
+
+def _validate_paging_args(limit: int | None, offset: int | None) -> None:
+    """Validate limit/offset up-front so a bad value surfaces as a clean
+    error envelope BEFORE any HTTP call (the slice itself runs post-GET)."""
+    _validate_query_int("limit", limit)
+    _validate_query_int("offset", offset)
+
+
+def _sliced_result(data, limit: int | None, offset: int | None, unit: str = "items", key: str = "data") -> dict:
+    """Success envelope for the MCP-side-paged list tools.
+
+    Zero-arg calls (no paging) return the exact pre-pagination shape
+    ``{"success": True, "data": ...}``; when limit/offset are provided the
+    tool adds a ``paging`` metadata dict (applied/total/offset/returned) so
+    the agent can tell whether more items exist beyond the window.
+    Failure envelopes come from the tool's own ``except`` block unchanged.
+    """
+    data, meta = _mcp_slice_response(data, limit, offset, unit=unit, key=key)
+    if meta is not None:
+        return {"success": True, "data": data, "paging": meta}
+    return {"success": True, "data": data}
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list.")
@@ -672,12 +751,13 @@ async def npg_list_proxy_hosts(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_proxy_host_groups", description="LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Zero required params. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters.")
-async def npg_list_proxy_host_groups() -> dict:
+@mcp.tool(name="npg_list_proxy_host_groups", description="LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Optional: limit/offset — MCP-side window on the tags list only (upstream aggregates everything regardless; paging is applied MCP-side, domains/upstreams/status counts are always complete). Zero-arg returns everything unpaginated. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters.")
+async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/proxy-hosts/groups")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="tags", key="tags")
     except Exception as e:
         return _error_result(e)
 
@@ -2466,12 +2546,13 @@ async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict
 
 # ── Cloud Providers ───────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_cloud_providers", description="List all cloud providers (for certificate DNS challenges).")
-async def npg_list_cloud_providers() -> dict:
+@mcp.tool(name="npg_list_cloud_providers", description="LIST cloud providers (IP-range DB entries for certificate DNS challenges). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get one by slug with npg_get_cloud_provider; region view with npg_list_cloud_providers_by_region.")
+async def npg_list_cloud_providers(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/cloud-providers")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="providers")
     except Exception as e:
         return _error_result(e)
 
@@ -2821,12 +2902,13 @@ async def npg_get_security_headers_presets() -> dict:
 
 # ── Exploit Rules ─────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules (the block_exploits feature's rule catalog). Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host.")
-async def npg_list_exploit_rules() -> dict:
+@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules (the block_exploits feature's rule catalog, grouped by category). Optional: limit/offset — MCP-side slice of the rules list in EACH category object (categories are preserved; paging is applied MCP-side — upstream ignores paging query params). Zero-arg returns all rules. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host.")
+async def npg_list_exploit_rules(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/exploit-rules")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="rules", key="rules")
     except Exception as e:
         return _error_result(e)
 
@@ -2895,15 +2977,16 @@ async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
 
 # ── WAF ───────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_waf_rules", description="LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 600+ rule set). Zero-arg returns all rules.")
-async def npg_list_waf_rules(proxy_host_id: str | None = None) -> dict:
+@mcp.tool(name="npg_list_waf_rules", description="LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules.")
+async def npg_list_waf_rules(proxy_host_id: str | None = None, limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         params: dict = {}
         if proxy_host_id is not None and str(proxy_host_id).strip():
             params["proxy_host_id"] = str(proxy_host_id)
         data = await _api(c.get, "/api/v1/waf/rules", params=params or None)
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="rules", key="rules")
     except Exception as e:
         return _error_result(e)
 
@@ -3258,12 +3341,13 @@ async def npg_restore_backup(backup_id: str | int) -> dict:
 
 # ── API Tokens ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens.")
-async def npg_list_api_tokens() -> dict:
+@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens.")
+async def npg_list_api_tokens(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/api-tokens")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="tokens")
     except Exception as e:
         return _error_result(e)
 
@@ -3322,12 +3406,13 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
 
 # ── Notification Channels ──────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel.")
-async def npg_list_notification_channels() -> dict:
+@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything.")
+async def npg_list_notification_channels(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/notification-channels")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="channels")
     except Exception as e:
         return _error_result(e)
 
@@ -3440,12 +3525,13 @@ async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: st
 
 # ── Users ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_users", description="LIST user accounts (no secrets in responses). Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles).")
-async def npg_list_users() -> dict:
+@mcp.tool(name="npg_list_users", description="LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles).")
+async def npg_list_users(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/users")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="users")
     except Exception as e:
         return _error_result(e)
 
@@ -3507,12 +3593,13 @@ async def npg_delete_user(user_id: str | int) -> dict:
 
 # ── Roles ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user.")
-async def npg_list_roles() -> dict:
+@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user.")
+async def npg_list_roles(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/roles")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="roles")
     except Exception as e:
         return _error_result(e)
 
@@ -3554,12 +3641,13 @@ async def npg_delete_role(role_id: str | int) -> dict:
 
 # ── SSO Providers ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider.")
-async def npg_list_sso_providers() -> dict:
+@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider.")
+async def npg_list_sso_providers(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/sso-providers")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="providers")
     except Exception as e:
         return _error_result(e)
 
@@ -3810,12 +3898,13 @@ async def npg_upload_certificate(domain_names: list[str], cert_content: str, key
 
 # ── URI Blocks ─────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus each proxy host's URI block summary. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule.")
-async def npg_list_uri_blocks() -> dict:
+@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus each proxy host's URI block summary. Optional: limit/offset — MCP-side slice of the per-host summary list (paging applied MCP-side — upstream ignores paging query params; global config always complete). Zero-arg returns everything. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule.")
+async def npg_list_uri_blocks(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/uri-blocks")
-        return {"success": True, "data": data}
+        return _sliced_result(data, limit, offset, unit="hosts", key="host_summaries")
     except Exception as e:
         return _error_result(e)
 

@@ -24,8 +24,14 @@ npg_list_proxy_hosts:
       required: false
 
 npg_list_proxy_host_groups:
-  description: "LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Zero required params. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters."
-  parameters: []
+  description: "LIST proxy-host filter groups: tag counts (tags: [{name, count}]), distinct domains, distinct upstreams, and enabled/disabled status counts. Optional: limit/offset — MCP-side window on the tags list only (upstream aggregates everything regardless; paging is applied MCP-side, domains/upstreams/status counts are always complete). Zero-arg returns everything unpaginated. Read-only — feeds filter panels. Call before npg_list_proxy_hosts with tags/domain/upstream filters."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_proxy_host:
   description: "Get a single proxy host by its ID. REQUIRED: host_id."
@@ -1074,8 +1080,14 @@ npg_test_dns_provider:
       required: false
 
 npg_list_cloud_providers:
-  description: "List all cloud providers (for certificate DNS challenges)."
-  parameters: []
+  description: "LIST cloud providers (IP-range DB entries for certificate DNS challenges). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get one by slug with npg_get_cloud_provider; region view with npg_list_cloud_providers_by_region."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_cloud_provider:
   description: "GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region."
@@ -1408,8 +1420,14 @@ npg_get_security_headers_presets:
   parameters: []
 
 npg_list_exploit_rules:
-  description: "LIST the exploit block rules (the block_exploits feature's rule catalog). Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host."
-  parameters: []
+  description: "LIST the exploit block rules (the block_exploits feature's rule catalog, grouped by category). Optional: limit/offset — MCP-side slice of the rules list in EACH category object (categories are preserved; paging is applied MCP-side — upstream ignores paging query params). Zero-arg returns all rules. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_exploit_rule:
   description: "Get an exploit rule by its ID. REQUIRED: rule_id."
@@ -1476,10 +1494,16 @@ npg_toggle_exploit_rule:
       required: true
 
 npg_list_waf_rules:
-  description: "LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 600+ rule set). Zero-arg returns all rules."
+  description: "LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules."
   parameters:
     - name: proxy_host_id
       type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
       required: false
 
 npg_get_waf_hosts:
@@ -1778,8 +1802,14 @@ npg_restore_backup:
       required: true
 
 npg_list_api_tokens:
-  description: "LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens."
-  parameters: []
+  description: "LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_api_token:
   description: "Get an API token by its ID. REQUIRED: token_id."
@@ -1830,8 +1860,14 @@ npg_delete_api_token:
       required: true
 
 npg_list_notification_channels:
-  description: "LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel."
-  parameters: []
+  description: "LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_create_notification_channel:
   description: "CREATE a notification channel. REQUIRED: name, channel_type (webhook/discord/telegram). Optional: config (dict: url for webhook/discord; bot_token+chat_id for telegram), events (at least one event or digest_enabled), allow_private_target, digest_enabled, digest_hour (0-23)."
@@ -1936,8 +1972,14 @@ npg_detect_telegram_chats:
       required: false
 
 npg_list_users:
-  description: "LIST user accounts (no secrets in responses). Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles)."
-  parameters: []
+  description: "LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles)."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_get_user:
   description: "Get a user by their ID. REQUIRED: user_id."
@@ -1991,8 +2033,14 @@ npg_delete_user:
       required: true
 
 npg_list_roles:
-  description: "LIST roles for RBAC (built-ins first, then by name). Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user."
-  parameters: []
+  description: "LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_create_role:
   description: "CREATE a new role. REQUIRED: name. Optional: description, permissions (array of 'area:verb' strings, e.g. ['proxy:read','proxy:write']). Use npg_get_permission_areas to list valid areas and verbs."
@@ -2032,8 +2080,14 @@ npg_delete_role:
       required: true
 
 npg_list_sso_providers:
-  description: "LIST configured SSO (OIDC) providers. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider."
-  parameters: []
+  description: "LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_create_sso_provider:
   description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. Optional: client_secret (placeholder), scopes, trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id. Verify via npg_list_sso_providers."
@@ -2243,8 +2297,14 @@ npg_upload_certificate:
       required: true
 
 npg_list_uri_blocks:
-  description: "LIST the global URI block config plus each proxy host's URI block summary. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule."
-  parameters: []
+  description: "LIST the global URI block config plus each proxy host's URI block summary. Optional: limit/offset — MCP-side slice of the per-host summary list (paging applied MCP-side — upstream ignores paging query params; global config always complete). Zero-arg returns everything. Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_bulk_add_uri_block_rule:
   description: "Bulk add a URI block rule to multiple or all proxy hosts. REQUIRED: pattern. Optional: match_type ('exact'/'prefix'/'regex', default 'exact'), description, host_ids (list of host UUIDs; empty = all enabled hosts)."
@@ -3036,7 +3096,7 @@ npg_get_dns_provider_default:
   parameters: []
 
 npg_post_log:
-  description: "INSERT a log entry manually (CreateLog model). REQUIRED: log_type — one of access|error|modsec (default access). Optional fields are type-specific: error logs use severity (debug..emerg) + error_message; modsec logs use rule_id/rule_message/attack_type/action_taken/block_reason; access logs use host, client_ip, request_method, request_uri, status_code, http_user_agent, etc. NOTE: upstream has NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead; out-of-enum log_type is rejected locally (upstream would 500)."
+  description: "INSERT a log entry manually (CreateLog model). REQUIRED: log_type — one of access|error|modsec (default access). Optional fields are type-specific: error logs use severity (debug..emerg) + error_message; modsec logs use rule_id/rule_message/attack_type/action_taken/block_reason; access logs use host, client_ip, request_method, request_uri, status_code, http_user_agent, etc. NOTE: upstream has NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead; invalid values (bad log_type enum, status_code outside 100-599, client_ip range, host >500 chars, NUL in strings) now return upstream HTTP 400 naming the field (v2.61.1, #325 — was 500)."
   parameters:
     - name: log_type
       type: string

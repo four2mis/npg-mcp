@@ -912,3 +912,210 @@ class TestGetCertificateHistory:
         assert result["success"] is False
         assert "non-negative integer" in result["error"]
         assert recording.calls == []
+
+
+# ── Phase-3 parity: MCP-side limit/offset paging on the 10 remaining ─────
+# list tools whose upstream endpoints IGNORE pagination query params
+# (verified GET-only against the live API: responses are byte-identical
+# with and without ?limit=&offset=). Paging is applied MCP-side after the
+# GET; zero-arg calls must remain byte-identical to the pre-change shape.
+
+
+class TestMcpSliceResponseHelper:
+    def test_no_args_is_identity(self):
+        data = {"data": [1, 2, 3]}
+        out, meta = main_mod._mcp_slice_response(data, None, None)
+        assert out is data
+        assert meta is None
+
+    def test_bare_list_window(self):
+        out, meta = main_mod._mcp_slice_response([1, 2, 3, 4, 5], 2, 1)
+        assert out == [2, 3]
+        assert meta["total"] == 5 and meta["returned"] == 2 and meta["offset"] == 1
+        assert "mcp-side" in meta["applied"]
+
+    def test_dict_key_window(self):
+        data = {"data": ["a", "b", "c"], "total": 3}
+        out, meta = main_mod._mcp_slice_response(data, 2, None)
+        assert out["data"] == ["a", "b"]
+        assert out["total"] == 3  # non-sliced keys preserved
+        assert meta["total"] == 3 and meta["returned"] == 2
+
+    def test_offset_only_takes_tail(self):
+        out, meta = main_mod._mcp_slice_response([1, 2, 3], None, 2)
+        assert out == [3]
+        assert meta["total"] == 3 and meta["returned"] == 1
+
+    def test_offset_beyond_end_empty_window(self):
+        out, meta = main_mod._mcp_slice_response([1, 2], 5, 10)
+        assert out == []
+        assert meta["total"] == 2 and meta["returned"] == 0
+
+    def test_category_grouped_payload_slices_every_categorys_rules(self):
+        data = {
+            "categories": [
+                {"id": "x", "name": "X", "rules": [{"id": 1}, {"id": 2}, {"id": 3}]},
+                {"id": "y", "name": "Y", "rules": [{"id": 4}, {"id": 5}]},
+                {"id": "z", "name": "Z"},  # no rules key — passed through
+            ],
+            "total_rules": 5,
+        }
+        out, meta = main_mod._mcp_slice_response(data, 2, 0, unit="rules", key="rules")
+        assert [r["id"] for r in out["categories"][0]["rules"]] == [1, 2]
+        assert [r["id"] for r in out["categories"][1]["rules"]] == [4, 5]
+        assert out["categories"][2] == {"id": "z", "name": "Z"}
+        assert out["total_rules"] == 5
+        assert meta["total"] == 5 and meta["returned"] == 4
+
+    def test_input_not_mutated(self):
+        data = {"data": [1, 2, 3]}
+        main_mod._mcp_slice_response(data, 1, None)
+        assert data["data"] == [1, 2, 3]
+
+    def test_negative_values_rejected(self):
+        with pytest.raises(ValueError):
+            main_mod._mcp_slice_response([1], -1, None)
+        with pytest.raises(ValueError):
+            main_mod._mcp_slice_response([1], None, -2)
+
+    def test_unexpected_shape_passes_through_with_none_applied(self):
+        out, meta = main_mod._mcp_slice_response({"foo": "bar"}, 2, None)
+        assert out == {"foo": "bar"}
+        assert "none" in meta["applied"]
+
+
+class _ListFakeClient(_RecordingClient):
+    """Fake client returning canned data for a fixed path."""
+
+    def __init__(self, path, data):
+        super().__init__()
+        self._path = path
+        self._data = data
+
+    def get(self, path, params=None):
+        self.calls.append(("GET", path, params))
+        assert path == self._path
+        return self._data
+
+
+def _fake(monkeypatch, path, data):
+    client = _ListFakeClient(path, data)
+    monkeypatch.setattr(main_mod, "_get_client", lambda: client)
+    return client
+
+
+class TestMcpSidePagedListTools:
+    """Each of the 10 tools: zero-arg byte-identical + sliced w/ paging meta."""
+
+    BARE_LIST = [{"id": i} for i in range(5)]
+
+    def _assert_tool(self, monkeypatch, path, tool, args, key="data", unit_check=None):
+        client = _fake(monkeypatch, path, list(self.BARE_LIST))
+
+        # zero-arg: byte-identical legacy shape, no paging key
+        result = _run(tool())
+        assert result == {"success": True, "data": list(self.BARE_LIST)}
+        assert "paging" not in result
+
+        # limit=2, offset=1 → items[1:3] + paging metadata
+        result = _run(tool(*args))
+        assert result["success"] is True
+        assert result["data"] == self.BARE_LIST[1:3]
+        assert result["paging"]["total"] == 5
+        assert result["paging"]["returned"] == 2
+        assert result["paging"]["offset"] == 1
+        assert "mcp-side" in result["paging"]["applied"]
+        # both GETs went out with NO query params (upstream ignores them);
+        # slicing happens purely MCP-side after the response
+        assert client.calls == [("GET", path, None), ("GET", path, None)]
+
+    def test_users(self, monkeypatch):
+        self._assert_tool(monkeypatch, "/api/v1/users", main_mod.npg_list_users, (2, 1))
+
+    def test_roles(self, monkeypatch):
+        self._assert_tool(monkeypatch, "/api/v1/roles", main_mod.npg_list_roles, (2, 1))
+
+    def test_sso_providers(self, monkeypatch):
+        self._assert_tool(
+            monkeypatch,
+            "/api/v1/sso-providers",
+            main_mod.npg_list_sso_providers,
+            (2, 1),
+        )
+
+    def test_api_tokens(self, monkeypatch):
+        self._assert_tool(
+            monkeypatch, "/api/v1/api-tokens", main_mod.npg_list_api_tokens, (2, 1)
+        )
+
+    def test_cloud_providers(self, monkeypatch):
+        self._assert_tool(
+            monkeypatch,
+            "/api/v1/cloud-providers",
+            main_mod.npg_list_cloud_providers,
+            (2, 1),
+        )
+
+    def test_notification_channels(self, monkeypatch):
+        self._assert_tool(
+            monkeypatch,
+            "/api/v1/notification-channels",
+            main_mod.npg_list_notification_channels,
+            (2, 1),
+        )
+
+    def test_uri_blocks(self, monkeypatch):
+        self._assert_tool(
+            monkeypatch, "/api/v1/uri-blocks", main_mod.npg_list_uri_blocks, (2, 1)
+        )
+
+    def test_proxy_host_groups_slices_tags_only(self, monkeypatch):
+        data = {"tags": [{"name": f"t{i}", "count": 1} for i in range(5)],
+                "domains": ["a.com", "b.com"], "status": {"enabled": 1, "disabled": 1}}
+        client = _fake(monkeypatch, "/api/v1/proxy-hosts/groups", data)
+        result = _run(main_mod.npg_list_proxy_host_groups(limit=2, offset=1))
+        assert result["data"]["tags"] == data["tags"][1:3]
+        assert result["data"]["domains"] == ["a.com", "b.com"]  # untouched
+        assert result["paging"]["total"] == 5
+        # zero-arg unchanged
+        result = _run(main_mod.npg_list_proxy_host_groups())
+        assert result == {"success": True, "data": data}
+        assert client.calls == [
+            ("GET", "/api/v1/proxy-hosts/groups", None),
+            ("GET", "/api/v1/proxy-hosts/groups", None),
+        ]
+
+    def test_exploit_rules_slices_per_category(self, monkeypatch):
+        data = {"categories": [{"id": "c", "rules": [{"id": i} for i in range(4)]}],
+                "total_rules": 4}
+        client = _fake(monkeypatch, "/api/v1/exploit-rules", data)
+        result = _run(main_mod.npg_list_exploit_rules(limit=2, offset=1))
+        assert result["data"]["categories"][0]["rules"] == [{"id": 1}, {"id": 2}]
+        assert result["data"]["total_rules"] == 4
+        assert client.calls == [("GET", "/api/v1/exploit-rules", None)]
+
+    def test_waf_rules_paging_coexists_with_proxy_host_filter(self, monkeypatch):
+        data = {"categories": [{"id": "c", "rules": [{"id": i} for i in range(6)]}],
+                "total_rules": 6}
+        client = _fake(monkeypatch, "/api/v1/waf/rules", data)
+        result = _run(main_mod.npg_list_waf_rules(
+            proxy_host_id="123e4567-e89b-12d3-a456-426614174000", limit=3, offset=2))
+        assert result["data"]["categories"][0]["rules"] == [
+            {"id": 2}, {"id": 3}, {"id": 4},
+        ]
+        # upstream filter still sent; no pagination params in the query string
+        assert client.calls == [("GET", "/api/v1/waf/rules", {
+            "proxy_host_id": "123e4567-e89b-12d3-a456-426614174000",
+        })]
+
+    def test_negative_limit_clean_error_no_http_call(self, monkeypatch):
+        users_client = _fake(monkeypatch, "/api/v1/users", [])
+        result = _run(main_mod.npg_list_users(limit=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        # waf_rules: same validation, different fixture path
+        waf_client = _fake(monkeypatch, "/api/v1/waf/rules", {"categories": []})
+        result = _run(main_mod.npg_list_waf_rules(limit=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert users_client.calls == [] and waf_client.calls == []
