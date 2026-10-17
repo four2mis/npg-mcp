@@ -918,7 +918,7 @@ npg_get_system_settings:
   parameters: []
 
 npg_update_system_settings:
-  description: "Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false."
+  description: "Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
@@ -961,7 +961,7 @@ npg_get_access_list:
       required: true
 
 npg_create_access_list:
-  description: "CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth (bool, allow authenticated users to bypass), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all, description, sort_order)."
+  description: "CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address, description. hostname = domain allow rule, address is a DDNS name, deny refused; legacy = old name-rule resent as-is; without kind address must be IP/CIDR/all)."
   parameters:
     - name: name
       type: string
@@ -980,7 +980,7 @@ npg_create_access_list:
       required: false
 
 npg_update_access_list:
-  description: "UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth (bool), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all)."
+  description: "UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address. Rules returned as read keep what they are; legacy rules must already be in the list; hostname rules allow-only, stored lowercase)."
   parameters:
     - name: list_id
       type: integer | string
@@ -1007,6 +1007,30 @@ npg_delete_access_list:
     - name: list_id
       type: integer | string
       required: true
+
+npg_confirm_access_list_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in an access list. REQUIRED: list_id, hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: list_id
+      type: integer | string
+      required: true
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
+
+npg_get_dns_entries:
+  description: "GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure."
+  parameters: []
+
+npg_apply_dns_entries:
+  description: "Force-apply the domain (DDNS) entries to nginx NOW (writes include files, runs nginx -t + reload immediately, ignoring the retry schedule). No params. 200 returns DNSApplyResponse (outcome: accepted/unconfirmed/signalled/skipped/blocked/failed/not_up, with detail/blocking_file); 409 code=nginx_reload_rejected. Publishes or removes nothing — it applies what the DB already says."
+  parameters: []
 
 npg_list_dns_providers:
   description: "LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back."

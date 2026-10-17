@@ -164,7 +164,7 @@ Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) ca
 
 ## Tools Reference
 
-This server exposes **304 MCP tools** across 27 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **307 MCP tools** across 28 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
@@ -182,11 +182,12 @@ This server exposes **304 MCP tools** across 27 categories. Tool names, descript
 | **API Tokens** | 8 tools |
 | **Users** | 9 tools |
 | **SSO Providers** | 8 tools |
+| **Other** | 2 tools |
 | **Dashboard** | 3 tools |
 | **IP Management** | 4 tools |
 | **Notification Channels** | 7 tools |
 | **Redirect Hosts** | 6 tools |
-| **Access Lists** | 5 tools |
+| **Access Lists** | 6 tools |
 | **Geo** | 10 tools |
 | **Fail2ban & Challenge** | 3 tools |
 | **Banned IPs & Bots** | 7 tools |
@@ -249,7 +250,7 @@ Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always docume
 
 ```
 npg_mcp/
-  main.py       # All 304 MCP tools
+  main.py       # All 307 MCP tools
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Layered toolset exposure (NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
