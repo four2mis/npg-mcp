@@ -53,6 +53,9 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
     "npg_update_system_settings": frozenset({
         "geoip_enabled", "maxmind_license_key", "maxmind_account_id",
         "geoip_auto_update", "geoip_update_interval",
+        # v2.63.0: DNSEntrySettings partial PUT object (omitted/null key keeps
+        # stored value; unknown key / wrong type / out-of-range number -> 400)
+        "dns_entry_settings",
         "acme_enabled", "acme_email", "acme_staging", "acme_auto_renew",
         "acme_renew_days_before", "acme_dns_provider", "acme_dns_credentials",
         "notification_email", "notify_cert_expiry", "notify_cert_expiry_days",

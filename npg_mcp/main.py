@@ -2368,7 +2368,7 @@ async def npg_get_system_settings() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_system_settings", description="Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_system_settings", description="Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false.")
 async def npg_update_system_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_system_settings", kwargs, strict)
     c = _get_client()
@@ -2432,7 +2432,7 @@ async def npg_get_access_list(list_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_access_list", description="CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth (bool, allow authenticated users to bypass), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all, description, sort_order).")
+@mcp.tool(name="npg_create_access_list", description="CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address, description. hostname = domain allow rule, address is a DDNS name, deny refused; legacy = old name-rule resent as-is; without kind address must be IP/CIDR/all).")
 async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     try:
         _validate_required("name", name)
@@ -2448,7 +2448,7 @@ async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pas
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth (bool), description, items (list of dicts with directive=allow|deny, address=IP/CIDR/all).")
+@mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address. Rules returned as read keep what they are; legacy rules must already be in the list; hostname rules allow-only, stored lowercase).")
 async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
     try:
         _validate_id("list_id", list_id)
@@ -2475,6 +2475,42 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
         c = _get_client()
         data = await _api(c.delete, f"/api/v1/access-lists/{_id_path(list_id)}")
         return _mutate_result(data, f"Access list {_id_str(list_id)} deleted")
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_access_list_dns", description="Re-allow a domain entry that waits for review (needs_review) in an access list. REQUIRED: list_id, hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_access_list_dns(list_id: str | int, hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_id("list_id", list_id)
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, f"/api/v1/access-lists/{_id_path(list_id)}/dns-confirm", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+
+# ── Domain Entries (DDNS) ─────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_dns_entries", description="GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure.")
+async def npg_get_dns_entries() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/dns-entries")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_apply_dns_entries", description="Force-apply the domain (DDNS) entries to nginx NOW (writes include files, runs nginx -t + reload immediately, ignoring the retry schedule). No params. 200 returns DNSApplyResponse (outcome: accepted/unconfirmed/signalled/skipped/blocked/failed/not_up, with detail/blocking_file); 409 code=nginx_reload_rejected. Publishes or removes nothing — it applies what the DB already says.")
+async def npg_apply_dns_entries() -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.post, "/api/v1/dns-entries/apply", {})
+        return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
