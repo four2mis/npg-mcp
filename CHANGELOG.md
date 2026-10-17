@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.45] - 2026-10-17
+
+### What changed
+- Synced the MCP wrapper with upstream NPG v2.63.0 (commit 4e60684): 3 new API endpoints gained MCP tools, and `npg_update_system_settings` now whitelists the new `dns_entry_settings` kwargs block (DNS entry limits accept values 1–256; verified live: 64→90 set, out-of-range 999 rejected with the documented API 400).
+- `npg_update_system_settings` now whitelists `dns_entry_settings` (DNS entry limit + status; partial object — an omitted or null key keeps its stored value). Descriptions of `npg_update_settings`-style kwargs tools unchanged otherwise; unknown fields were already rejected client-side unless `strict=false` (behavior from an earlier release, verified live this cycle).
+- Regenerated tool-schemas.yaml + README.md + README.ko.md after the sync (commit 3faf6b7): tool-schemas.yaml now covers all 307 tools, README Access Lists category 5→6, new "Other" category (2 tools). Drift check exits 0.
+- Verified at commit 4e60684 against the isolated test stack with a local image pinned to that exact SHA (npg-test-mcp @ 127.0.0.1:8082, NPG @ 192.168.0.140): all 3 new tools + `dns_entry_settings` kwargs + access-list hostname flows pass live, error paths match documented codes, regression sample clean, 307/307 tools registered in FastMCP (0 dupes, 0 non-NPG), tier counts pass the pipeline check (read=139, standard=260, full=307), doc drift check exit 0.
+
+### What's new
+- New tool `npg_get_dns_entries` — DNS entry overview per settings/env switches, apply state, and entries.
+- New tool `npg_apply_dns_entries` — applies pending DNS entries (returns `outcome=accepted`).
+- New tool `npg_confirm_access_list_dns` — confirms access-list DNS after review (404 missing list / 400 not a domain / 400 not awaiting review all match documented behavior).
+- New capability: DNS entry settings management (entry limit + status) via `npg_update_system_settings` `dns_entry_settings`.
+- New capability: access-list rules now support `kind=hostname` DDNS name entries in `npg_create_access_list` / `npg_update_access_list`, and `npg_get_access_list` shows DNS entry status.
+
+### Breaking changes
+- (none)
+
 ## [0.5.44] - 2026-10-14
 
 ### What changed
