@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.46] - 2026-10-19
+
+### What changed
+- Synced the MCP wrapper with upstream NPG v2.64.0 (commit 68b12f4): the geo / rate-limit / URI-block / trusted IP exception lists now accept **hostname (DDNS domain-name) entries** in addition to IP/CIDR entries, and 5 new DNS-confirm tools were added. `swagger.yaml` re-synced to the v2.64.0 spec (+628 lines).
+- Hostname support is exposed on the existing mutating tools as new partial-update params: `allowed_hostnames` on `npg_create_proxy_host_geo` / `npg_update_proxy_host_geo` / `npg_update_global_geo`, `whitelist_hostnames` on `npg_update_proxy_host_rate_limit` / `npg_update_global_rate_limit`, `exception_hostnames` on `npg_update_proxy_host_uri_block` / `npg_update_global_uri_block`, and `global_trusted_hostnames` via the `npg_update_system_settings` kwargs whitelist. Each follows the established partial-update contract — omit = keep the stored list, `[]` = clear.
+- `npg_update_system_settings` now whitelists the new `global_trusted_hostnames` kwargs key in `npg_mcp/upstream_models.py`.
+- Regenerated `tool-schemas.yaml` + `README.md` + `README.ko.md` after the sync (commit 348a59f): tool-schemas.yaml and both READMEs now cover all 312 tools (Proxy Hosts 45→46, Geo 10→11, Security & WAF 30→31, Settings 11→12, URI Block 6→7); doc drift check exits 0.
+- Updated hardcoded unit-test guardrails (`tests/test_health.py`, `tests/test_toolsets.py`) to the new surface: 312 tools, read=139, standard=265, full=312; full pytest suite green (440 passed).
+- Verified at commit 68b12f4 against the isolated test stack with a local image pinned to that exact SHA (`local/npg-mcp:68b12f4@sha256:5d7013df…`, task t_a23806a7): a 30-check live sweep passed 30/30 — all 5 new `npg_confirm_*_dns` tools callable, all 7 new hostname params verified as stored on GET, 312 tools / 0 duplicate names, AST syntax OK, tier counts match (`--check-env` ✅), 11-tool regression sample clean, and cleanup confirmed (disposable host 404, globals restored).
+
+### What's new
+- New tool `npg_confirm_proxy_host_dns` — re-allow a domain entry that waits for review (`needs_review`) in a proxy host's exception lists (URI-block exceptions, priority allow, rate-limit exceptions); re-resolves the name (≤3s) and publishes only if it still matches.
+- New tool `npg_confirm_trusted_dns` — same re-allow flow for the global trusted list (`system-settings` `global_trusted_hostnames`).
+- New tool `npg_confirm_global_uri_block_dns` — re-allow a `needs_review` domain in the global URI-block exceptions.
+- New tool `npg_confirm_global_geo_dns` — re-allow a `needs_review` domain in the global priority allow list (global GeoIP `allowed_hostnames`).
+- New tool `npg_confirm_global_rate_limit_dns` — re-allow a `needs_review` domain in the global rate-limit exceptions.
+- New capability: domain (DDNS) name entries in allow / exception / whitelist / trusted lists — a domain name whose resolved addresses count as the corresponding IP entry, managed via the new `*_hostnames` params and confirmed via the 5 `npg_confirm_*_dns` tools.
+
+### Breaking changes
+- Domain names are no longer accepted in the IP/CIDR list fields: sending a hostname in `whitelist_ips`, `allowed_ips`, `exception_ips`, or `global_trusted_ips` now returns HTTP 400 `hostname_in_ip_field`. Use the corresponding new `*_hostnames` parameter instead.
+
 ## [0.5.45] - 2026-10-17
 
 ### What changed
