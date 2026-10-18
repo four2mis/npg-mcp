@@ -168,16 +168,16 @@ This server exposes **312 MCP tools** across 28 categories. Tool names, descript
 
 | Category | Tools |
 |----------|-------|
-| **Proxy Hosts** | 45 tools |
+| **Proxy Hosts** | 46 tools |
 | **Logs** | 38 tools |
-| **Security & WAF** | 30 tools |
+| **Security & WAF** | 31 tools |
 | **DNS Providers** | 15 tools |
 | **Authentication** | 9 tools |
 | **Certificates** | 15 tools |
 | **Filter Subscriptions** | 15 tools |
 | **Cloud Providers** | 13 tools |
-| **URI Block** | 6 tools |
-| **Settings** | 11 tools |
+| **URI Block** | 7 tools |
+| **Settings** | 12 tools |
 | **Backups** | 8 tools |
 | **API Tokens** | 8 tools |
 | **Users** | 9 tools |
@@ -188,7 +188,7 @@ This server exposes **312 MCP tools** across 28 categories. Tool names, descript
 | **Notification Channels** | 7 tools |
 | **Redirect Hosts** | 6 tools |
 | **Access Lists** | 6 tools |
-| **Geo** | 10 tools |
+| **Geo** | 11 tools |
 | **Fail2ban & Challenge** | 3 tools |
 | **Banned IPs & Bots** | 7 tools |
 | **Roles** | 4 tools |

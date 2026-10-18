@@ -168,16 +168,16 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 | 카테고리 | 도구 |
 |----------|-------|
-| **프록시 호스트(Proxy Hosts)** | 45 tools |
+| **프록시 호스트(Proxy Hosts)** | 46 tools |
 | **로그(Logs)** | 38 tools |
-| **보안 및 WAF(Security & WAF)** | 30 tools |
+| **보안 및 WAF(Security & WAF)** | 31 tools |
 | **DNS 제공자(DNS Providers)** | 15 tools |
 | **인증(Authentication)** | 9 tools |
 | **인증서(Certificates)** | 15 tools |
 | **필터 구독(Filter Subscriptions)** | 15 tools |
 | **클라우드 제공자(Cloud Providers)** | 13 tools |
-| **URI 차단(URI Block)** | 6 tools |
-| **설정(Settings)** | 11 tools |
+| **URI 차단(URI Block)** | 7 tools |
+| **설정(Settings)** | 12 tools |
 | **백업(Backups)** | 8 tools |
 | **API 토큰(API Tokens)** | 8 tools |
 | **사용자(Users)** | 9 tools |
@@ -188,7 +188,7 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | **알림 채널(Notification Channels)** | 7 tools |
 | **리다이렉트 호스트(Redirect Hosts)** | 6 tools |
 | **액세스 목록(Access Lists)** | 6 tools |
-| **지역(Geo)** | 10 tools |
+| **지역(Geo)** | 11 tools |
 | **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3 tools |
 | **차단 IP 및 봇(Banned IPs & Bots)** | 7 tools |
 | **역할(Roles)** | 4 tools |

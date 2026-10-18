@@ -706,7 +706,7 @@ npg_get_proxy_host_rate_limit:
       required: true
 
 npg_update_proxy_host_rate_limit:
-  description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list)."
+  description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list), whitelist_hostnames (domain/DDNS names whose addresses count as whitelist_ips; omit=keep, []=clear — a domain name sent in whitelist_ips now 400s hostname_in_ip_field)."
   parameters:
     - name: host_id
       type: integer | string
@@ -734,6 +734,9 @@ npg_update_proxy_host_rate_limit:
       required: false
     - name: whitelist_ips
       type: string
+      required: false
+    - name: whitelist_hostnames
+      type: array<string>
       required: false
 
 npg_get_proxy_host_bot_filter:
@@ -877,7 +880,7 @@ npg_get_proxy_host_uri_block:
       required: true
 
 npg_update_proxy_host_uri_block:
-  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
+  description: "UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -897,6 +900,25 @@ npg_update_proxy_host_uri_block:
     - name: skip_reload
       type: boolean
       required: false
+    - name: exception_hostnames
+      type: array<string>
+      required: false
+
+npg_confirm_proxy_host_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in a proxy host's exception lists (URI block exceptions, priority allow, rate limit exceptions). REQUIRED: host_id, hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
 
 npg_get_settings:
   description: "GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset."
@@ -918,7 +940,7 @@ npg_get_system_settings:
   parameters: []
 
 npg_update_system_settings:
-  description: "Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false."
+  description: "Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domain/DDNS names trusted like global_trusted_ips; omit=keep, []=clear — a domain name sent in global_trusted_ips now 400s hostname_in_ip_field), UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
@@ -927,6 +949,19 @@ npg_update_system_settings:
       type: boolean
       required: false
       default: true
+
+npg_confirm_trusted_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in the global trusted list (system-settings global_trusted_hostnames). REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
 
 npg_get_dashboard:
   description: "Get dashboard data (summary of proxy hosts, certificates, etc.)."
@@ -1216,7 +1251,7 @@ npg_get_proxy_host_geo:
       required: true
 
 npg_create_proxy_host_geo:
-  description: "CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
+  description: "CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. After creating the geo restriction, re-allow a needs_review domain with npg_confirm_proxy_host_dns. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
   parameters:
     - name: host_id
       type: integer | string
@@ -1254,9 +1289,12 @@ npg_create_proxy_host_geo:
     - name: skip_reload
       type: boolean
       required: false
+    - name: allowed_hostnames
+      type: array<string>
+      required: false
 
 npg_update_proxy_host_geo:
-  description: "UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable)."
+  description: "UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable). Re-allow a needs_review domain with npg_confirm_proxy_host_dns."
   parameters:
     - name: host_id
       type: integer | string
@@ -1284,6 +1322,9 @@ npg_update_proxy_host_geo:
       required: false
     - name: allow_search_bots
       type: boolean
+      required: false
+    - name: allowed_hostnames
+      type: array<string>
       required: false
 
 npg_delete_proxy_host_geo:
@@ -2352,7 +2393,7 @@ npg_get_global_uri_block:
   parameters: []
 
 npg_update_global_uri_block:
-  description: "UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips."
+  description: "UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. Re-allow a needs_review domain with npg_confirm_global_uri_block_dns."
   parameters:
     - name: enabled
       type: boolean
@@ -2366,6 +2407,22 @@ npg_update_global_uri_block:
     - name: allow_private_ips
       type: boolean
       required: false
+    - name: exception_hostnames
+      type: array<string>
+      required: false
+
+npg_confirm_global_uri_block_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in the global URI block exceptions. REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
 
 npg_add_global_uri_block_rule:
   description: "ADD a rule to the global URI block. REQUIRED: pattern. Optional: match_type (exact/prefix/regex, default prefix), description, enabled (default true)."
@@ -2567,7 +2624,7 @@ npg_get_global_geo:
   parameters: []
 
 npg_update_global_geo:
-  description: "UPDATE global GeoIP restriction (partial update; global default inherited by hosts without their own override). Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode."
+  description: "UPDATE global GeoIP restriction (partial update; global default inherited by hosts without their own override). Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips — the priority allow list; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), allow_private_ips, allow_search_bots, challenge_mode. Re-allow a needs_review domain with npg_confirm_global_geo_dns."
   parameters:
     - name: enabled
       type: boolean
@@ -2590,13 +2647,29 @@ npg_update_global_geo:
     - name: challenge_mode
       type: boolean
       required: false
+    - name: allowed_hostnames
+      type: array<string>
+      required: false
+
+npg_confirm_global_geo_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in the global priority allow list (global GeoIP allowed_hostnames). REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
 
 npg_get_global_rate_limit:
   description: "GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit."
   parameters: []
 
 npg_update_global_rate_limit:
-  description: "UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400)."
+  description: "UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400), whitelist_hostnames (domain/DDNS names whose addresses count as whitelist_ips; omit=keep, []=clear — a domain name sent in whitelist_ips now 400s hostname_in_ip_field). Re-allow a needs_review domain with npg_confirm_global_rate_limit_dns."
   parameters:
     - name: enabled
       type: boolean
@@ -2619,6 +2692,22 @@ npg_update_global_rate_limit:
     - name: whitelist_ips
       type: string
       required: false
+    - name: whitelist_hostnames
+      type: array<string>
+      required: false
+
+npg_confirm_global_rate_limit_dns:
+  description: "Re-allow a domain entry that waits for review (needs_review) in the global rate limit exceptions. REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected."
+  parameters:
+    - name: hostname
+      type: string
+      required: true
+    - name: expected_addresses
+      type: array<string>
+      required: true
+    - name: expected_canonical_name
+      type: string
+      required: true
 
 npg_get_global_fail2ban:
   description: "GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log."
