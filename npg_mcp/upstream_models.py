@@ -80,6 +80,9 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         "waf_auto_ban_enabled", "waf_auto_ban_threshold",
         "waf_auto_ban_window", "waf_auto_ban_duration",
         "global_trusted_ips", "global_trusted_ips_bypass_waf",
+        # v2.64.0: domain (DDNS) names trusted like global_trusted_ips
+        # (omitted key keeps the stored names, [] clears them)
+        "global_trusted_hostnames",
         "global_block_exploits_exceptions", "direct_ip_access_action",
         "ui_font_family", "ui_error_page_language",
         "system_logs_enabled", "system_logs_levels",

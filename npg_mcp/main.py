@@ -2171,8 +2171,8 @@ async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list).")
-async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None, whitelist_ips: str | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_rate_limit", description="UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list), whitelist_hostnames (domain/DDNS names whose addresses count as whitelist_ips; omit=keep, []=clear — a domain name sent in whitelist_ips now 400s hostname_in_ip_field).")
+async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, disable_global: bool | None = None, whitelist_ips: str | None = None, whitelist_hostnames: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2187,6 +2187,7 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
                 "limit_response": "limit_response",
                 "disable_global": "disable_global",
                 "whitelist_ips": "whitelist_ips",
+                "whitelist_hostnames": "whitelist_hostnames",
             },
         )
         data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/rate-limit", body)
@@ -2317,8 +2318,8 @@ async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
-async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, skip_reload: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. REQUIRED: host_id. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, skip_reload: bool | None = None, exception_hostnames: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2329,10 +2330,26 @@ async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | No
                 "rules": "rules",
                 "exception_ips": "exception_ips",
                 "allow_private_ips": "allow_private_ips",
+                "exception_hostnames": "exception_hostnames",
             },
         )
         params = {"skip_reload": "true"} if skip_reload else None
         data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block", body, params=params)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_proxy_host_dns", description="Re-allow a domain entry that waits for review (needs_review) in a proxy host's exception lists (URI block exceptions, priority allow, rate limit exceptions). REQUIRED: host_id, hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_proxy_host_dns(host_id: str | int, hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/dns-confirm", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2368,12 +2385,26 @@ async def npg_get_system_settings() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_system_settings", description="Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs, UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_system_settings", description="Update system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domain/DDNS names trusted like global_trusted_ips; omit=keep, []=clear — a domain name sent in global_trusted_ips now 400s hostname_in_ip_field), UI, dns_entry_settings for DDNS domain entries — partial object, an omitted or null key keeps its stored value). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false.")
 async def npg_update_system_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_system_settings", kwargs, strict)
     c = _get_client()
     try:
         data = await _api(c.put, "/api/v1/system-settings", kwargs or {})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_trusted_dns", description="Re-allow a domain entry that waits for review (needs_review) in the global trusted list (system-settings global_trusted_hostnames). REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_trusted_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, "/api/v1/system-settings/trusted-dns-confirm", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2722,8 +2753,8 @@ async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
-async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True, skip_reload: bool | None = None) -> dict:
+@mcp.tool(name="npg_create_proxy_host_geo", description="CREATE geo restriction for a proxy host. Required: host_id, countries (list of ISO codes, min 1). Optional: mode (whitelist/blacklist, default blacklist), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), challenge_mode, disable_global (bool — false=inherit, true=disable global), allow_private_ips, allow_search_bots. After creating the geo restriction, re-allow a needs_review domain with npg_confirm_proxy_host_dns. skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once.")
+async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mode: Literal["whitelist", "blacklist"] = "blacklist", enabled: bool = True, allowed_ips: list[str] | None = None, challenge_mode: bool = False, disable_global: bool = False, allow_private_ips: bool = True, allow_search_bots: bool = True, skip_reload: bool | None = None, allowed_hostnames: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         _validate_required("countries", countries)
@@ -2731,14 +2762,15 @@ async def npg_create_proxy_host_geo(host_id: str | int, countries: list[str], mo
         # Non-standard: pre-seeded defaults dict (create semantics) + conditional — kept as-is (not _build_body).
         body: dict = {"mode": mode, "countries": countries, "enabled": enabled, "challenge_mode": challenge_mode, "disable_global": disable_global, "allow_private_ips": allow_private_ips, "allow_search_bots": allow_search_bots}
         if allowed_ips is not None: body["allowed_ips"] = allowed_ips
+        if allowed_hostnames is not None: body["allowed_hostnames"] = allowed_hostnames
         params = {"skip_reload": "true"} if skip_reload else None
         data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body, params=params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable).")
-async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_geo", description="UPDATE geo restriction for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), challenge_mode, allow_private_ips, allow_search_bots, disable_global (omit=inherit, false=inherit, true=disable). Re-allow a needs_review domain with npg_confirm_proxy_host_dns.")
+async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, challenge_mode: bool | None = None, disable_global: bool | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None, allowed_hostnames: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2753,6 +2785,7 @@ async def npg_update_proxy_host_geo(host_id: str | int, enabled: bool | None = N
                 "disable_global": "disable_global",
                 "allow_private_ips": "allow_private_ips",
                 "allow_search_bots": "allow_search_bots",
+                "allowed_hostnames": "allowed_hostnames",
             },
         )
         data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/geo", body)
@@ -3982,8 +4015,8 @@ async def npg_get_global_uri_block() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_uri_block", description="UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips.")
-async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_global_uri_block", description="UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. Re-allow a needs_review domain with npg_confirm_global_uri_block_dns.")
+async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, exception_hostnames: list[str] | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
@@ -3993,9 +4026,24 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
                 "rules": "rules",
                 "exception_ips": "exception_ips",
                 "allow_private_ips": "allow_private_ips",
+                "exception_hostnames": "exception_hostnames",
             },
         )
         data = await _api(c.put, "/api/v1/global-uri-block", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_global_uri_block_dns", description="Re-allow a domain entry that waits for review (needs_review) in the global URI block exceptions. REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_global_uri_block_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, "/api/v1/global-uri-block/dns-confirm", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4301,8 +4349,8 @@ async def npg_get_global_geo() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_geo", description="UPDATE global GeoIP restriction (partial update; global default inherited by hosts without their own override). Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allow_private_ips, allow_search_bots, challenge_mode.")
-async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None, challenge_mode: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_global_geo", description="UPDATE global GeoIP restriction (partial update; global default inherited by hosts without their own override). Optional: enabled, mode (whitelist/blacklist), countries (ISO codes), allowed_ips, allowed_hostnames (domain/DDNS names whose addresses count as allowed_ips — the priority allow list; omit=keep, []=clear — a domain name sent in allowed_ips now 400s hostname_in_ip_field), allow_private_ips, allow_search_bots, challenge_mode. Re-allow a needs_review domain with npg_confirm_global_geo_dns.")
+async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whitelist", "blacklist"] | None = None, countries: list[str] | None = None, allowed_ips: list[str] | None = None, allow_private_ips: bool | None = None, allow_search_bots: bool | None = None, challenge_mode: bool | None = None, allowed_hostnames: list[str] | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
@@ -4315,9 +4363,24 @@ async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whit
                 "allow_private_ips": "allow_private_ips",
                 "allow_search_bots": "allow_search_bots",
                 "challenge_mode": "challenge_mode",
+                "allowed_hostnames": "allowed_hostnames",
             },
         )
         data = await _api(c.put, "/api/v1/settings/global-geo", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_global_geo_dns", description="Re-allow a domain entry that waits for review (needs_review) in the global priority allow list (global GeoIP allowed_hostnames). REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_global_geo_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, "/api/v1/settings/global-geo/dns-confirm", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4334,8 +4397,8 @@ async def npg_get_global_rate_limit() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_rate_limit", description="UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400).")
-async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, whitelist_ips: str | None = None) -> dict:
+@mcp.tool(name="npg_update_global_rate_limit", description="UPDATE global rate limit configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep stored list, \"\"=clear; IP/CIDR entries, invalid 400), whitelist_hostnames (domain/DDNS names whose addresses count as whitelist_ips; omit=keep, []=clear — a domain name sent in whitelist_ips now 400s hostname_in_ip_field). Re-allow a needs_review domain with npg_confirm_global_rate_limit_dns.")
+async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per_second: int | None = None, burst_size: int | None = None, zone_size: str | None = None, limit_by: str | None = None, limit_response: int | None = None, whitelist_ips: str | None = None, whitelist_hostnames: list[str] | None = None) -> dict:
     c = _get_client()
     try:
         body = _build_body(
@@ -4348,9 +4411,24 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
                 "limit_by": "limit_by",
                 "limit_response": "limit_response",
                 "whitelist_ips": "whitelist_ips",
+                "whitelist_hostnames": "whitelist_hostnames",
             },
         )
         data = await _api(c.put, "/api/v1/settings/global-rate-limit", body)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_confirm_global_rate_limit_dns", description="Re-allow a domain entry that waits for review (needs_review) in the global rate limit exceptions. REQUIRED: hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). Looks the name up again (<=3s) and publishes the answer only if it still matches. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 403 the caller lacks a write permission of another list that uses the domain; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+async def npg_confirm_global_rate_limit_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
+    try:
+        _validate_required("hostname", hostname)
+        _validate_required("expected_canonical_name", expected_canonical_name)
+        if not expected_addresses:
+            raise ValueError("expected_addresses is required (list of observed addresses)")
+        c = _get_client()
+        body = {"hostname": hostname, "expected_addresses": expected_addresses, "expected_canonical_name": expected_canonical_name}
+        data = await _api(c.post, "/api/v1/settings/global-rate-limit/dns-confirm", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
