@@ -58,7 +58,7 @@ npg_get_proxy_host_full:
       required: false
 
 npg_create_proxy_host:
-  description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*."
+  description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl (incl. ssl_http3), cache, timeouts, buffering, access, auth, ddns, stream_*; WAF tuning when waf_use_global=false: waf_mode (detection|blocking), waf_paranoia_level, waf_anomaly_threshold."
   parameters:
     - name: domain_names
       type: array<string>
@@ -72,13 +72,7 @@ npg_create_proxy_host:
     - name: forward_scheme
       type: string
       required: false
-    - name: block_normal
-      type: boolean
-      required: false
     - name: waf_enabled
-      type: boolean
-      required: false
-    - name: block_http
       type: boolean
       required: false
     - name: ssl_enabled
@@ -108,14 +102,8 @@ npg_create_proxy_host:
     - name: cache_ttl
       type: string
       required: false
-    - name: cache_template
-      type: string
-      required: false
     - name: advanced_config
       type: string
-      required: false
-    - name: enable_proxy_headers
-      type: boolean
       required: false
     - name: block_exploits
       type: boolean
@@ -224,7 +212,7 @@ npg_create_proxy_host:
       required: false
 
 npg_update_proxy_host:
-  description: "UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible."
+  description: "UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible."
   parameters:
     - name: host_id
       type: integer | string
@@ -241,9 +229,6 @@ npg_update_proxy_host:
     - name: forward_scheme
       type: string
       required: false
-    - name: block_normal
-      type: boolean
-      required: false
     - name: waf_enabled
       type: boolean
       required: false
@@ -258,9 +243,6 @@ npg_update_proxy_host:
       required: false
     - name: waf_anomaly_threshold
       type: integer
-      required: false
-    - name: block_http
-      type: boolean
       required: false
     - name: ssl_forced
       type: boolean
@@ -277,14 +259,8 @@ npg_update_proxy_host:
     - name: cache_ttl
       type: string
       required: false
-    - name: cache_template
-      type: string
-      required: false
     - name: advanced_config
       type: string
-      required: false
-    - name: enable_proxy_headers
-      type: boolean
       required: false
     - name: enabled
       type: boolean
@@ -530,7 +506,7 @@ npg_import_proxy_host:
       default: true
 
 npg_bulk_import_proxy_hosts:
-  description: "BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; other columns optional, inherit global defaults when empty. Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually."
+  description: "BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; optional columns: forward_scheme, ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, cache_enabled, cache_ttl, block_exploits, waf_enabled, waf_use_global, waf_paranoia_level, waf_mode, client_max_body_size, advanced_config, access_list_id, auth_provider_id, proxy_type, enabled (other columns ignored — note: no block_normal column; upstream has no such field). Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually."
   parameters:
     - name: csv_data
       type: string
@@ -1884,7 +1860,7 @@ npg_get_api_token:
       required: true
 
 npg_create_api_token:
-  description: "Create a new API token. Required: name, permissions (array). Optional: expires_at."
+  description: "Create a new API token. Required: name, permissions (array). Optional: expires_in — '<n>' + unit suffix (e.g. '30d', '12h', '1y') or 'never'; omit = never expires."
   parameters:
     - name: name
       type: string
@@ -1892,7 +1868,7 @@ npg_create_api_token:
     - name: permissions
       type: array<string>
       required: true
-    - name: expires_at
+    - name: expires_in
       type: string
       required: false
 
@@ -2054,7 +2030,7 @@ npg_get_user:
       required: true
 
 npg_create_user:
-  description: "CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Optional: is_active. The API rejects creation without a valid role_id (empty string causes 500)."
+  description: "CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Created users are active immediately (upstream has no is_active option). The API rejects creation without a valid role_id (empty string causes 500)."
   parameters:
     - name: username
       type: string
@@ -2068,10 +2044,6 @@ npg_create_user:
     - name: role_id
       type: integer | string
       required: true
-    - name: is_active
-      type: boolean
-      required: false
-      default: true
 
 npg_set_user_password:
   description: "Set/reset a user's password. Required: user_id, new_password."
@@ -3004,7 +2976,7 @@ npg_get_filter_subscription:
       required: true
 
 npg_update_filter_subscription:
-  description: "Update a filter subscription (partial update). Pass only fields to change. REQUIRED: subscription_id."
+  description: "Update a filter subscription (partial update). Pass only fields to change. Optional: name, enabled, refresh_type ('interval'|'daily'|'cron'), refresh_value (interval: '6h'/'12h'/'24h'/'48h'; daily: 'HH:MM'; cron: cron expression), exclude_private_ips. NOTE: no url change — the list URL is create-only upstream. REQUIRED: subscription_id."
   parameters:
     - name: subscription_id
       type: integer | string
@@ -3012,10 +2984,16 @@ npg_update_filter_subscription:
     - name: name
       type: string
       required: false
-    - name: url
+    - name: enabled
+      type: boolean
+      required: false
+    - name: refresh_type
       type: string
       required: false
-    - name: enabled
+    - name: refresh_value
+      type: string
+      required: false
+    - name: exclude_private_ips
       type: boolean
       required: false
 
@@ -3398,16 +3376,19 @@ npg_get_system_settings_logs:
   parameters: []
 
 npg_update_system_settings_logs:
-  description: "Update the container log collector configuration (partial update). Pass only fields to change."
+  description: "UPDATE the container log collector configuration. REQUIRED: at least one field to change. Optional: enabled (bool), levels (dict: container_name -> min level 'debug'/'info'/'warn'/'error'), exclude_patterns (list of regex patterns), stdout_excluded (list of container names). Read-modify-write: the upstream PUT is FULL-REPLACE (absent keys are written as zero values and DISABLE the collector), so the live config is fetched and merged before the PUT — never send a partial body yourself."
   parameters:
-    - name: max_age
-      type: string
+    - name: enabled
+      type: boolean
       required: false
-    - name: max_size
-      type: string
+    - name: levels
+      type: object
       required: false
-    - name: max_files
-      type: integer
+    - name: exclude_patterns
+      type: array<string>
+      required: false
+    - name: stdout_excluded
+      type: array<string>
       required: false
 
 npg_get_audit_log_actions:

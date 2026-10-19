@@ -4,8 +4,8 @@ Verifies, without any network access (recording fake client):
 * CSV parsing: required columns enforced, header-only payload rejected,
   quoted multi-domain cells split into lists,
 * each row routes through npg_create_proxy_host's real code path (the exact
-  POST body carries mapped API field names — certificate_id, ssl_force_https,
-  block_normal_access — plus the tool's hardcoded defaults),
+  POST body carries mapped API field names — certificate_id, ssl_force_https —
+  plus the tool's hardcoded defaults),
 * per-row aggregation: one bad row (bad bool cell, missing domain, bad port)
   fails only its row; valid rows still import,
 * the 50-row bulk cap raises ValueError before any call,
@@ -121,7 +121,9 @@ class TestRowImport:
         # MCP param names map to API field names via npg_create_proxy_host.
         assert body["certificate_id"] == "cert-uuid-1"
         assert body["ssl_force_https"] is False
-        assert body["block_normal_access"] is True
+        # block_normal is a legacy phantom CSV column — upstream v2.64.0 has
+        # no such field, so it must be ignored, never routed into the body.
+        assert "block_normal_access" not in body
         assert body["waf_paranoia_level"] == 3
         # Hardcoded defaults of the create tool are present.
         assert body["proxy_type"] == "http"

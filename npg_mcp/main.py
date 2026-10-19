@@ -878,15 +878,13 @@ async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_proxy_host", description="CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl, cache, timeouts, buffering, access, auth, ddns, stream_*.")
+@mcp.tool(name="npg_create_proxy_host", description="CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. tags: optional list of up to 10 labels (API normalizes to lowercase, max 32 chars each, pattern alnum/._-). Others: ssl (incl. ssl_http3), cache, timeouts, buffering, access, auth, ddns, stream_*; WAF tuning when waf_use_global=false: waf_mode (detection|blocking), waf_paranoia_level, waf_anomaly_threshold.")
 async def npg_create_proxy_host(
     domain_names: list[str],
     forward_host: str,
     forward_port: int,
     forward_scheme: str | None = None,
-    block_normal: bool | None = None,
     waf_enabled: bool | None = None,
-    block_http: bool | None = None,
     ssl_enabled: bool = True,
     ssl_forced: bool = True,
     ssl_http2: bool = True,
@@ -895,9 +893,7 @@ async def npg_create_proxy_host(
     cache_enabled: bool | None = None,
     cache_static_only: bool | None = None,
     cache_ttl: str | None = None,
-    cache_template: str | None = None,
     advanced_config: str | None = None,
-    enable_proxy_headers: bool | None = None,
     block_exploits: bool = True,
     block_exploits_exceptions: str | None = None,
     allow_websocket_upgrade: bool = True,
@@ -944,9 +940,7 @@ async def npg_create_proxy_host(
                 "forward_host": "forward_host",
                 "forward_port": "forward_port",
                 "forward_scheme": "forward_scheme",
-                "block_normal": "block_normal_access",
                 "waf_enabled": "waf_enabled",
-                "block_http": "block_http_requests",
                 "ssl_enabled": "ssl_enabled",
                 "ssl_forced": "ssl_force_https",
                 "ssl_http2": "ssl_http2",
@@ -955,9 +949,7 @@ async def npg_create_proxy_host(
                 "cache_enabled": "cache_enabled",
                 "cache_static_only": "cache_static_only",
                 "cache_ttl": "cache_ttl",
-                "cache_template": "cache_template",
                 "advanced_config": "advanced_config",
-                "enable_proxy_headers": "enable_proxy_headers",
                 "block_exploits": "block_exploits",
                 "block_exploits_exceptions": "block_exploits_exceptions",
                 "allow_websocket_upgrade": "allow_websocket_upgrade",
@@ -1000,28 +992,24 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
     forward_host: str | None = None,
     forward_port: int | None = None,
     forward_scheme: str | None = None,
-    block_normal: bool | None = None,
     waf_enabled: bool | None = None,
     waf_mode: str | None = None,
     waf_use_global: bool | None = None,
     waf_paranoia_level: int | None = None,
     waf_anomaly_threshold: int | None = None,
-    block_http: bool | None = None,
     ssl_forced: bool | None = None,
     ssl_cert_id: str | int | None = None,
     cache_enabled: bool | None = None,
     cache_static_only: bool | None = None,
     cache_ttl: str | None = None,
-    cache_template: str | None = None,
     advanced_config: str | None = None,
-    enable_proxy_headers: bool | None = None,
     enabled: bool | None = None,
     ssl_http2: bool | None = None,
     ssl_http3: bool | None = None,
@@ -1057,21 +1045,17 @@ async def npg_update_proxy_host(
                 "forward_host": "forward_host",
                 "forward_port": "forward_port",
                 "forward_scheme": "forward_scheme",
-                "block_normal": "block_normal_access",
                 "waf_enabled": "waf_enabled",
                 "waf_mode": "waf_mode",
                 "waf_use_global": "waf_use_global",
                 "waf_paranoia_level": "waf_paranoia_level",
                 "waf_anomaly_threshold": "waf_anomaly_threshold",
-                "block_http": "block_http_requests",
                 "ssl_forced": "ssl_force_https",
                 "ssl_cert_id": "certificate_id",
                 "cache_enabled": "cache_enabled",
                 "cache_static_only": "cache_static_only",
                 "cache_ttl": "cache_ttl",
-                "cache_template": "cache_template",
                 "advanced_config": "advanced_config",
-                "enable_proxy_headers": "enable_proxy_headers",
                 "enabled": "enabled",
                 "ssl_http2": "ssl_http2",
                 "ssl_http3": "ssl_http3",
@@ -1745,7 +1729,6 @@ _BULK_IMPORT_OPTIONAL_COLUMNS: dict[str, str] = {
     "cache_enabled": "cache_enabled",
     "cache_ttl": "cache_ttl",
     "block_exploits": "block_exploits",
-    "block_normal": "block_normal",
     "waf_enabled": "waf_enabled",
     "waf_use_global": "waf_use_global",
     "waf_paranoia_level": "waf_paranoia_level",
@@ -1781,7 +1764,7 @@ def _parse_csv_cell(name: str, value) -> Any:
         return items
     if name in (
         "ssl_enabled", "ssl_forced", "ssl_http2", "ssl_http3", "cache_enabled",
-        "block_exploits", "block_normal", "waf_enabled", "waf_use_global", "enabled",
+        "block_exploits", "waf_enabled", "waf_use_global", "enabled",
     ):
         lowered = text.lower()
         if lowered in _TRUTHY:
@@ -1829,7 +1812,7 @@ def _parse_import_csv(csv_data: str) -> tuple[list[str], list[dict]]:
     return fieldnames, rows
 
 
-@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; other columns optional, inherit global defaults when empty. Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually.")
+@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data — CSV whose header includes domain_names, forward_host, forward_port; optional columns: forward_scheme, ssl_enabled, ssl_forced, ssl_http2, ssl_http3, ssl_cert_id, cache_enabled, cache_ttl, block_exploits, waf_enabled, waf_use_global, waf_paranoia_level, waf_mode, client_max_body_size, advanced_config, access_list_id, auth_provider_id, proxy_type, enabled (other columns ignored — note: no block_normal column; upstream has no such field). Multi-domain cells are comma-separated inside quotes. Max 50 rows; bad rows fail individually.")
 async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("csv_data", csv_data)
@@ -3438,13 +3421,15 @@ async def npg_get_api_token(token_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, permissions (array). Optional: expires_at.")
-async def npg_create_api_token(name: str, permissions: list[str], expires_at: str | None = None) -> dict:
+@mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, permissions (array). Optional: expires_in — '<n>' + unit suffix (e.g. '30d', '12h', '1y') or 'never'; omit = never expires.")
+async def npg_create_api_token(name: str, permissions: list[str], expires_in: str | None = None) -> dict:
     try:
         _validate_required("name", name)
         _validate_required("permissions", permissions)
         c = _get_client()
-        body = {"name": name, "permissions": permissions, "expires_at": expires_at}
+        body: dict = {"name": name, "permissions": permissions}
+        if expires_in is not None:
+            body["expires_in"] = expires_in
         data = await _api(c.post, "/api/v1/api-tokens", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -3622,15 +3607,15 @@ async def npg_get_user(user_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_user", description="CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Optional: is_active. The API rejects creation without a valid role_id (empty string causes 500).")
-async def npg_create_user(username: str, email: str, password: str, role_id: str | int, is_active: bool = True) -> dict:
+@mcp.tool(name="npg_create_user", description="CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Created users are active immediately (upstream has no is_active option). The API rejects creation without a valid role_id (empty string causes 500).")
+async def npg_create_user(username: str, email: str, password: str, role_id: str | int) -> dict:
     try:
         _validate_required("username", username)
         _validate_required("email", email)
         _validate_required("password", password)
         _validate_id("role_id", role_id)
         c = _get_client()
-        body = {"username": username, "email": email, "password": password, "role_id": _id_str(role_id), "is_active": is_active}
+        body = {"username": username, "email": email, "password": password, "role_id": _id_str(role_id)}
         data = await _api(c.post, "/api/v1/users", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -4829,14 +4814,27 @@ async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_filter_subscription", description="Update a filter subscription (partial update). Pass only fields to change. REQUIRED: subscription_id.")
-async def npg_update_filter_subscription(subscription_id: str | int, name: str | None = None, url: str | None = None, enabled: bool | None = None) -> dict:
+@mcp.tool(name="npg_update_filter_subscription", description="Update a filter subscription (partial update). Pass only fields to change. Optional: name, enabled, refresh_type ('interval'|'daily'|'cron'), refresh_value (interval: '6h'/'12h'/'24h'/'48h'; daily: 'HH:MM'; cron: cron expression), exclude_private_ips. NOTE: no url change — the list URL is create-only upstream. REQUIRED: subscription_id.")
+async def npg_update_filter_subscription(
+    subscription_id: str | int,
+    name: str | None = None,
+    enabled: bool | None = None,
+    refresh_type: str | None = None,
+    refresh_value: str | None = None,
+    exclude_private_ips: bool | None = None,
+) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
         body = _build_body(
             locals(),
-            {"name": "name", "url": "url", "enabled": "enabled"},
+            {
+                "name": "name",
+                "enabled": "enabled",
+                "refresh_type": "refresh_type",
+                "refresh_value": "refresh_value",
+                "exclude_private_ips": "exclude_private_ips",
+            },
         )
         data = await _api(c.put, f"/api/v1/filter-subscriptions/{_id_path(subscription_id)}", body)
         return {"success": True, "data": data}
@@ -5323,14 +5321,43 @@ async def npg_get_system_settings_logs() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_system_settings_logs", description="Update the container log collector configuration (partial update). Pass only fields to change.")
-async def npg_update_system_settings_logs(max_age: str | None = None, max_size: str | None = None, max_files: int | None = None) -> dict:
+@mcp.tool(name="npg_update_system_settings_logs", description="UPDATE the container log collector configuration. REQUIRED: at least one field to change. Optional: enabled (bool), levels (dict: container_name -> min level 'debug'/'info'/'warn'/'error'), exclude_patterns (list of regex patterns), stdout_excluded (list of container names). Read-modify-write: the upstream PUT is FULL-REPLACE (absent keys are written as zero values and DISABLE the collector), so the live config is fetched and merged before the PUT — never send a partial body yourself.")
+async def npg_update_system_settings_logs(
+    enabled: bool | None = None,
+    levels: dict | None = None,
+    exclude_patterns: list[str] | None = None,
+    stdout_excluded: list[str] | None = None,
+) -> dict:
     c = _get_client()
     try:
-        body = _build_body(
-            locals(),
-            {"max_age": "max_age", "max_size": "max_size", "max_files": "max_files"},
-        )
+        if enabled is None and levels is None and exclude_patterns is None and stdout_excluded is None:
+            raise ValueError(
+                "npg_update_system_settings_logs: pass at least one field to change "
+                "(enabled, levels, exclude_patterns, stdout_excluded)"
+            )
+        # Upstream binds a full-value SystemLogConfig struct here (NOT a
+        # pointer-based partial request): any PUT body that omits keys writes
+        # them as zero values — enabled=false, nil levels/exclusions — so a
+        # naive partial "update" silently DISABLES the collector. Merge into
+        # the live config instead.
+        current = await _api(c.get, "/api/v1/system-settings/logs")
+        if isinstance(current, dict) and isinstance(current.get("data"), dict):
+            current = current["data"]
+        body: dict = {k: v for k, v in current.items()} if isinstance(current, dict) else {}
+        if enabled is not None:
+            body["enabled"] = enabled
+        if levels is not None:
+            body["levels"] = levels
+        if exclude_patterns is not None:
+            body["exclude_patterns"] = exclude_patterns
+        if stdout_excluded is not None:
+            body["stdout_excluded"] = stdout_excluded
+        if "enabled" not in body:
+            raise ValueError(
+                "no current config available and no explicit 'enabled' passed — "
+                "upstream would write enabled=false (zero value) and silently "
+                "disable the container log collector; pass enabled explicitly"
+            )
         data = await _api(c.put, "/api/v1/system-settings/logs", body)
         return {"success": True, "data": data}
     except Exception as e:
