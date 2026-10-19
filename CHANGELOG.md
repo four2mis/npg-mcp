@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.47] - 2026-10-19
+
+### What changed
+- Fixed 7 MCP-layer phantom-field / field-mapping bugs found by the static preflight (task t_b191add1), each verified against upstream NPG v2.64.0 Go request structs (svrforum/NginxProxyGuard @ 71fdb608). Class of bug: Go silently drops unknown JSON keys, so callers saw success while nothing was applied (or, worse, unrelated settings were wiped).
+- `npg_create_api_token`: body param `expires_at` renamed to `expires_in` (upstream `CreateAPITokenRequest` has no `expires_at`); format `'<n>'+unit` (e.g. `30d`, `1y`, `12h`) or `never`; omitted = never expires.
+- `npg_create_user`: removed the `is_active` param — upstream `CreateUserRequest` is `{username, password, role_id, email}` and created users are active immediately. Body no longer sends `is_active`.
+- `npg_update_system_settings_logs`: the 3 phantom params (`max_age`/`max_size`/`max_files`) are replaced with the real config fields (`enabled`, `levels`, `exclude_patterns`, `stdout_excluded`). The tool now does READ-MODIFY-WRITE: upstream binds a full-value `SystemLogConfig` struct on PUT, so any partial body writes absent keys as zero values and DISABLES the container log collector. Zero-field calls are rejected; disabling requires explicit `enabled=false`.
+- `npg_create_proxy_host` / `npg_update_proxy_host`: removed 4 phantom params (`block_normal`, `block_http`, `cache_template`, `enable_proxy_headers`) — zero occurrences anywhere in upstream v2.64.0 (all .go + swagger.yaml); those body keys were silently dropped by Go.
+- `npg_bulk_import_proxy_hosts`: dropped the `block_normal` CSV column (fed the phantom create param); the tool description now lists the exact accepted columns.
+- `npg_update_filter_subscription`: removed the `url` param (URL is create-only upstream — every `url` update silently no-oped) and added the 3 real optional params `refresh_type` (`interval`/`daily`/`cron`), `refresh_value` (interval: `6h`/`12h`/`24h`/`48h`; daily: `HH:MM`; cron: cron expression) and `exclude_private_ips`.
+- All 7 signature changes carry description updates in the same commit (publish.yml validate gate); `tool-schemas.yaml`, `README.md` and `README.ko.md` regenerated (`--check` in sync); `tests/test_bulk_import.py` updated to assert the phantom body field is absent.
+
+### What's new
+- `npg_update_filter_subscription` gained `refresh_type` / `refresh_value` / `exclude_private_ips` — refresh schedules and private-IP exclusion were previously unmanageable through MCP.
+- `npg_update_system_settings_logs` gained the only reachable log-collector params (`enabled`, per-container `levels`, `exclude_patterns`, `stdout_excluded`); updates now round out the live config instead of risking disabling the collector.
+
+### Breaking changes
+- `npg_create_api_token`: parameter `expires_at` is gone — send `expires_in` (duration string like `30d`/`1y`/`never`) instead.
+- `npg_create_user`: parameter `is_active` is gone (upstream always activates new users).
+- `npg_create_proxy_host` / `npg_update_proxy_host`: parameters `block_normal`, `block_http`, `cache_template`, `enable_proxy_headers` are gone — they never had any upstream effect.
+- `npg_update_filter_subscription`: parameter `url` is gone — the list URL can only be set at create time.
+- Bulk-import CSV: the `block_normal` column is no longer routed to the create call (it was always a no-op); CSVs carrying it still import fine with the column ignored.
+
 ## [0.5.46] - 2026-10-19
 
 ### What changed
