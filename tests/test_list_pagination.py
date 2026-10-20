@@ -91,6 +91,18 @@ class TestListProxyHosts:
         assert result["success"] is True
         assert recording.calls == [("GET", "/api/v1/proxy-hosts", None)]
 
+    def test_sort_params_sent(self, recording):
+        _run(main_mod.npg_list_proxy_hosts(sort_by="updated", sort_order="desc"))
+        assert recording.calls == [
+            ("GET", "/api/v1/proxy-hosts", {"sort_by": "updated", "sort_order": "desc"})
+        ]
+        _run(main_mod.npg_list_proxy_hosts(sort_by="name"))
+        assert recording.calls[-1] == ("GET", "/api/v1/proxy-hosts", {"sort_by": "name"})
+
+    def test_sort_params_blank_omitted(self, recording):
+        _run(main_mod.npg_list_proxy_hosts(sort_by="  ", sort_order="  "))
+        assert recording.calls[-1] == ("GET", "/api/v1/proxy-hosts", None)
+
     def test_limit_and_page_sent(self, recording):
         _run(main_mod.npg_list_proxy_hosts(page=2, limit=10))
         assert recording.calls == [

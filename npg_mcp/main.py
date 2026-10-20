@@ -731,7 +731,7 @@ def _sliced_result(data, limit: int | None, offset: int | None, unit: str = "ite
 
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false), sort_by (name = first domain name | created | updated; unknown values ignored, default created_at descending), sort_order (asc/desc, applied only when sort_by is accepted; non-desc = asc). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
@@ -740,6 +740,8 @@ async def npg_list_proxy_hosts(
     domain: str | None = None,
     upstream: str | None = None,
     enabled: bool | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
 ) -> dict:
     c = _get_client()
     try:
@@ -754,6 +756,10 @@ async def npg_list_proxy_hosts(
             params["upstream"] = str(upstream)
         if enabled is not None:
             params["enabled"] = "true" if enabled else "false"
+        if sort_by is not None and str(sort_by).strip():
+            params["sort_by"] = str(sort_by)
+        if sort_order is not None and str(sort_order).strip():
+            params["sort_order"] = str(sort_order)
         data = await _api(c.get, "/api/v1/proxy-hosts", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:

@@ -1,5 +1,5 @@
 npg_list_proxy_hosts:
-  description: "LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list."
+  description: "LIST proxy hosts. Optional: page, limit (mapped to API per_page), search (domain/forward host text), tags (list, AND semantics), domain (parent-domain bucket, NOT substring), upstream (exact forward_host match), enabled (true/false), sort_by (name = first domain name | created | updated; unknown values ignored, default created_at descending), sort_order (asc/desc, applied only when sort_by is accepted; non-desc = asc). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg returns the full unpaginated list."
   parameters:
     - name: page
       type: integer
@@ -21,6 +21,12 @@ npg_list_proxy_hosts:
       required: false
     - name: enabled
       type: boolean
+      required: false
+    - name: sort_by
+      type: string
+      required: false
+    - name: sort_order
+      type: string
       required: false
 
 npg_list_proxy_host_groups:
