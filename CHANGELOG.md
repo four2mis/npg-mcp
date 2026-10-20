@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0] - 2026-10-21
+
+### What changed
+- Exposed five previously hidden upstream NPG query capabilities as optional MCP tool parameters, after upstream route/struct review confirmed the API already supports them. All new params are optional with `None` defaults — omitted params hit the API byte-identically to before (no behavior change for existing callers); every signature change carries a description update in the same commit (publish.yml validate gate).
+- Tool-surface audit follow-up: marked 5 exact route+behavior duplicate tools as deprecated aliases in their descriptions (commit 7d4ef6f). Canonical picks — `npg_sync_proxy_hosts` over `npg_sync_nginx`/`npg_reload_nginx`, `npg_validate_nginx_config` over `npg_test_nginx`, `npg_enable_waf_rule` over `npg_enable_waf_rule_by_host`. No signatures, routes, tiers, or tool count changed (312 tools throughout); aliases are slated for removal in a later minor release.
+- README accuracy pass (commit 56af7e8, both languages): tool naming fixed to `mcp__npg_mcp__*`, dependency pin corrected to `mcp>=1.29.0,<2.0.0`, MCP_TRANSPORT defaults documented (bare process = stdio, Docker image = http), Quick Start now shows explicit env export (`source .env` is NOT auto-loaded — no dotenv dep), added version-pinned image pull and a Development & Testing section.
+
+### What's new
+- New capability: `npg_list_proxy_hosts` gained `sort_by` (name|created|updated) and `sort_order` (asc|desc) — server-side proxy host sorting (commit b3cd521).
+- New capability: `npg_get_audit_log_api_tokens` gained `limit`/`offset` paging via the `_list_params` helper, so large audit tables can be paged instead of pulled whole (commit d52863d).
+- New capability: the 4 log autocomplete tools (`npg_get_log_autocomplete_hosts/ips/uris/user_agents`) gained `q` (substring filter) and `limit` params (commit d296893).
+- New capability: `npg_get_certificate_history` gained `certificate_id` (scopes history to one certificate) and `limit` (maps to upstream `per_page`) (commit e6a20a2).
+
+### Breaking changes
+- (none — all new parameters are optional; omitted params behave exactly as before)
+
 ## [1.0.0] - 2026-10-20
 
 ### What changed
