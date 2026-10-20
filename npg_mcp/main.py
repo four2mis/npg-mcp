@@ -5177,38 +5177,58 @@ async def npg_cleanup_logs() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_hosts", description="Get distinct hosts seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_hosts() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_hosts", description="Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
+async def npg_get_log_autocomplete_hosts(q: str | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/logs/autocomplete/hosts")
+        params: dict = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/logs/autocomplete/hosts", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_ips() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
+async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/logs/autocomplete/ips")
+        params: dict = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/logs/autocomplete/ips", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_user_agents() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
+async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/logs/autocomplete/user-agents")
+        params: dict = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/logs/autocomplete/user-agents", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_uris() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
+async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/logs/autocomplete/uris")
+        params: dict = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        data = await _api(c.get, "/api/v1/logs/autocomplete/uris", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

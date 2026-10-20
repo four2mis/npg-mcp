@@ -3298,20 +3298,44 @@ npg_cleanup_logs:
   parameters: []
 
 npg_get_log_autocomplete_hosts:
-  description: "Get distinct hosts seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  parameters:
+    - name: q
+      type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_autocomplete_ips:
-  description: "Get distinct client IPs seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  parameters:
+    - name: q
+      type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_autocomplete_user_agents:
-  description: "Get distinct User-Agents seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  parameters:
+    - name: q
+      type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_autocomplete_uris:
-  description: "Get distinct request URIs seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  parameters:
+    - name: q
+      type: string
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_autocomplete_countries:
   description: "Get distinct countries seen in nginx access logs (for autocomplete)."
