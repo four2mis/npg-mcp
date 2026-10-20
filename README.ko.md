@@ -34,9 +34,10 @@ pip install -e .
 cp .env.example .env
 ```
 
-stdio 모드로 실행:
+stdio 모드로 실행 — 패키지는 `.env`를 **자동 로딩하지 않습니다**(`.env`는 Docker Compose의 `env_file:`이 사용). 먼저 환경변수를 export하거나 MCP 클라이언트의 `env` 매핑으로 전달하십시오(아래 로컬 stdio 참고):
 
 ```bash
+set -a; source .env; set +a
 python3 -m npg_mcp.main
 ```
 
@@ -46,6 +47,12 @@ GitHub Container Registry에서 이미지 가져오기:
 
 ```bash
 docker pull ghcr.io/four2mis/npg-mcp:latest
+```
+
+릴리스 버전별 태그된 이미지도 제공됩니다(`v` 접두어 없음 — 릴리스는 `1.0.x` 체계):
+
+```bash
+docker pull ghcr.io/four2mis/npg-mcp:1.0.0
 ```
 
 템플릿에서 `.env` 파일 생성:
@@ -76,7 +83,8 @@ services:
     restart: unless-stopped
     networks:
       - npg-network
-    # 모든 런타임 설정은 .env에서 가져옵니다(.env.example 참고). 여기에 시크릿 없음.
+    # 모든 런타임 설정은 .env에서 가져옵니다(.env.example 참고). .env.example을 .env로
+    # 복사해 값을 채우십시오. 이 파일에 시크릿 없음.
     env_file:
       - .env
     ports:
@@ -119,7 +127,7 @@ hermes config set mcp_servers.npg-mcp.url 'http://<host>:8081/mcp'
 hermes config set mcp_servers.npg-mcp.headers.Authorization 'Bearer <MCP_API_TOKEN>'
 ```
 
-그러면 도구가 `mcp_npg_mcp_*`로 나타납니다(예: `mcp_npg_mcp_npg_list_proxy_hosts`).
+그러면 도구가 `mcp__npg_mcp__*`로 나타납니다 — MCP 서버 키 `npg-mcp`는 `npg_mcp`로 정규화됩니다(예: `mcp__npg_mcp__npg_list_proxy_hosts`).
 
 ### Claude Code / Claude Desktop
 
@@ -156,6 +164,39 @@ headers = { Authorization = "Bearer <MCP_API_TOKEN>" }
 
 Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라이언트가 연결할 수 있습니다. 이 엔드포인트는 표준 FastMCP Streamable HTTP 서버입니다.
 
+### 로컬 stdio(HTTP 서버 없음)
+
+일반 프로세스로 실행하면 서버는 기본값 `MCP_TRANSPORT=stdio`로 동작합니다 — 포트 없음, `MCP_API_TOKEN` 없음. MCP 클라이언트가 프로세스를 직접 실행하고 stdin/stdout으로 통신합니다. command 기반 서버를 지원하는 클라이언트에서 venv 인터프리터를 가리키고, 클라이언트의 `env` 매핑으로 설정을 전달하십시오(패키지는 `.env`를 자동 로딩하지 않음):
+
+```json
+{
+  "mcpServers": {
+    "npg-mcp": {
+      "command": "/path/to/npg-mcp/.venv/bin/python3",
+      "args": ["-m", "npg_mcp.main"],
+      "env": {
+        "NPG_BASE_URL": "http://<npg-api-host>:8080",
+        "NPG_API_TOKEN": "ng_..."
+      }
+    }
+  }
+}
+```
+
+`MCP_TRANSPORT`는 직접 실행 시 기본값이 stdio이므로 설정할 필요가 없습니다. Hermes도 동일한 stdio 키를 사용합니다:
+
+```yaml
+mcp_servers:
+  npg-mcp:
+    command: /path/to/npg-mcp/.venv/bin/python3
+    args: ["-m", "npg_mcp.main"]
+    env:
+      NPG_BASE_URL: http://<npg-api-host>:8080
+      NPG_API_TOKEN: ng_...
+```
+
+stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는 프로세스를 실행할 수 있는 사람이 곧 접근 권한입니다.
+
 ### 네트워크 및 방화벽 참고 사항
 
 - 서버는 `MCP_PORT`(기본값 `8081`)에서 수신하며 `MCP_HOST`(기본값 `0.0.0.0`)에 바인딩됩니다.
@@ -168,34 +209,34 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 
 | 카테고리 | 도구 |
 |----------|-------|
-| **프록시 호스트(Proxy Hosts)** | 46 tools |
-| **로그(Logs)** | 38 tools |
-| **보안 및 WAF(Security & WAF)** | 31 tools |
-| **DNS 제공자(DNS Providers)** | 15 tools |
-| **인증(Authentication)** | 9 tools |
-| **인증서(Certificates)** | 15 tools |
-| **필터 구독(Filter Subscriptions)** | 15 tools |
-| **클라우드 제공자(Cloud Providers)** | 13 tools |
-| **URI 차단(URI Block)** | 7 tools |
-| **설정(Settings)** | 12 tools |
-| **백업(Backups)** | 8 tools |
-| **API 토큰(API Tokens)** | 8 tools |
-| **사용자(Users)** | 9 tools |
-| **SSO 제공자(SSO Providers)** | 8 tools |
-| **기타(Other)** | 2 tools |
-| **대시보드(Dashboard)** | 3 tools |
-| **IP 관리(IP Management)** | 4 tools |
-| **알림 채널(Notification Channels)** | 7 tools |
-| **리다이렉트 호스트(Redirect Hosts)** | 6 tools |
-| **액세스 목록(Access Lists)** | 6 tools |
-| **지역(Geo)** | 11 tools |
-| **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3 tools |
-| **차단 IP 및 봇(Banned IPs & Bots)** | 7 tools |
-| **역할(Roles)** | 4 tools |
-| **시스템(System)** | 18 tools |
-| **SSL / Nginx** | 5 tools |
-| **시스템 및 상태(System & Health)** | 1 tool |
-| **Docker** | 1 tool |
+| **프록시 호스트(Proxy Hosts)** | 46개 |
+| **로그(Logs)** | 38개 |
+| **보안 및 WAF(Security & WAF)** | 31개 |
+| **DNS 제공자(DNS Providers)** | 15개 |
+| **인증(Authentication)** | 9개 |
+| **인증서(Certificates)** | 15개 |
+| **필터 구독(Filter Subscriptions)** | 15개 |
+| **클라우드 제공자(Cloud Providers)** | 13개 |
+| **URI 차단(URI Block)** | 7개 |
+| **설정(Settings)** | 12개 |
+| **백업(Backups)** | 8개 |
+| **API 토큰(API Tokens)** | 8개 |
+| **사용자(Users)** | 9개 |
+| **SSO 제공자(SSO Providers)** | 8개 |
+| **기타(Other)** | 2개 |
+| **대시보드(Dashboard)** | 3개 |
+| **IP 관리(IP Management)** | 4개 |
+| **알림 채널(Notification Channels)** | 7개 |
+| **리다이렉트 호스트(Redirect Hosts)** | 6개 |
+| **액세스 목록(Access Lists)** | 6개 |
+| **지역(Geo)** | 11개 |
+| **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3개 |
+| **차단 IP 및 봇(Banned IPs & Bots)** | 7개 |
+| **역할(Roles)** | 4개 |
+| **시스템(System)** | 18개 |
+| **SSL / Nginx** | 5개 |
+| **시스템 및 상태(System & Health)** | 1개 |
+| **Docker** | 1개 |
 
 ## 인증
 
@@ -215,10 +256,10 @@ Streamable HTTP 서버(`type: "http"` / `sse`)를 지원하는 모든 MCP 클라
 | `MCP_ALLOWED_HOSTS` | `localhost:port` | 엔드포인트가 허용하는 `Host` 헤더의 `host:port`(쉼표 구분, 예: 리버스 프록시 공개 호스트) |
 | `MCP_ALLOWED_ORIGINS` | *(비어 있음)* | 교차 출처 요청에서 허용되는 origin(쉼표 구분); CSRF 제한 |
 | `MCP_REBINDING_PROTECTION` | `true` | DNS 리바인딩 보호 활성화(프록시가 깨지는 경우에만 비활성화) |
-| `MCP_TRANSPORT` | `http` | 전송 모드: 네트워크 배포는 `http`, 직접 파이프는 `stdio`. Docker 이미지 기본값 `http`. |
+| `MCP_TRANSPORT` | `stdio` | 전송 모드: 직접 파이프는 `stdio` (직접 실행 기본값), 네트워크 배포는 `http`. Docker 이미지는 `ENV`로 `http`를 설정합니다. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
 | `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 139개), `standard`(파괴적 작업 제외 265개), `full`(전체 312개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가집니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
-| `NPG_DRY_RUN` | `off` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
+| `NPG_DRY_RUN` | `0` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 | `NPG_HTTP_TIMEOUT` | `30` | 발신 NPG API 요청 타임아웃(초). 대용량 액세스 로그 다운로드, 백업 내보내기/복원, 인증서 업로드, 전체 프록시 호스트 동기화 등 오래 걸리는 엔드포인트에서 `ReadTimeout` 실패를 피하려면 값을 높이세요. `[1, 600]` 범위로 제한되며, 잘못된 값은 경고와 함께 `30`으로 대체됩니다. |
 
 ### 컨테이너 로그
@@ -256,9 +297,17 @@ npg_mcp/
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml
-pyproject.toml  # 의존성: mcp>=1.0, httpx>=0.27
+pyproject.toml  # 의존성: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
 tool-schemas.yaml  # 312개 도구의 전체 입력 매개변수 스키마
 ```
+
+## 개발 및 테스트
+
+```bash
+pytest tests/ -q   # 오프라인 — NPG API 호출은 모킹(respx)되므로 실제 인스턴스가 필요 없습니다
+```
+
+문서(`tool-schemas.yaml`, README 두 언어)는 도구 표면에서 생성되며 동기화가 유지되어야 합니다 — 형식 규약은 [AGENTS.md](AGENTS.md)에 있습니다. 릴리스 기록은 [CHANGELOG.md](CHANGELOG.md).
 
 ## 라이선스
 

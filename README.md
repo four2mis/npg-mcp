@@ -34,9 +34,10 @@ Create a `.env` file (copy from `.env.example`):
 cp .env.example .env
 ```
 
-Run in stdio mode:
+Run in stdio mode — the package does **not** auto-load `.env` (that file is consumed by Docker Compose's `env_file:`), so export the variables first, or let your MCP client pass them via its `env` mapping (see Local stdio below):
 
 ```bash
+set -a; source .env; set +a
 python3 -m npg_mcp.main
 ```
 
@@ -46,6 +47,12 @@ Pull the image from GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/four2mis/npg-mcp:latest
+```
+
+Images are also tagged per release version (without the `v` prefix — releases follow a `1.0.x` scheme):
+
+```bash
+docker pull ghcr.io/four2mis/npg-mcp:1.0.0
 ```
 
 Create a `.env` file from the template:
@@ -76,7 +83,8 @@ services:
     restart: unless-stopped
     networks:
       - npg-network
-    # All runtime config comes from .env (see .env.example). No secrets here.
+    # All runtime config comes from .env (see .env.example). Copy .env.example to
+    # .env and fill in your values. No secrets in this file.
     env_file:
       - .env
     ports:
@@ -119,7 +127,7 @@ hermes config set mcp_servers.npg-mcp.url 'http://<host>:8081/mcp'
 hermes config set mcp_servers.npg-mcp.headers.Authorization 'Bearer <MCP_API_TOKEN>'
 ```
 
-Tools then appear as `mcp_npg_mcp_*` (e.g. `mcp_npg_mcp_npg_list_proxy_hosts`).
+Tools then appear as `mcp__npg_mcp__*` — the MCP server key `npg-mcp` is sanitized to `npg_mcp` (e.g. `mcp__npg_mcp__npg_list_proxy_hosts`).
 
 ### Claude Code / Claude Desktop
 
@@ -155,6 +163,39 @@ Add a **remote / SSE+HTTP MCP server** entry in the client's MCP settings with:
 - **Headers:** `Authorization: Bearer <MCP_API_TOKEN>` (if a token is configured)
 
 Any MCP client that supports Streamable HTTP servers (`type: "http"` / `sse`) can connect. The endpoint is a standard FastMCP Streamable HTTP server.
+
+### Local stdio (no HTTP server)
+
+When launched as a plain process the server defaults to `MCP_TRANSPORT=stdio` — no port, no `MCP_API_TOKEN`; the MCP client starts the process itself and talks over stdin/stdout. Point a command-server client at the venv interpreter and pass configuration through the client's `env` mapping (the package has no `.env` auto-loading):
+
+```json
+{
+  "mcpServers": {
+    "npg-mcp": {
+      "command": "/path/to/npg-mcp/.venv/bin/python3",
+      "args": ["-m", "npg_mcp.main"],
+      "env": {
+        "NPG_BASE_URL": "http://<npg-api-host>:8080",
+        "NPG_API_TOKEN": "ng_..."
+      }
+    }
+  }
+}
+```
+
+`MCP_TRANSPORT` doesn't need to be set — stdio is the bare-process default. Hermes uses the same stdio keys:
+
+```yaml
+mcp_servers:
+  npg-mcp:
+    command: /path/to/npg-mcp/.venv/bin/python3
+    args: ["-m", "npg_mcp.main"]
+    env:
+      NPG_BASE_URL: http://<npg-api-host>:8080
+      NPG_API_TOKEN: ng_...
+```
+
+`MCP_API_TOKEN` does not apply over stdio — access control is whoever can execute the process.
 
 ### Network & Firewall Notes
 
@@ -215,7 +256,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_ALLOWED_HOSTS` | `localhost:port` | Comma-separated `host:port` whose `Host` header the endpoint accepts |
 | `MCP_ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins accepted for cross-origin requests; restricts CSRF |
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
-| `MCP_TRANSPORT` | `http` | Transport mode: `http` for network deployment, `stdio` for direct pipe. Docker images default to `http`. |
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` for direct pipes (bare-process default), `http` for network deployment. Docker images set `http` via `ENV`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
 | `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (139 read-only tools), `standard` (265 tools, no destructive ops), `full` (all 312 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
@@ -256,9 +297,17 @@ npg_mcp/
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
-pyproject.toml  # Dependencies: mcp>=1.0, httpx>=0.27
+pyproject.toml  # Dependencies: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
 tool-schemas.yaml  # Full input parameter schemas for all 312 tools
 ```
+
+## Development & Testing
+
+```bash
+pytest tests/ -q   # offline — NPG API calls are mocked (respx); no live instance needed
+```
+
+Documentation (`tool-schemas.yaml`, both READMEs) is generated from the tool surface and must stay in sync — the format contract lives in [AGENTS.md](AGENTS.md). Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
