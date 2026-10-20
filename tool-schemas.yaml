@@ -2320,9 +2320,15 @@ npg_get_expiring_certificates:
       required: false
 
 npg_get_certificate_history:
-  description: "GET the certificate issuance/renewal history log. Optional: page (upstream paginated — default page 1). Use npg_get_expiring_certificates for upcoming expiry dates."
+  description: "GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates."
   parameters:
+    - name: certificate_id
+      type: string
+      required: false
     - name: page
+      type: integer
+      required: false
+    - name: limit
       type: integer
       required: false
 

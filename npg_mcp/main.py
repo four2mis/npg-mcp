@@ -3942,11 +3942,13 @@ async def npg_get_expiring_certificates(days: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. Optional: page (upstream paginated — default page 1). Use npg_get_expiring_certificates for upcoming expiry dates.")
-async def npg_get_certificate_history(page: int | None = None) -> dict:
+@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates.")
+async def npg_get_certificate_history(certificate_id: str | None = None, page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        params = _list_params_per_page(page=page)
+        params = _list_params_per_page(limit=limit, page=page)
+        if certificate_id is not None and str(certificate_id).strip():
+            params["certificate_id"] = str(certificate_id)
         data = await _api(c.get, "/api/v1/certificates/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:

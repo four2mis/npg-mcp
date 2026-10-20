@@ -925,6 +925,29 @@ class TestGetCertificateHistory:
         assert "non-negative integer" in result["error"]
         assert recording.calls == []
 
+    def test_certificate_id_forwarded(self, recording):
+        result = _run(main_mod.npg_get_certificate_history(certificate_id="abc-123"))
+        assert result["success"] is True
+        assert recording.calls == [("GET", "/api/v1/certificates/history", {"certificate_id": "abc-123"})]
+
+    def test_certificate_id_blank_omitted(self, recording):
+        _run(main_mod.npg_get_certificate_history(certificate_id="   "))
+        assert recording.calls == [("GET", "/api/v1/certificates/history", None)]
+
+    def test_limit_maps_to_per_page(self, recording):
+        _run(main_mod.npg_get_certificate_history(limit=5))
+        assert recording.calls == [("GET", "/api/v1/certificates/history", {"per_page": 5})]
+
+    def test_certificate_id_with_page_and_limit(self, recording):
+        _run(main_mod.npg_get_certificate_history(certificate_id="abc-123", page=2, limit=5))
+        assert recording.calls == [("GET", "/api/v1/certificates/history", {"page": 2, "per_page": 5, "certificate_id": "abc-123"})]
+
+    def test_negative_limit_clean_error_no_http_call(self, recording):
+        result = _run(main_mod.npg_get_certificate_history(limit=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []
+
 
 # ── Phase-3 parity: MCP-side limit/offset paging on the 10 remaining ─────
 # list tools whose upstream endpoints IGNORE pagination query params
