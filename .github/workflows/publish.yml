@@ -70,10 +70,12 @@ jobs:
 
           # 2. README.md / README.ko.md: category counts must match main.py
           #    (READMEs no longer list tool names — see regenerate_all_docs.py)
+          # Category rows are English ("46 tools") or Korean ("46개") — the KO
+          # README switched to Korean units in commit 56af7e8.
           def readme_total(path):
               with open(path) as f:
                   content = f.read()
-              return sum(int(m) for m in re.findall(r'\|\s*\*\*[^*]+\*\*\s*\|\s*(\d+) tools?', content))
+              return sum(int(m) for m in re.findall(r'\|\s*\*\*[^*]+\*\*\s*\|\s*(\d+)\s*(?:tools?|개)(?![\w])', content))
 
           # Category counts from main.py are validated by regenerate_all_docs.py;
           # here we only verify the READMEs' total tool count matches main.py.
