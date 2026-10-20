@@ -1191,7 +1191,7 @@ async def npg_regenerate_config(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_sync_proxy_hosts", description="SYNC every enabled proxy host's nginx config (regenerate, nginx -t, reload once) — the REQUIRED follow-up after creating/modifying proxy hosts. Returns per-host results; a per-host failure does not fail the batch. Validate-only via npg_validate_nginx_config.")
+@mcp.tool(name="npg_sync_proxy_hosts", description="SYNC every enabled proxy host's nginx config (regenerate, nginx -t, reload once) — the REQUIRED follow-up after creating/modifying proxy hosts. Returns per-host results; a per-host failure does not fail the batch. Validate-only via npg_validate_nginx_config. CANONICAL tool for this operation: npg_sync_nginx and npg_reload_nginx are deprecated aliases slated for removal in a future minor release.")
 async def npg_sync_proxy_hosts() -> dict:
     c = _get_client()
     try:
@@ -1999,7 +1999,7 @@ async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
 
 # ── Nginx ─────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_reload_nginx", description="Reload nginx configuration without full restart.")
+@mcp.tool(name="npg_reload_nginx", description="DEPRECATED ALIAS of npg_sync_proxy_hosts — identical call (POST proxy-hosts/sync: regenerate configs, nginx -t, reload; upstream always performs the full sync, there is no reload-only operation). Use npg_sync_proxy_hosts. This alias is slated for removal in a future minor release.")
 async def npg_reload_nginx() -> dict:
     """Reload nginx configuration."""
     c = _get_client()
@@ -2009,7 +2009,7 @@ async def npg_reload_nginx() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_sync_nginx", description="SYNC all proxy host configs and reload nginx (POST proxy-hosts/sync: regenerate, nginx -t, reload — returns per-host results; a per-host failure does not fail the whole call). Call after any proxy-host mutation; validate-only via npg_validate_nginx_config.")
+@mcp.tool(name="npg_sync_nginx", description="DEPRECATED ALIAS of npg_sync_proxy_hosts — identical call (POST proxy-hosts/sync: regenerate configs, nginx -t, reload; returns per-host results). Use npg_sync_proxy_hosts. This alias is slated for removal in a future minor release.")
 async def npg_sync_nginx() -> dict:
     """Sync all proxy hosts. Equivalent to nginx reload — tests config then reloads nginx."""
     c = _get_client()
@@ -2019,7 +2019,7 @@ async def npg_sync_nginx() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_nginx", description="TEST nginx configuration validity (runs `nginx -t` in the proxy container). Diagnostic only — does NOT regenerate host configs or reload nginx. Use npg_sync_nginx to apply changes. On invalid config returns success=false with the raw `nginx -t` error output.")
+@mcp.tool(name="npg_test_nginx", description="DEPRECATED ALIAS of npg_validate_nginx_config — identical call (POST /test/nginx-config; dry-run `nginx -t`, no reload). Use npg_validate_nginx_config; apply changes afterward with npg_sync_proxy_hosts. This alias is slated for removal in a future minor release.")
 async def npg_test_nginx() -> dict:
     """Validate the running nginx configuration without reloading."""
     c = _get_client()
@@ -2042,7 +2042,7 @@ async def npg_probe_upstream(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_validate_nginx_config", description="VALIDATE the running nginx config via dry-run `nginx -t` — NO reload, no changes (POST /test/nginx-config). Read-only. Returns status=ok on valid, or success=false with the raw error output. Use npg_sync_nginx first if you just edited hosts.")
+@mcp.tool(name="npg_validate_nginx_config", description="VALIDATE the running nginx config via dry-run `nginx -t` — NO reload, no changes (POST /test/nginx-config). Read-only. Returns status=ok on valid, or success=false with the raw error output. Use npg_sync_proxy_hosts first if you just edited hosts. CANONICAL tool for this operation: npg_test_nginx is a deprecated alias slated for removal in a future minor release.")
 async def npg_validate_nginx_config() -> dict:
     """Dry-run validate nginx config — never reloads."""
     c = _get_client()
@@ -3080,7 +3080,7 @@ async def npg_disable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_enable_waf_rule", description="RE-ENABLE a per-host WAF rule disabled with npg_disable_waf_rule (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable). REQUIRED: host_id, rule_id from npg_list_waf_rules. Enabling a never-disabled rule returns upstream HTTP 500 — check npg_get_waf_host_config first.")
+@mcp.tool(name="npg_enable_waf_rule", description="RE-ENABLE a per-host WAF rule disabled with npg_disable_waf_rule (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable). REQUIRED: host_id, rule_id from npg_list_waf_rules. Enabling a never-disabled rule returns upstream HTTP 500 — check npg_get_waf_host_config first. CANONICAL tool: npg_enable_waf_rule_by_host is a deprecated alias slated for removal.")
 async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -4449,7 +4449,7 @@ async def npg_get_global_waf() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_waf", description="UPDATE global WAF configuration (partial update). Optional: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_nginx; WAF changes take effect after a proxy container restart.")
+@mcp.tool(name="npg_update_global_waf", description="UPDATE global WAF configuration (partial update). Optional: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_proxy_hosts; WAF changes take effect after a proxy container restart.")
 async def npg_update_global_waf(enabled: bool | None = None, mode: str | None = None, paranoia_level: int | None = None, anomaly_threshold: int | None = None) -> dict:
     c = _get_client()
     try:
@@ -5826,7 +5826,7 @@ async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_enable_waf_rule_by_host", description="Re-enable a CRS rule for a specific proxy host (removes per-host exclusion). REQUIRED: host_id (proxy host UUID), rule_id (CRS rule ID).")
+@mcp.tool(name="npg_enable_waf_rule_by_host", description="DEPRECATED ALIAS of npg_enable_waf_rule — identical call (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable); takes host_id directly, NOT a domain. For whole-host rule disabling by domain use npg_disable_waf_rule_by_host. This alias is slated for removal in a future minor release.")
 async def npg_enable_waf_rule_by_host(host_id: str | int, rule_id: str | int) -> dict:
     try:
         _validate_id("host_id", host_id)
