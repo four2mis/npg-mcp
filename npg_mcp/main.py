@@ -5401,11 +5401,12 @@ async def npg_get_audit_log_resource_types() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_audit_log_api_tokens", description="LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Single-token view via npg_get_api_token_usage.")
-async def npg_get_audit_log_api_tokens() -> dict:
+@mcp.tool(name="npg_get_audit_log_api_tokens", description="LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage.")
+async def npg_get_audit_log_api_tokens(limit: int | None = None, offset: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/audit-logs/api-tokens")
+        params = _list_params(limit=limit, offset=offset)
+        data = await _api(c.get, "/api/v1/audit-logs/api-tokens", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

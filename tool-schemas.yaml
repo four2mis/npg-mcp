@@ -3424,8 +3424,14 @@ npg_get_audit_log_resource_types:
   parameters: []
 
 npg_get_audit_log_api_tokens:
-  description: "LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Single-token view via npg_get_api_token_usage."
-  parameters: []
+  description: "LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
+    - name: offset
+      type: integer
+      required: false
 
 npg_set_proxy_host_favorite:
   description: "Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool)."
