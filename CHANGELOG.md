@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0] - 2026-10-20
+
+### What changed
+- Version-scheme migration: the 0.5.x numbering is retired at 0.5.47. The minor version had been frozen since 0.5.0 while the patch counter grew to 47 (86 releases total since 2026-08-02), so the "0.5.x" label no longer carried any meaning about change size. From this release on, the project follows the user-approved 1.0.x scheme: bug-fix/doc/internal releases bump the patch digit (1.0.0 → 1.0.1), releases that add tools or capabilities — including upstream NPG feature syncs — bump the minor digit and reset the patch (1.0.5 → 1.1.0), and the major digit moves only on deliberate, user-directed exceptions. This release changes version metadata and release automation only; the shipped code is identical to v0.5.47 (commit ef073cd).
+- Release-task automation (repo-external, npg-kanban-pipeline.py): the release task template now spells out the patch/minor bump rules and adds a post-push verification leg — poll the `publish.yml` run, confirm tag + release notes exist, and verify the GHCR bare-tag digest match via `verify_ghcr_release.sh` — so a failed/missing publish surfaces in the same run instead of days later.
+
+### What's new
+- (none — scheme-migration release; the MCP tool surface is byte-identical to v0.5.47: 312 tools, read=139 / standard=265 / full=312)
+
+### Breaking changes
+- (none — no tool, parameter, or configuration changes; existing `0.5.x` image references keep working and `latest` now tracks v1.0.0)
+
 ## [0.5.47] - 2026-10-19
 
 ### What changed
