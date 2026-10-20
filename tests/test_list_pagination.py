@@ -97,7 +97,9 @@ class TestListProxyHosts:
             ("GET", "/api/v1/proxy-hosts", {"sort_by": "updated", "sort_order": "desc"})
         ]
         _run(main_mod.npg_list_proxy_hosts(sort_by="name"))
-        assert recording.calls[-1] == ("GET", "/api/v1/proxy-hosts", {"sort_by": "name"})
+        assert recording.calls[-1] == (
+            "GET", "/api/v1/proxy-hosts", {"sort_by": "name"}
+        )
 
     def test_sort_params_blank_omitted(self, recording):
         _run(main_mod.npg_list_proxy_hosts(sort_by="  ", sort_order="  "))
@@ -928,7 +930,9 @@ class TestGetCertificateHistory:
     def test_certificate_id_forwarded(self, recording):
         result = _run(main_mod.npg_get_certificate_history(certificate_id="abc-123"))
         assert result["success"] is True
-        assert recording.calls == [("GET", "/api/v1/certificates/history", {"certificate_id": "abc-123"})]
+        assert recording.calls == [
+            ("GET", "/api/v1/certificates/history", {"certificate_id": "abc-123"})
+        ]
 
     def test_certificate_id_blank_omitted(self, recording):
         _run(main_mod.npg_get_certificate_history(certificate_id="   "))
@@ -936,11 +940,18 @@ class TestGetCertificateHistory:
 
     def test_limit_maps_to_per_page(self, recording):
         _run(main_mod.npg_get_certificate_history(limit=5))
-        assert recording.calls == [("GET", "/api/v1/certificates/history", {"per_page": 5})]
+        assert recording.calls == [
+            ("GET", "/api/v1/certificates/history", {"per_page": 5})
+        ]
 
     def test_certificate_id_with_page_and_limit(self, recording):
-        _run(main_mod.npg_get_certificate_history(certificate_id="abc-123", page=2, limit=5))
-        assert recording.calls == [("GET", "/api/v1/certificates/history", {"page": 2, "per_page": 5, "certificate_id": "abc-123"})]
+        _run(main_mod.npg_get_certificate_history(
+            certificate_id="abc-123", page=2, limit=5
+        ))
+        assert recording.calls == [
+            ("GET", "/api/v1/certificates/history",
+             {"page": 2, "per_page": 5, "certificate_id": "abc-123"})
+        ]
 
     def test_negative_limit_clean_error_no_http_call(self, recording):
         result = _run(main_mod.npg_get_certificate_history(limit=-1))
