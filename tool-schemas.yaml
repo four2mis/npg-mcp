@@ -432,7 +432,7 @@ npg_regenerate_config:
       required: true
 
 npg_sync_proxy_hosts:
-  description: "SYNC every enabled proxy host's nginx config (regenerate, nginx -t, reload once) — the REQUIRED follow-up after creating/modifying proxy hosts. Returns per-host results; a per-host failure does not fail the batch. Validate-only via npg_validate_nginx_config. CANONICAL tool for this operation: npg_sync_nginx and npg_reload_nginx are deprecated aliases slated for removal in a future minor release."
+  description: "SYNC every enabled proxy host's nginx config (regenerate, nginx -t, reload once) — the REQUIRED follow-up after creating/modifying proxy hosts. Returns per-host results; a per-host failure does not fail the batch. Validate-only via npg_validate_nginx_config. There is no reload-only operation upstream — sync always regenerates all hosts first."
   parameters: []
 
 npg_clone_proxy_host:
@@ -589,18 +589,6 @@ npg_bulk_renew_certificates:
       type: array<st> | int]
       required: true
 
-npg_reload_nginx:
-  description: "DEPRECATED ALIAS of npg_sync_proxy_hosts — identical call (POST proxy-hosts/sync: regenerate configs, nginx -t, reload; upstream always performs the full sync, there is no reload-only operation). Use npg_sync_proxy_hosts. This alias is slated for removal in a future minor release."
-  parameters: []
-
-npg_sync_nginx:
-  description: "DEPRECATED ALIAS of npg_sync_proxy_hosts — identical call (POST proxy-hosts/sync: regenerate configs, nginx -t, reload; returns per-host results). Use npg_sync_proxy_hosts. This alias is slated for removal in a future minor release."
-  parameters: []
-
-npg_test_nginx:
-  description: "DEPRECATED ALIAS of npg_validate_nginx_config — identical call (POST /test/nginx-config; dry-run `nginx -t`, no reload). Use npg_validate_nginx_config; apply changes afterward with npg_sync_proxy_hosts. This alias is slated for removal in a future minor release."
-  parameters: []
-
 npg_probe_upstream:
   description: "PROBE only the proxy host's upstream connectivity (POST /test/proxy-host/{id}) — fast 5s HEAD/dial, no SSL/cache/header findings. REQUIRED: host_id. Returns 200 with status ok|error even when the upstream is unreachable (connection failure is DATA, not a tool error). For the full end-to-end test (SSL, HTTP2-3, cache, security headers, DDNS) use npg_test_proxy_host instead."
   parameters:
@@ -609,7 +597,7 @@ npg_probe_upstream:
       required: true
 
 npg_validate_nginx_config:
-  description: "VALIDATE the running nginx config via dry-run `nginx -t` — NO reload, no changes (POST /test/nginx-config). Read-only. Returns status=ok on valid, or success=false with the raw error output. Use npg_sync_proxy_hosts first if you just edited hosts. CANONICAL tool for this operation: npg_test_nginx is a deprecated alias slated for removal in a future minor release."
+  description: "VALIDATE the running nginx config via dry-run `nginx -t` — NO reload, no changes (POST /test/nginx-config). Read-only. Returns status=ok on valid, or success=false with the raw error output. Use npg_sync_proxy_hosts first if you just edited hosts."
   parameters: []
 
 npg_list_redirect_hosts:
@@ -1575,7 +1563,7 @@ npg_disable_waf_rule:
       required: true
 
 npg_enable_waf_rule:
-  description: "RE-ENABLE a per-host WAF rule disabled with npg_disable_waf_rule (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable). REQUIRED: host_id, rule_id from npg_list_waf_rules. Enabling a never-disabled rule returns upstream HTTP 500 — check npg_get_waf_host_config first. CANONICAL tool: npg_enable_waf_rule_by_host is a deprecated alias slated for removal."
+  description: "RE-ENABLE a per-host WAF rule disabled with npg_disable_waf_rule (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable). REQUIRED: host_id, rule_id from npg_list_waf_rules. Enabling a never-disabled rule returns upstream HTTP 500 — check npg_get_waf_host_config first."
   parameters:
     - name: host_id
       type: integer | string
@@ -3695,16 +3683,6 @@ npg_disable_waf_rule_by_host:
   parameters:
     - name: domain_name
       type: string
-      required: true
-    - name: rule_id
-      type: integer | string
-      required: true
-
-npg_enable_waf_rule_by_host:
-  description: "DEPRECATED ALIAS of npg_enable_waf_rule — identical call (DELETE /waf/hosts/{host_id}/rules/{rule_id}/disable); takes host_id directly, NOT a domain. For whole-host rule disabling by domain use npg_disable_waf_rule_by_host. This alias is slated for removal in a future minor release."
-  parameters:
-    - name: host_id
-      type: integer | string
       required: true
     - name: rule_id
       type: integer | string

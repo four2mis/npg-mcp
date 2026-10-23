@@ -205,7 +205,7 @@ mcp_servers:
 
 ## Tools Reference
 
-This server exposes **312 MCP tools** across 28 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **308 MCP tools** across 28 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
@@ -233,8 +233,8 @@ This server exposes **312 MCP tools** across 28 categories. Tool names, descript
 | **Fail2ban & Challenge** | 3 tools |
 | **Banned IPs & Bots** | 7 tools |
 | **Roles** | 4 tools |
-| **System** | 18 tools |
-| **SSL / Nginx** | 5 tools |
+| **System** | 17 tools |
+| **SSL / Nginx** | 2 tools |
 | **System & Health** | 1 tool |
 | **Docker** | 1 tool |
 
@@ -258,7 +258,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` for direct pipes (bare-process default), `http` for network deployment. Docker images set `http` via `ENV`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
-| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (139 read-only tools), `standard` (265 tools, no destructive ops), `full` (all 312 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (139 read-only tools), `standard` (261 tools, no destructive ops), `full` (all 308 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 | `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
 
@@ -282,23 +282,23 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 | Level | Tools | Scope |
 |-------|-------|-------|
 | `read` | 139 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`). Suitable for monitoring agents that must not mutate NPG state. |
-| `standard` | 265 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
-| `full` | 312 | All tools. Default; behavior without the variable is unchanged. |
+| `standard` | 261 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
+| `full` | 308 | All tools. Default; behavior without the variable is unchanged. |
 
-Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 312-tool reference regardless of the selected level.
+Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 308-tool reference regardless of the selected level.
 
 ## Project Structure
 
 ```
 npg_mcp/
-  main.py       # All 312 MCP tools
+  main.py       # All 308 MCP tools
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Layered toolset exposure (NPG_TOOL_LEVEL: read/standard/full)
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
 pyproject.toml  # Dependencies: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
-tool-schemas.yaml  # Full input parameter schemas for all 312 tools
+tool-schemas.yaml  # Full input parameter schemas for all 308 tools
 ```
 
 ## Development & Testing

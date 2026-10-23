@@ -33,7 +33,6 @@ def _sample_tools() -> set[str]:
         # mutations (only at standard/full)
         "npg_create_proxy_host",
         "npg_update_proxy_host",
-        "npg_sync_nginx",
         "npg_ban_ip",
         "npg_unban_ip",
         "npg_delete_proxy_host",
@@ -94,7 +93,6 @@ class TestTierAllowed:
         for mut in (
             "npg_create_proxy_host",
             "npg_ban_ip",
-            "npg_sync_nginx",
             "npg_delete_proxy_host",
         ):
             assert mut not in allowed
@@ -112,7 +110,6 @@ class TestTierAllowed:
         allowed = tier_allowed(_sample_tools(), "standard")
         assert "npg_create_proxy_host" in allowed
         assert "npg_update_proxy_host" in allowed
-        assert "npg_sync_nginx" in allowed
         assert "npg_unban_ip" in allowed
         assert "npg_ban_ip" not in allowed
         assert "npg_delete_proxy_host" not in allowed
@@ -187,10 +184,10 @@ class TestDerivedDestructiveTools:
         assert (
             len(tier_allowed(all_tools, "standard"))
             == len(all_tools) - len(DESTRUCTIVE_TOOLS)
-            == 265
+            == 261
         )
-        # Live surface guardrail (current HEAD): 312 tools, 47 destructive.
-        assert len(all_tools) == 312
+        # Live surface guardrail (current HEAD): 308 tools, 47 destructive.
+        assert len(all_tools) == 308
         assert len(DESTRUCTIVE_TOOLS) == 47
 
     def test_destructive_count_47_exact(self):
@@ -201,9 +198,9 @@ class TestDerivedDestructiveTools:
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(tier_allowed(all_tools, "standard")) == 265
+        assert len(tier_allowed(all_tools, "standard")) == 261
         assert len(tier_allowed(all_tools, "read")) == 139
-        assert len(tier_allowed(all_tools, "full")) == 312
+        assert len(tier_allowed(all_tools, "full")) == 308
 
     def test_docstring_documents_naming_convention(self):
         import inspect

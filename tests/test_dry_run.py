@@ -172,13 +172,6 @@ class TestToolDryRunSurface:
             },
         }
 
-    def test_reload_nginx_surfaces_payload(self, dry_client):
-        result = self._run(main_mod.npg_reload_nginx())
-        assert result["success"] is True
-        assert result["data"]["dry_run"] is True
-        assert result["data"]["method"] == "POST"
-        assert result["data"]["path"] == "/api/v1/proxy-hosts/sync"
-
     def test_set_user_email_surfaces_payload(self, dry_client):
         result = self._run(main_mod.npg_set_user_email(user_id="u1", email="a@b.c"))
         assert result["success"] is True
@@ -197,10 +190,3 @@ class TestToolDryRunSurface:
         assert result["data"]["method"] == "POST"
         assert result["data"]["path"] == "/api/v1/proxy-hosts"
         assert result["data"]["body"]["domain_names"] == ["dry.four2mis.com"]
-
-    def test_test_nginx_returns_payload_not_transform(self, dry_client):
-        result = self._run(main_mod.npg_test_nginx())
-        assert result["success"] is True
-        assert result["data"]["dry_run"] is True
-        # the "valid/status" transform must not swallow the payload
-        assert "valid" not in result["data"]

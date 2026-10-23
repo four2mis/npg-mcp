@@ -142,8 +142,11 @@ class TestHealthIsNotAnMCPTool:
         assert not any("health" == n for n in names)
 
     def test_tool_count_unchanged(self):
+        # 312 → 308: the 4 deprecated alias tools (npg_sync_nginx,
+        # npg_reload_nginx, npg_test_nginx, npg_enable_waf_rule_by_host)
+        # were removed; canonical replacements cover the same routes.
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 312
+        assert len(names) == 308
 
 
 class TestAccessLogRequestId:
