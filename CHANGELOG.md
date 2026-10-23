@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2] - 2026-10-23
+
+### What changed
+- Removed the 4 deprecated alias tools that were marked as exact route+behavior duplicates in v1.1.0 (commit 87288a4). Tool count drops 312 → 308; per-tier counts drop to read=139 / standard=261 / full=308 and the tier-count block in `.env.example` was updated in the same commit.
+- Regenerated `tool-schemas.yaml`, `README.md`, and `README.ko.md` from source in the same commit; toolset/dry-run/health tests were updated for the removal (pytest 445/445 passing).
+- Verified on the isolated test stack against a local HEAD build (local/npg-mcp:87288a4): server serves 308 tools with all 4 aliases absent, 6/6 sampled MCP tool calls succeed, prose-drift `--check` exits 0 with all 5 rules passing.
+
+### What's new
+- (none)
+
+### Breaking changes
+- Removed `npg_sync_nginx` and `npg_reload_nginx` — use `npg_sync_proxy_hosts` (single sync+test+reload call).
+- Removed `npg_test_nginx` — use `npg_validate_nginx_config`.
+- Removed `npg_enable_waf_rule_by_host` — use `npg_enable_waf_rule` (the removed alias called a non-existent `POST /enable` upstream path; the canonical tool enables via `DELETE` on the `/disable` path).
+
 ## [1.1.1] - 2026-10-23
 
 ### What changed
