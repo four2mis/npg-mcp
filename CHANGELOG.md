@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.1] - 2026-10-23
+
+### What changed
+- Publish workflow doc-drift gate now accepts the Korean category-count unit (N개) in README.ko.md, so the compact bilingual README format no longer trips the CI validate step (commit 773c20a).
+- Wrapped 5 over-length assert lines in tests/test_list_pagination.py to satisfy ruff E501; test logic unchanged (commit 7bc8dd1).
+
+### What's new
+- (none)
+
+### Breaking changes
+- (none)
+
 ## [1.1.0] - 2026-10-21
 
 ### What changed
