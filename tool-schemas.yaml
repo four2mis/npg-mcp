@@ -1052,7 +1052,7 @@ npg_get_dns_provider:
       required: true
 
 npg_create_dns_provider:
-  description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/manual), credentials (dict, e.g. {'api_token': '...'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false)."
+  description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict, e.g. {'api_token': '...'}; ionos: {'api_key_prefix': '...public prefix', 'api_key': '...secret'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false). NOTE: IONOS can issue certificates but has NO DDNS updater (DDNS-restricted values: cloudflare/duckdns/dynu)."
   parameters:
     - name: name
       type: string
@@ -1093,7 +1093,7 @@ npg_delete_dns_provider:
       required: true
 
 npg_test_dns_provider:
-  description: "Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here."
+  description: "Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|ionos|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}; ionos: {\"api_key_prefix\": \"...public prefix\", \"api_key\": \"...secret\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here."
   parameters:
     - name: name
       type: string

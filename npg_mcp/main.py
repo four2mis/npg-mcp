@@ -2525,7 +2525,7 @@ async def npg_get_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/manual), credentials (dict, e.g. {'api_token': '...'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false).")
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict, e.g. {'api_token': '...'}; ionos: {'api_key_prefix': '...public prefix', 'api_key': '...secret'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false). NOTE: IONOS can issue certificates but has NO DDNS updater (DDNS-restricted values: cloudflare/duckdns/dynu).")
 async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
@@ -2563,7 +2563,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here.")
+@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|ionos|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}; ionos: {\"api_key_prefix\": \"...public prefix\", \"api_key\": \"...secret\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here.")
 async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict, is_default: bool | None = None) -> dict:
     try:
         c = _get_client()
