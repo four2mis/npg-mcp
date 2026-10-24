@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-10-24
+
+### What changed
+- Upstream NPG v2.65.0 sync. The swagger delta (v2.64.0 → v2.65.0) was the IONOS DNS-provider addition: new `ionos` enum value in the DNS-provider credentials doc (`api_key_prefix` + `api_key`). No route, struct, or signature changes upstream (ops count unchanged 317 → 317), so the MCP tool surface stays at 308 tools with zero signature changes.
+- `npg_create_dns_provider` and `npg_test_dns_provider` descriptions now list `ionos` as a valid `provider_type` and document the exact credential shape (`{'api_key_prefix': '...public prefix', 'api_key': '...secret'}`); IONOS is cert-DNS01-capable but explicitly excluded from DDNS updater use (commit dac7438).
+- `tool-schemas.yaml` regenerated from source in the same commit (dac7438); committed `swagger.yaml` synced from upstream v2.65.0 (commit f6dfd37).
+- Verified (task t_e0237f84) against the isolated test stack: SYNTAX_OK, 308 unique tools, no duplicates, no non-npg names, IONOS present in both descriptions, tool-schemas.yaml in sync, zero signature changes vs 075db2e; a HEAD-pinned local image (local/npg-mcp:f6dfd37) served 308 tools with both IONOS descriptions and live calls (`npg_get_health`, `npg_list_dns_providers`, `npg_list_proxy_hosts`) all succeeded against test NPG 2.65.0.
+
+### What's new
+- IONOS is now a supported `provider_type` for DNS-01 certificate issuance, surfaced through the `npg_create_dns_provider` / `npg_test_dns_provider` descriptions (new capability added upstream in NPG v2.65.0; MCP tools already pass `provider_type`/`credentials` through — no param changes needed).
+
+### Breaking changes
+- (none)
+
 ## [1.1.2] - 2026-10-23
 
 ### What changed
