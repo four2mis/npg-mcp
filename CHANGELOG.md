@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0] - 2026-10-27
+
+### What changed
+- `.github/workflows/publish.yml` now publishes multi-arch images (linux/amd64 + linux/arm64) via `docker/setup-qemu-action` + `docker/setup-buildx-action` in a single `docker buildx build --platform linux/amd64,linux/arm64 --push` with the same 3 tags (ver / major.minor / latest). Verified end-to-end against a local OCI registry: manifest index lists both platforms, the arm64 image runs under QEMU (aarch64, 308 tools registered), and the amd64 image wired to the test NPG stack (192.168.0.140) passes a real MCP initialize + tools/list (308 tools) + live read-only tool calls. Dockerfile is already arch-safe (python:3.11-slim, pure-python wheels).
+- README.md / README.ko.md updated to document multi-arch image availability.
+- Zero MCP-layer changes: tool signatures, descriptions, tiers, and docs tool counts untouched (308 tools in sync, docs drift --check exit 0, pytest 445 passed, ruff + mypy clean at commit a4e1a9ce).
+
+### What's new
+- GHCR images are now published for linux/arm64 in addition to linux/amd64 — arm64 hosts can pull `ghcr.io/four2mis/npg-mcp` directly (`docker pull ghcr.io/four2mis/npg-mcp:latest` selects the matching platform automatically).
+
+### Breaking changes
+- (none)
+
 ## [1.2.0] - 2026-10-24
 
 ### What changed
