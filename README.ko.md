@@ -55,6 +55,8 @@ docker pull ghcr.io/four2mis/npg-mcp:latest
 docker pull ghcr.io/four2mis/npg-mcp:1.0.0
 ```
 
+이미지는 **멀티 아키텍처 매니페스트(linux/amd64 + linux/arm64)**로 게시됩니다 — `docker pull`이 플랫폼에 맞는 이미지를 자동으로 선택합니다.
+
 템플릿에서 `.env` 파일 생성:
 
 ```bash

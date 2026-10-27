@@ -55,6 +55,8 @@ Images are also tagged per release version (without the `v` prefix — releases 
 docker pull ghcr.io/four2mis/npg-mcp:1.0.0
 ```
 
+Images are published as **multi-arch manifests (linux/amd64 + linux/arm64)** — `docker pull` selects the right platform automatically.
+
 Create a `.env` file from the template:
 
 ```bash
