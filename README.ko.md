@@ -289,13 +289,24 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 308개 도구 참조를 문서화합니다.
 
+### 도구 애노테이션(Tool Annotations)
+
+모든 도구는 표준 MCP `ToolAnnotations`(`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`)와 사람이 읽을 수 있는 `title`을 함께 제공합니다. 이 값들은 시작 시 각 도구 본문이 호출하는 HTTP 메서드와 도구 수준(toolset level) 뒤에 있는 파괴적 이름 목록에서 계산되므로 코드와 어긋날 수 없으며, 도구 동작 자체는 바꾸지 않습니다:
+
+| 힌트 | `true`인 경우 |
+|------|-----------|
+| `readOnlyHint` | NPG 호출이 모두 GET인 도구(`npg_get_*`, `npg_list_*`, `npg_download_*` 등). GET 검사 도구 하나는 의도적으로 `false`입니다: `npg_check_backup_restore`는 일회용 백업 행을 만들고 삭제합니다. |
+| `destructiveHint` | `standard` 수준에서 숨겨지는 파괴적 도구 집합: 삭제/제거, IP 차단, 초기화, 복원, 토큰 폐기, 자격 증명 변경, 세션 종료, 로그 회전. |
+| `idempotentHint` | GET 전용 도구와 멱등 `PUT` 업데이트 — 같은 호출을 반복해도 동일한 최종 상태에 도달합니다. 생성/테스트/삭제는 `false`입니다. |
+| `openWorldHint` | 폐쇄형 카탈로그 읽기(국가 목록, 프리셋, 권한 영역, 알려진 봇, WAF 테스트 패턴, 로그 소스/수준, 감사 로그 액션)만 `false`이며, 그 외에는 업스트림·ACME·DNS 공급자·Telegram에 접근하므로 `true`입니다. |
+
 ## 프로젝트 구조
 
 ```
 npg_mcp/
   main.py       # 308개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
-  toolsets.py   # 계층형 도구 노출(NPG_TOOL_LEVEL: read/standard/full)
+  toolsets.py   # 도구 수준(NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml

@@ -6,6 +6,9 @@ Covers:
 * standard-level excludes all 47 DESTRUCTIVE_TOOLS.
 * full-level returns everything.
 * resolve_level normalizes unknown values to full.
+* MCP ToolAnnotations: every tool annotated, destructive/read-only/idempotent/
+  open-world hints derived from each tool's HTTP verbs, hints reaching the
+  served tools/list surface.
 
 Pure-function tests — no MCP server, no network.
 """
@@ -15,6 +18,8 @@ from __future__ import annotations
 from npg_mcp.toolsets import (
     DESTRUCTIVE_TOOLS,
     VALID_LEVELS,
+    annotate_tools,
+    annotations_for,
     resolve_level,
     tier_allowed,
 )
@@ -226,3 +231,177 @@ class TestDerivedDestructiveTools:
         allowed = tier_allowed(all_tools, "standard")
         assert "npg_bulk_delete_proxy_hosts" not in allowed
         assert "npg_bulk_apply_certificate" in allowed
+
+
+def _hints(annotations) -> dict:
+    """Return ToolAnnotations as protocol wire names (mcp 1.x and 2.x safe).
+
+    mcp 1.x declares the fields camelCase (``readOnlyHint``); mcp 2.x renames
+    them snake_case with camelCase aliases. ``model_dump(by_alias=True)`` yields
+    the camelCase wire names on both, so the tests never depend on the installed
+    SDK's Python attribute names.
+    """
+    return annotations.model_dump(by_alias=True)
+
+
+class TestToolAnnotations:
+    """MCP ToolAnnotations are derived per tool and reach the served surface.
+
+    Classification is derived from the HTTP verbs each tool body calls
+    (AST-harvested from ``npg_mcp/main.py``) plus the destructive-name registry
+    — never from a hand-maintained name table — so these tests pin the
+    derivation itself rather than a snapshot of its output.
+    """
+
+    @staticmethod
+    def _served() -> dict:
+        """``tools/list`` exactly as an MCP client receives it."""
+        import asyncio
+
+        import npg_mcp.main as main_mod
+
+        annotate_tools(main_mod.mcp)
+        return {tool.name: tool for tool in asyncio.run(main_mod.mcp.list_tools())}
+
+    def test_every_registered_tool_is_annotated(self):
+        from npg_mcp.toolsets import _discover_tool_names
+
+        all_tools = _discover_tool_names()
+        assert len(all_tools) == 308
+        missing = sorted(n for n in all_tools if annotations_for(n) is None)
+        assert missing == []
+
+    def test_every_tool_body_yields_route_data(self):
+        """A tool whose HTTP call convention is unrecognized fails here."""
+        from npg_mcp.toolsets import _discover_tool_names, _tool_verbs
+
+        verbs = _tool_verbs()
+        assert set(verbs) == _discover_tool_names()
+        assert sorted(n for n, v in verbs.items() if not v) == []
+
+    def test_destructive_tools_carry_destructive_hint(self):
+        assert DESTRUCTIVE_TOOLS
+        for name in DESTRUCTIVE_TOOLS:
+            hints = _hints(annotations_for(name))
+            assert hints["destructiveHint"] is True, name
+            assert hints["readOnlyHint"] is False, name
+            assert hints["idempotentHint"] is False, name
+
+    def test_get_only_tools_are_read_only(self):
+        from npg_mcp.toolsets import _READ_VERBS, _READONLY_DENYLIST, _tool_verbs
+
+        get_only = [
+            name
+            for name, verbs in _tool_verbs().items()
+            if verbs and verbs <= _READ_VERBS and name not in _READONLY_DENYLIST
+        ]
+        assert len(get_only) > 100
+        for name in get_only:
+            assert _hints(annotations_for(name))["readOnlyHint"] is True, name
+
+    def test_mutating_routes_are_never_read_only(self):
+        from npg_mcp.toolsets import _MUTATING_VERBS, _tool_verbs
+
+        mutating = [
+            name
+            for name, verbs in _tool_verbs().items()
+            if verbs & _MUTATING_VERBS
+        ]
+        assert len(mutating) > 100
+        for name in mutating:
+            assert _hints(annotations_for(name))["readOnlyHint"] is False, name
+
+    def test_idempotent_hint_rules(self):
+        from npg_mcp.toolsets import _READ_VERBS, _tool_verbs
+
+        for name, verbs in _tool_verbs().items():
+            expected = (
+                bool(verbs)
+                and name not in DESTRUCTIVE_TOOLS
+                and verbs <= (_READ_VERBS | {"put"})
+            )
+            hints = _hints(annotations_for(name))
+            assert hints["idempotentHint"] is expected, name
+
+    def test_readonly_denylist_entries_are_live_get_only_tools(self):
+        """A stale denylist entry (or a newly side-effecting GET) fails here."""
+        from npg_mcp.toolsets import _READ_VERBS, _READONLY_DENYLIST, _tool_verbs
+
+        verbs = _tool_verbs()
+        assert "npg_check_backup_restore" in _READONLY_DENYLIST
+        for name in _READONLY_DENYLIST:
+            assert name in verbs, f"stale denylist entry {name}"
+            assert verbs[name] <= _READ_VERBS, f"{name} is not GET-only"
+            assert _hints(annotations_for(name))["readOnlyHint"] is False
+
+    def test_closed_world_tools_are_registered_read_only_catalogs(self):
+        from npg_mcp.toolsets import _CLOSED_WORLD_TOOLS, _READ_VERBS, _tool_verbs
+
+        verbs = _tool_verbs()
+        assert _CLOSED_WORLD_TOOLS
+        for name in _CLOSED_WORLD_TOOLS:
+            assert name in verbs, f"unknown closed-world tool {name}"
+            assert verbs[name] <= _READ_VERBS, name
+            hints = _hints(annotations_for(name))
+            assert hints["readOnlyHint"] is True, name
+            assert hints["openWorldHint"] is False, name
+        # Every other tool keeps the spec default (interacts with an open world).
+        others = [n for n in verbs if n not in _CLOSED_WORLD_TOOLS]
+        assert len(others) > 250
+        for name in others:
+            assert _hints(annotations_for(name))["openWorldHint"] is True, name
+
+    def test_title_derivation(self):
+        from npg_mcp.toolsets import _tool_title
+
+        assert _tool_title("npg_update_proxy_host_waf") == "NPG Update Proxy Host WAF"
+        assert _tool_title("npg_list_dns_providers") == "NPG List DNS Providers"
+        assert _tool_title("npg_ban_ip") == "NPG Ban IP"
+        assert _tool_title("npg_get_auth_sso_providers") == (
+            "NPG Get Auth SSO Providers"
+        )
+
+    def test_every_annotation_carries_title_and_all_hints(self):
+        from npg_mcp.toolsets import _discover_tool_names
+
+        keys = ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint")
+        for name in _discover_tool_names():
+            hints = _hints(annotations_for(name))
+            assert hints["title"].startswith("NPG "), name
+            for key in keys:
+                assert isinstance(hints[key], bool), (name, key)
+
+    def test_annotations_reach_served_tools_list(self):
+        served = self._served()
+        assert len(served) == 308
+        assert [n for n, t in served.items() if t.annotations is None] == []
+        for name, tool in served.items():
+            expected = _hints(annotations_for(name))
+            served_hints = _hints(tool.annotations)
+            for key in (
+                "title",
+                "readOnlyHint",
+                "destructiveHint",
+                "idempotentHint",
+                "openWorldHint",
+            ):
+                assert served_hints[key] == expected[key], (name, key)
+            # the display title is also exposed on the tool itself
+            assert tool.title == expected["title"], name
+
+    def test_unknown_tool_has_no_annotations(self):
+        assert annotations_for("npg_not_a_tool") is None
+
+    def test_annotate_tools_is_idempotent(self):
+        import npg_mcp.main as main_mod
+
+        assert annotate_tools(main_mod.mcp) == 308
+        assert annotate_tools(main_mod.mcp) == 308
+
+    def test_annotate_tools_never_raises_on_broken_tool_manager(self):
+        class Broken:
+            @property
+            def _tool_manager(self):
+                raise RuntimeError("boom")
+
+        assert annotate_tools(Broken()) == 0

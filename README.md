@@ -289,13 +289,24 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 
 Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 308-tool reference regardless of the selected level.
 
+### Tool Annotations
+
+Every tool is served with standard MCP `ToolAnnotations` — `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — plus a derived human-readable `title`. They are computed at startup from the HTTP verbs each tool's body calls plus the destructive-name registry behind the toolset levels, so the hints cannot drift from the code and never change tool behavior:
+
+| Hint | `true` for |
+|------|-----------|
+| `readOnlyHint` | Tools whose only NPG calls are GETs (`npg_get_*`, `npg_list_*`, `npg_download_*`, …). One GET probe is deliberately `false`: `npg_check_backup_restore` writes and deletes a throwaway backup row. |
+| `destructiveHint` | The destructive set hidden at the `standard` level: deletes, removes, IP bans, resets, restores, revocations, credential changes, session termination, log rotation. |
+| `idempotentHint` | GET-only tools and idempotent `PUT` updates — repeating the call reaches the same end state. Creates, tests, and deletes are `false`. |
+| `openWorldHint` | `false` only for closed-catalog reads (countries, presets, permission areas, known bots, WAF test patterns, log sources/levels, audit-log actions); `true` everywhere else, since the API reaches upstreams, ACME, DNS providers, and Telegram. |
+
 ## Project Structure
 
 ```
 npg_mcp/
   main.py       # All 308 MCP tools
   client.py     # HTTP client wrapper with API token auth
-  toolsets.py   # Layered toolset exposure (NPG_TOOL_LEVEL: read/standard/full)
+  toolsets.py   # Toolset levels (NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml

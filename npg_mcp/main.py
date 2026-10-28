@@ -5927,6 +5927,14 @@ async def npg_set_user_email(user_id: str | int, email: str) -> dict:
 
 def main() -> None:
     _setup_logging()
+    # Attach standard MCP ToolAnnotations (readOnlyHint / destructiveHint /
+    # idempotentHint / openWorldHint + derived title) to every registered tool.
+    # Classification is derived from each tool's HTTP verbs plus the
+    # destructive-name registry in toolsets.py; annotations are client-facing
+    # metadata only — execution, signatures, and descriptions are unchanged.
+    # Runs before the tier filter below so every tool is annotated regardless
+    # of which subset NPG_TOOL_LEVEL exposes.
+    toolsets.annotate_tools(mcp)
     # Apply the layered toolset filter (NPG_TOOL_LEVEL) before the server
     # starts. Hidden tools are removed from the FastMCP tool manager, so they
     # are neither listed in tools/list nor callable via tools/call. Unknown
