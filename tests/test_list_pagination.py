@@ -1180,8 +1180,10 @@ class TestLogAutocompleteBoundsParity:
     @pytest.mark.parametrize(
         "tool, path",
         [
-            (main_mod.npg_get_log_autocomplete_countries, "/api/v1/logs/autocomplete/countries"),
-            (main_mod.npg_get_log_autocomplete_methods, "/api/v1/logs/autocomplete/methods"),
+            (main_mod.npg_get_log_autocomplete_countries,
+             "/api/v1/logs/autocomplete/countries"),
+            (main_mod.npg_get_log_autocomplete_methods,
+             "/api/v1/logs/autocomplete/methods"),
         ],
     )
     def test_zero_arg_full_list_no_params(self, monkeypatch, tool, path):

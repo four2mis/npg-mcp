@@ -87,6 +87,54 @@ jobs:
               else:
                   print(f'OK: {fname} total tool count {total} matches main.py')
 
+          # 3. DESC_LEN: every @mcp.tool description must be <= 460 chars.
+          #    Mirrors the DESC_LEN rule in
+          #    ~/.hermes/shared-skills/npg-mcp/scripts/regenerate_all_docs.py
+          #    (repo CI cannot import that out-of-repo script, so the cap and the
+          #    override list are duplicated here — keep them in sync).
+          #    AST-based so escapes like \" count as one char, and fail-closed: an
+          #    unparsable main.py or a non-literal description is an error.
+          import ast
+
+          DESC_LEN_CAP = 460
+          DESC_LEN_OVERRIDES = frozenset()
+
+          with open('npg_mcp/main.py') as f:
+              tree = ast.parse(f.read())
+          over, unmeasurable, measured = [], [], 0
+          for node in ast.walk(tree):
+              if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                  continue
+              for dec in node.decorator_list:
+                  if not (isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute)
+                          and dec.func.attr == 'tool'):
+                      continue
+                  name = desc = None
+                  for kw in dec.keywords:
+                      if kw.arg == 'name' and isinstance(kw.value, ast.Constant):
+                          name = kw.value.value
+                      elif kw.arg == 'description':
+                          desc = kw.value.value if isinstance(kw.value, ast.Constant) else None
+                  if not isinstance(name, str):
+                      continue
+                  if not isinstance(desc, str):
+                      unmeasurable.append(name)
+                      continue
+                  measured += 1
+                  if len(desc) > DESC_LEN_CAP and name not in DESC_LEN_OVERRIDES:
+                      over.append(f'{name} ({len(desc)} chars)')
+          if unmeasurable:
+              print(f'ERROR: {len(unmeasurable)} description(s) are not string literals '
+                    f'(length cannot be measured): {sorted(unmeasurable)[:5]}')
+              errors += 1
+          if over:
+              print(f'ERROR: {len(over)} of {measured} tool descriptions exceed '
+                    f'{DESC_LEN_CAP} chars: {sorted(over)[:5]}')
+              print('Trim them in npg_mcp/main.py — add to DESC_LEN_OVERRIDES only if unavoidable.')
+              errors += 1
+          else:
+              print(f'OK: all {measured} tool descriptions <= {DESC_LEN_CAP} chars')
+
           if errors:
               print(f'\n{errors} file(s) out of sync. Run: regenerate_all_docs.py --write')
               sys.exit(1)
