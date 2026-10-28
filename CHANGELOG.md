@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0] - 2026-10-28
+
+### What changed
+- `npg_mcp/toolsets.py` gained a derived MCP `ToolAnnotations` layer: `annotate_tools(mcp)`, called once from `main()` before the tier filter, attaches `readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint` plus a derived `title` to every registered tool. Classification is AST-derived from the HTTP verbs each tool body calls in `main.py` (`get`/`get_text`/`get_bytes` = read; `post`/`post_file`/`put`/`delete` = mutating) combined with the existing `DESTRUCTIVE_TOOLS` naming registry — there is no hand-maintained 308-name table. Two documented exception sets: `_READONLY_DENYLIST` (GET routes with side effects — `npg_check_backup_restore` writes and deletes a throwaway backup row) and `_CLOSED_WORLD_TOOLS` (11 closed-catalog reads).
+- Annotations are attached by mutating the FastMCP `Tool` objects instead of editing decorator lines, so all 308 `@mcp.tool(name=..., description=...)` decorators stay byte-identical and the AST-driven doc tooling (`regenerate_all_docs.py`, `check_tool_descriptions.py`, the CI description-sync and DESC_LEN gates) keeps parsing them unchanged. Zero signature changes, zero description changes, zero tools added/removed/renamed — tier counts stay read=139 / standard=261 / full=308.
+- `ToolAnnotations.model_validate({...camelCase...})` is used rather than kwargs construction: mcp 1.x declares the fields camelCase while mcp 2.x renames them snake_case with camelCase aliases, so alias validation is the only construction valid across the supported `mcp>=1.29,<2` range.
+- `tests/test_toolsets.py` gained 15 tests pinning the derivation itself: every tool annotated, every tool body yields route data, destructive ⇒ `destructiveHint`, GET-only ⇒ `readOnlyHint`, mutating routes never read-only, idempotent rules, denylist/closed-world liveness, title derivation, hints reaching the served `tools/list`, plus idempotent and defensive `annotate_tools` behavior.
+- README.md / README.ko.md gained a "Tool Annotations" subsection; the `toolsets.py` Project Structure line now mentions annotations.
+- Verified on the isolated test stack against a HEAD-pinned local image (`local/npg-mcp:576211b`, label revision = `576211b`): 21/21 live checks (308 tools served, all annotated, hint sets 141/47/185/11, spot semantics, derived titles) plus real tool calls — `npg_get_settings`, fixture `npg_create_proxy_host` → `npg_delete_proxy_host` → 404 confirm — and 7/7 read-tier checks on a second container at `NPG_TOOL_LEVEL=read` (139 tools, all annotated, destructive tools still unlisted and uncallable). Gates: pytest 472 passed, ruff + mypy clean, docs drift `--check` exit 0 (incl. DESC_LEN), `--check-env` tier counts match.
+
+### What's new
+- Every tool now carries standard MCP `ToolAnnotations` in `tools/list`: 141 read-only (`readOnlyHint=true`), 47 destructive (`destructiveHint=true`), 185 idempotent reads/`PUT` partial updates, and `openWorldHint=false` for the 11 closed-catalog reads. MCP clients (Hermes, Claude, Cursor) can now filter read-only tools, warn before destructive calls, and batch idempotent ones — with no change to tool execution.
+
+### Breaking changes
+- (none) Tool names, descriptions, parameter signatures, and toolset tiers are unchanged; annotations are additive client-facing metadata.
+
 ## [1.3.0] - 2026-10-27
 
 ### What changed
