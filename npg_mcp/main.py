@@ -5209,21 +5209,31 @@ async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_countries() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs with per-country hit counts (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window.")
+async def npg_get_log_autocomplete_countries(limit: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, None)
         data = await _api(c.get, "/api/v1/logs/autocomplete/countries")
-        return {"success": True, "data": data}
+        if limit is None:
+            return {"success": True, "data": data}
+        # Upstream encodes an empty distinct-value set as JSON null; report the
+        # window on an empty list instead of a bogus "unexpected shape" note.
+        return _sliced_result(data if data is not None else [], limit, None, unit="countries")
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_methods", description="Get distinct HTTP methods seen in nginx access logs (for autocomplete).")
-async def npg_get_log_autocomplete_methods() -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_methods", description="Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window.")
+async def npg_get_log_autocomplete_methods(limit: int | None = None) -> dict:
     c = _get_client()
     try:
+        _validate_paging_args(limit, None)
         data = await _api(c.get, "/api/v1/logs/autocomplete/methods")
-        return {"success": True, "data": data}
+        if limit is None:
+            return {"success": True, "data": data}
+        # Upstream encodes an empty distinct-value set as JSON null; report the
+        # window on an empty list instead of a bogus "unexpected shape" note.
+        return _sliced_result(data if data is not None else [], limit, None, unit="methods")
     except Exception as e:
         return _error_result(e)
 
@@ -5881,11 +5891,12 @@ async def npg_test_waf_all_patterns(target_url: str) -> dict:
 
 # ── GeoIP History ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_geoip_history", description="List GeoIP database update runs and their status.")
-async def npg_get_geoip_history() -> dict:
+@mcp.tool(name="npg_get_geoip_history", description="List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows).")
+async def npg_get_geoip_history(page: int | None = None, limit: int | None = None) -> dict:
     c = _get_client()
     try:
-        data = await _api(c.get, "/api/v1/system-settings/geoip/history")
+        params = _list_params_per_page(limit=limit, page=page)
+        data = await _api(c.get, "/api/v1/system-settings/geoip/history", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

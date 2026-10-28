@@ -1165,3 +1165,120 @@ class TestMcpSidePagedListTools:
         assert result["success"] is False
         assert "non-negative integer" in result["error"]
         assert users_client.calls == [] and waf_client.calls == []
+
+
+# ── Autocomplete parity + GeoIP history bounds (2026-10-28) ───────────────
+# countries/methods accept NO upstream query parameters (verified in the
+# upstream v2.65.2 handlers GetDistinctCountries/GetDistinctMethods, which
+# ignore the query string entirely and return the full list), so their
+# `limit` is applied MCP-side. geoip/history paginates natively
+# (page/per_page, per_page clamped to 1..100, default 20), so its
+# page/limit are forwarded to the API instead of sliced locally.
+
+
+class TestLogAutocompleteBoundsParity:
+    @pytest.mark.parametrize(
+        "tool, path",
+        [
+            (main_mod.npg_get_log_autocomplete_countries, "/api/v1/logs/autocomplete/countries"),
+            (main_mod.npg_get_log_autocomplete_methods, "/api/v1/logs/autocomplete/methods"),
+        ],
+    )
+    def test_zero_arg_full_list_no_params(self, monkeypatch, tool, path):
+        data = ["KR", "US", "JP", "DE", "FR"]
+        client = _fake(monkeypatch, path, list(data))
+        result = _run(tool())
+        # byte-identical to the pre-change shape: no paging key, no query params
+        assert result == {"success": True, "data": data}
+        assert "paging" not in result
+        assert client.calls == [("GET", path, None)]
+
+    def test_countries_limit_slices_with_total(self, monkeypatch):
+        data = [{"country": f"C{i}", "count": i} for i in range(6)]
+        client = _fake(monkeypatch, "/api/v1/logs/autocomplete/countries", list(data))
+        result = _run(main_mod.npg_get_log_autocomplete_countries(limit=3))
+        assert result["success"] is True
+        assert result["data"] == data[:3]
+        assert result["paging"]["unit"] == "countries"
+        assert result["paging"]["total"] == 6
+        assert result["paging"]["returned"] == 3
+        assert result["paging"]["offset"] == 0
+        assert "mcp-side" in result["paging"]["applied"]
+        # upstream gets NO query params — the window is applied after the GET
+        assert client.calls == [("GET", "/api/v1/logs/autocomplete/countries", None)]
+
+    def test_methods_limit_slices_with_total(self, monkeypatch):
+        data = ["GET", "POST", "PUT", "DELETE", "HEAD"]
+        client = _fake(monkeypatch, "/api/v1/logs/autocomplete/methods", list(data))
+        result = _run(main_mod.npg_get_log_autocomplete_methods(limit=2))
+        assert result["data"] == ["GET", "POST"]
+        assert result["paging"]["unit"] == "methods"
+        assert result["paging"]["total"] == 5
+        assert result["paging"]["returned"] == 2
+        assert client.calls == [("GET", "/api/v1/logs/autocomplete/methods", None)]
+
+    def test_negative_limit_clean_error_no_http_call(self, monkeypatch):
+        countries_client = _fake(monkeypatch, "/api/v1/logs/autocomplete/countries", [])
+        result = _run(main_mod.npg_get_log_autocomplete_countries(limit=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        methods_client = _fake(monkeypatch, "/api/v1/logs/autocomplete/methods", [])
+        result = _run(main_mod.npg_get_log_autocomplete_methods(limit=-2))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert countries_client.calls == [] and methods_client.calls == []
+
+    def test_zero_limit_is_empty_window_not_error(self, monkeypatch):
+        _fake(monkeypatch, "/api/v1/logs/autocomplete/methods", ["GET", "POST"])
+        result = _run(main_mod.npg_get_log_autocomplete_methods(limit=0))
+        assert result["success"] is True
+        assert result["data"] == []
+        assert result["paging"]["total"] == 2
+        assert result["paging"]["returned"] == 0
+
+    def test_null_upstream_zero_arg_preserved(self, monkeypatch):
+        # upstream encodes an empty distinct-value set as JSON null
+        _fake(monkeypatch, "/api/v1/logs/autocomplete/countries", None)
+        result = _run(main_mod.npg_get_log_autocomplete_countries())
+        assert result == {"success": True, "data": None}
+
+    def test_null_upstream_with_limit_reports_empty_window(self, monkeypatch):
+        client = _fake(monkeypatch, "/api/v1/logs/autocomplete/countries", None)
+        result = _run(main_mod.npg_get_log_autocomplete_countries(limit=2))
+        assert result["success"] is True
+        assert result["data"] == []
+        assert result["paging"]["total"] == 0
+        assert result["paging"]["returned"] == 0
+        assert result["paging"]["unit"] == "countries"
+        assert "mcp-side" in result["paging"]["applied"]
+        assert client.calls == [("GET", "/api/v1/logs/autocomplete/countries", None)]
+
+
+class TestGetGeoipHistoryPaging:
+    GEOIP_PATH = "/api/v1/system-settings/geoip/history"
+
+    def test_zero_arg_sends_no_params(self, recording):
+        result = _run(main_mod.npg_get_geoip_history())
+        assert result["success"] is True
+        assert recording.calls == [("GET", self.GEOIP_PATH, None)]
+
+    def test_page_and_limit_forwarded_as_per_page(self, recording):
+        _run(main_mod.npg_get_geoip_history(page=2, limit=5))
+        assert recording.calls == [("GET", self.GEOIP_PATH, {"page": 2, "per_page": 5})]
+
+    def test_limit_only_maps_to_per_page(self, recording):
+        _run(main_mod.npg_get_geoip_history(limit=100))
+        assert recording.calls == [("GET", self.GEOIP_PATH, {"per_page": 100})]
+
+    def test_page_only_forwarded(self, recording):
+        _run(main_mod.npg_get_geoip_history(page=3))
+        assert recording.calls == [("GET", self.GEOIP_PATH, {"page": 3})]
+
+    def test_negative_values_clean_error_no_http_call(self, recording):
+        result = _run(main_mod.npg_get_geoip_history(page=-1))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        result = _run(main_mod.npg_get_geoip_history(limit=-5))
+        assert result["success"] is False
+        assert "non-negative integer" in result["error"]
+        assert recording.calls == []

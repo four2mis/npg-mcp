@@ -3338,12 +3338,18 @@ npg_get_log_autocomplete_uris:
       required: false
 
 npg_get_log_autocomplete_countries:
-  description: "Get distinct countries seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct countries seen in nginx access logs with per-country hit counts (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_autocomplete_methods:
-  description: "Get distinct HTTP methods seen in nginx access logs (for autocomplete)."
-  parameters: []
+  description: "Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window."
+  parameters:
+    - name: limit
+      type: integer
+      required: false
 
 npg_get_log_filter_presets:
   description: "LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs."
@@ -3721,8 +3727,14 @@ npg_test_waf_all_patterns:
       required: true
 
 npg_get_geoip_history:
-  description: "List GeoIP database update runs and their status."
-  parameters: []
+  description: "List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows)."
+  parameters:
+    - name: page
+      type: integer
+      required: false
+    - name: limit
+      type: integer
+      required: false
 
 npg_set_user_role:
   description: "Assign a role to a user account. REQUIRED: user_id, role_id."
