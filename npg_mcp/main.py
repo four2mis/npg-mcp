@@ -3687,8 +3687,8 @@ async def npg_list_sso_providers(limit: int | None = None, offset: int | None = 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. Optional: client_secret (placeholder), scopes, trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id. Verify via npg_list_sso_providers.")
-async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False) -> dict:
+@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers.")
+async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     try:
         _validate_id("slug", slug)
         _validate_required("name", name)
@@ -3700,6 +3700,16 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
             body["client_secret"] = client_secret
         if scopes is not None:
             body["scopes"] = scopes
+        if allowed_email_domains is not None:
+            body["allowed_email_domains"] = allowed_email_domains
+        if allowed_emails is not None:
+            body["allowed_emails"] = allowed_emails
+        if group_claim is not None:
+            body["group_claim"] = group_claim
+        if required_group is not None:
+            body["required_group"] = required_group
+        if default_role_id is not None:
+            body["default_role_id"] = default_role_id
         data = await _api(c.post, "/api/v1/sso-providers", body)
         return {"success": True, "data": data}
     except Exception as e:
