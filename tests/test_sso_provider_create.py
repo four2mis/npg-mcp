@@ -90,7 +90,7 @@ class TestCreateSsoProviderBody:
         assert body["trust_provider_email"] is False
 
     def test_explicit_empty_lists_are_forwarded(self, recording):
-        """Empty allowlists are meaningful upstream (nobody signs in) — pass them through."""
+        """Empty allowlists mean "nobody signs in" upstream — pass them through."""
         result = _run(
             main_mod.npg_create_sso_provider(
                 **_base_kwargs(allowed_emails=[], allowed_email_domains=[])
@@ -119,7 +119,9 @@ class TestCreateSsoProviderSchemaParity:
     def test_schema_exposes_every_advertised_field(self):
         props = self._tool().parameters["properties"]
         for field in NEW_FIELDS:
-            assert field in props, f"{field} advertised in description but not in schema"
+            assert field in props, (
+                f"{field} advertised in description but not in schema"
+            )
 
     def test_advertised_fields_are_optional(self):
         required = self._tool().parameters.get("required", [])
@@ -142,7 +144,9 @@ class TestCreateSsoProviderSchemaParity:
             "group_role_mappings",
         }
         ghosts = [n for n in candidates if n in description and n not in props]
-        assert ghosts == [], f"description advertises params the schema rejects: {ghosts}"
+        assert ghosts == [], (
+            f"description advertises params the schema rejects: {ghosts}"
+        )
 
     def test_description_within_desc_len_cap(self):
         assert len(self._tool().description) <= 460
