@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.1] - 2026-10-31
+
+### What changed
+- `npg_create_sso_provider`'s signature now accepts the five parameters its own `description=` had advertised: `allowed_email_domains`, `allowed_emails`, `group_claim`, `required_group`, `default_role_id`. All five are optional and are written to the `POST /api/v1/sso-providers` body only when provided (conditional body building, so omitted fields stay omitted). Any agent following the published description previously hit a Pydantic validation error — `npg_create_sso_provider() got an unexpected keyword argument`.
+- Measured impact of the pre-fix behaviour while verifying: the previously published image served a 7-property schema (0 of 5 advertised params) and, on a call passing all five, returned `success: true` while silently dropping 4 of 4 security fields (`allowed_email_domains`, `allowed_emails`, `required_group`, `default_role_id` came back as `[]` / `""` / `null`). This was silent data loss on an access-control surface, not just a cosmetically stale description. The fixed build serves all 5 (12 properties) and a live create persists every value exactly, confirmed by an independent `npg_list_sso_providers` read-back.
+- The tool's `description=` was rewritten in the same commit as the signature change (431 chars) and now states the auth gate explicitly: `(email OR domain) AND required_group`; no allowlist means nobody can sign in. It also notes `client_secret` is required for most IdPs and that `default_role_id` must be an existing role UUID.
+- 8 new regression tests in `tests/test_sso_provider_create.py` pin the parameter set, the conditional body mapping, and description↔signature agreement. Full suite: 480 passed.
+- `tool-schemas.yaml` regenerated in a follow-up commit (f84c2c0) for the new parameters. This was needed because the docs drift gate compares tool-schemas.yaml by tool *name set* only, so a parameter-only change is invisible to `--check` and would otherwise ship stale parameter documentation silently.
+- Committed `swagger.yaml` synced to upstream NPG v2.65.3 (3-line diff; no route or request-struct change, so no MCP surface change beyond the fix above).
+- Verified on the isolated test stack against a HEAD-pinned local image (`local/npg-mcp:f84c2c0`), not the stale published image: target identity proven by comparing the container's installed `main.py` sha256 with the workspace file at HEAD; 12/12 checks pass, edge cases clean (empty arguments, empty lists, 64-char `name` cap rejection, unicode / special characters / IDN values, wrong-type arguments, missing optional params). Gates: 308 tools, 0 duplicate names, docs `--check` exit 0 including the 460-char description cap, tier counts read=139 / standard=261 / full=308, 5 unrelated tools called without regression.
+- Verification also surfaced an upstream constraint that is *not* an MCP-layer bug and is not fixed here: `group_claim` longer than 64 characters makes both `POST` and `PUT /api/v1/sso-providers` return HTTP 500 `{"error":"Operation failed"}` although swagger declares no `maxLength` (64 chars works, `required_group` accepts 250). Reproduced with raw HTTP and the MCP layer bypassed, so the tools pass the value through faithfully; failure is atomic (no partial row). Filed as an upstream suspicion for the pipeline to verify and report.
+
+### What's new
+- `npg_create_sso_provider` can now create SSO providers that actually restrict access by email domain (`allowed_email_domains`), by explicit email allowlist (`allowed_emails`), by a named OIDC group claim (`group_claim`, default `groups`), by a required IdP group (`required_group`), and can grant a specific existing role to auto-provisioned users (`default_role_id`) — all previously only reachable by hand-crafting the API request.
+- No new tools: the surface stays at 308 tools, same names, same tiers.
+
+### Breaking changes
+- (none) No tool, parameter, or default was renamed or removed; the five added parameters are optional, so existing calls behave identically.
+
 ## [1.4.0] - 2026-10-28
 
 ### What changed
