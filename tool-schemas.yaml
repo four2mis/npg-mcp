@@ -2121,7 +2121,7 @@ npg_list_sso_providers:
       required: false
 
 npg_create_sso_provider:
-  description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. Optional: client_secret (placeholder), scopes, trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id. Verify via npg_list_sso_providers."
+  description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers."
   parameters:
     - name: slug
       type: string
@@ -2145,6 +2145,21 @@ npg_create_sso_provider:
       type: boolean
       required: false
       default: false
+    - name: allowed_email_domains
+      type: array<string>
+      required: false
+    - name: allowed_emails
+      type: array<string>
+      required: false
+    - name: group_claim
+      type: string
+      required: false
+    - name: required_group
+      type: string
+      required: false
+    - name: default_role_id
+      type: string
+      required: false
 
 npg_update_sso_provider:
   description: "UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
