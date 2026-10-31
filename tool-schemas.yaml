@@ -218,7 +218,7 @@ npg_create_proxy_host:
       required: false
 
 npg_update_proxy_host:
-  description: "UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible."
+  description: "UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear. ids ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. Stream: proxy_type + stream_* (listen_port, protocol, timeouts). waf_mode only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records for a host left DDNS-unmanaged - irreversible."
   parameters:
     - name: host_id
       type: integer | string
@@ -251,6 +251,9 @@ npg_update_proxy_host:
       type: integer
       required: false
     - name: ssl_forced
+      type: boolean
+      required: false
+    - name: ssl_enabled
       type: boolean
       required: false
     - name: ssl_cert_id
@@ -331,6 +334,33 @@ npg_update_proxy_host:
     - name: forward_container_network
       type: string
       required: false
+    - name: proxy_type
+      type: string
+      required: false
+    - name: stream_listen_host
+      type: string
+      required: false
+    - name: stream_listen_port
+      type: integer
+      required: false
+    - name: stream_protocol
+      type: string
+      required: false
+    - name: stream_ssl_preread
+      type: boolean
+      required: false
+    - name: stream_accept_proxy_protocol
+      type: boolean
+      required: false
+    - name: stream_send_proxy_protocol
+      type: boolean
+      required: false
+    - name: stream_proxy_connect_timeout
+      type: integer
+      required: false
+    - name: stream_proxy_timeout
+      type: integer
+      required: false
     - name: tags
       type: array<string>
       required: false
@@ -383,7 +413,7 @@ npg_create_proxy_host_simple:
       default: true
 
 npg_update_proxy_host_simple:
-  description: "UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host."
+  description: "UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host."
   parameters:
     - name: host_id
       type: integer | string
@@ -404,6 +434,9 @@ npg_update_proxy_host_simple:
       type: boolean
       required: false
     - name: ssl_forced
+      type: boolean
+      required: false
+    - name: ssl_enabled
       type: boolean
       required: false
     - name: ssl_cert_id
@@ -1152,7 +1185,7 @@ npg_create_cloud_provider:
       default: true
 
 npg_update_cloud_provider:
-  description: "Update a cloud provider by its slug. Pass only fields to change in kwargs: name, description, ip_ranges, ip_ranges_url, enabled. Unknown fields rejected unless strict=false."
+  description: "UPDATE a cloud provider (partial: only the kwargs keys you pass are sent) by slug. REQUIRED: slug. kwargs fields: name, description, ip_ranges, ip_ranges_url, enabled. region and slug are create-only and cannot be changed. Unknown fields rejected unless strict=false."
   parameters:
     - name: slug
       type: string
