@@ -1380,7 +1380,7 @@ npg_get_proxy_host_challenge:
       required: true
 
 npg_update_proxy_host_challenge:
-  description: "UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) REQUIRED: host_id."
+  description: "UPDATE CAPTCHA/challenge config for a proxy host (partial — only provided fields change; omitted left as-is). REQUIRED: host_id. Optional: enabled, challenge_type (recaptcha_v2|recaptcha_v3|hcaptcha|turnstile), site_key, secret_key (required for verification — without it every verify is 503), token_validity (sec), min_score (recaptcha_v3), apply_to (bot_filter|geo_restriction|both), page_title, page_message, theme (light|dark)."
   parameters:
     - name: host_id
       type: integer | string
@@ -1392,6 +1392,9 @@ npg_update_proxy_host_challenge:
       type: string
       required: false
     - name: site_key
+      type: string
+      required: false
+    - name: secret_key
       type: string
       required: false
     - name: token_validity
@@ -1406,6 +1409,12 @@ npg_update_proxy_host_challenge:
     - name: page_title
       type: string
       required: false
+    - name: page_message
+      type: string
+      required: false
+    - name: theme
+      type: string
+      required: false
 
 npg_delete_proxy_host_challenge:
   description: "DELETE CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id."
@@ -1415,14 +1424,17 @@ npg_delete_proxy_host_challenge:
       required: true
 
 npg_verify_challenge:
-  description: "Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution."
+  description: "VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 503 = challenge disabled/unconfigured."
   parameters:
     - name: token
       type: string
       required: true
-    - name: solution
+    - name: proxy_host_id
+      type: integer | string
+      required: false
+    - name: challenge_reason
       type: string
-      required: true
+      required: false
 
 npg_list_banned_ips:
   description: "LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."

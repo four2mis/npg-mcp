@@ -2830,8 +2830,20 @@ async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled (bool), challenge_type (str), site_key (str), token_validity (int), min_score (float), apply_to (str), page_title (str) REQUIRED: host_id.")
-async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | None = None, challenge_type: str | None = None, site_key: str | None = None, token_validity: int | None = None, min_score: float | None = None, apply_to: str | None = None, page_title: str | None = None) -> dict:
+@mcp.tool(name="npg_update_proxy_host_challenge", description="UPDATE CAPTCHA/challenge config for a proxy host (partial — only provided fields change; omitted left as-is). REQUIRED: host_id. Optional: enabled, challenge_type (recaptcha_v2|recaptcha_v3|hcaptcha|turnstile), site_key, secret_key (required for verification — without it every verify is 503), token_validity (sec), min_score (recaptcha_v3), apply_to (bot_filter|geo_restriction|both), page_title, page_message, theme (light|dark).")
+async def npg_update_proxy_host_challenge(
+    host_id: str | int,
+    enabled: bool | None = None,
+    challenge_type: str | None = None,
+    site_key: str | None = None,
+    secret_key: str | None = None,
+    token_validity: int | None = None,
+    min_score: float | None = None,
+    apply_to: str | None = None,
+    page_title: str | None = None,
+    page_message: str | None = None,
+    theme: str | None = None,
+) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2841,10 +2853,13 @@ async def npg_update_proxy_host_challenge(host_id: str | int, enabled: bool | No
                 "enabled": "enabled",
                 "challenge_type": "challenge_type",
                 "site_key": "site_key",
+                "secret_key": "secret_key",
                 "token_validity": "token_validity",
                 "min_score": "min_score",
                 "apply_to": "apply_to",
                 "page_title": "page_title",
+                "page_message": "page_message",
+                "theme": "theme",
             },
         )
         data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/challenge", body)
@@ -2862,13 +2877,33 @@ async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_verify_challenge", description="Verify a CAPTCHA solution. Public endpoint. REQUIRED: token, solution.")
-async def npg_verify_challenge(token: str, solution: str) -> dict:
+@mcp.tool(name="npg_verify_challenge", description="VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 503 = challenge disabled/unconfigured.")
+async def npg_verify_challenge(
+    token: str,
+    proxy_host_id: str | int | None = None,
+    challenge_reason: str | None = None,
+) -> dict:
     try:
         _validate_required("token", token)
-        _validate_required("solution", solution)
+        if proxy_host_id is not None:
+            _validate_id("proxy_host_id", proxy_host_id)
         c = _get_client()
-        data = await _api(c.post, "/api/v1/challenge/verify", {"token": token, "solution": solution})
+        body = _build_body(
+            locals(),
+            {
+                "token": "token",
+                "proxy_host_id": "proxy_host_id",
+                "challenge_reason": "challenge_reason",
+            },
+            id_fields={"proxy_host_id"},
+        )
+        data = await _api(c.post, "/api/v1/challenge/verify", body)
+        if isinstance(data, dict) and data.get("success") is False:
+            return {
+                "success": False,
+                "error": data.get("error") or "CAPTCHA verification failed",
+                "data": data,
+            }
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
