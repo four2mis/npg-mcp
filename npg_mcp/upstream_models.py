@@ -105,6 +105,11 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
     "npg_create_cloud_provider": frozenset({
         "name", "slug", "region", "description", "ip_ranges", "ip_ranges_url",
     }),
+    # PUT /cloud-providers/{slug} binds UpdateCloudProviderRequest (model/
+    # cloud_provider.go), NOT CreateCloudProvider — the swagger $ref is stale.
+    # So region/slug are create-only (absent from the update model: sending
+    # them is a silent no-op) while `enabled` is a real *bool the repository
+    # writes when non-nil. Do not "fix" this whitelist against the swagger.
     "npg_update_cloud_provider": frozenset({
         "name", "description", "ip_ranges", "ip_ranges_url", "enabled",
     }),

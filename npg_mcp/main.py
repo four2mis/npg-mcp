@@ -998,7 +998,7 @@ async def npg_create_proxy_host(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear, list=replaces. Nullable ids: ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. waf_mode (detection|blocking) applies only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records when the update leaves the host DDNS-unmanaged - irreversible.")
+@mcp.tool(name="npg_update_proxy_host", description="UPDATE a proxy host (partial update: omitted fields unchanged). REQUIRED: host_id. tags: omit=unchanged, []=clear. ids ''=clear (incl. ssl_cert_id). SSL: ssl_enabled/ssl_forced/ssl_http2/ssl_http3. Stream: proxy_type + stream_* (listen_port, protocol, timeouts). waf_mode only when waf_use_global=false. skip_nginx=true skips regen. DESTRUCTIVE: ddns_remove_provider=true deletes provider-side DNS records for a host left DDNS-unmanaged - irreversible.")
 async def npg_update_proxy_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -1011,6 +1011,7 @@ async def npg_update_proxy_host(
     waf_paranoia_level: int | None = None,
     waf_anomaly_threshold: int | None = None,
     ssl_forced: bool | None = None,
+    ssl_enabled: bool | None = None,
     ssl_cert_id: str | int | None = None,
     cache_enabled: bool | None = None,
     cache_static_only: bool | None = None,
@@ -1037,6 +1038,15 @@ async def npg_update_proxy_host(
     ddns_proxied: bool | None = None,
     forward_container_name: str | None = None,
     forward_container_network: str | None = None,
+    proxy_type: str | None = None,
+    stream_listen_host: str | None = None,
+    stream_listen_port: int | None = None,
+    stream_protocol: str | None = None,
+    stream_ssl_preread: bool | None = None,
+    stream_accept_proxy_protocol: bool | None = None,
+    stream_send_proxy_protocol: bool | None = None,
+    stream_proxy_connect_timeout: int | None = None,
+    stream_proxy_timeout: int | None = None,
     tags: list[str] | None = None,
     skip_nginx: bool = False,
     ddns_remove_provider: bool | None = None,
@@ -1057,6 +1067,7 @@ async def npg_update_proxy_host(
                 "waf_paranoia_level": "waf_paranoia_level",
                 "waf_anomaly_threshold": "waf_anomaly_threshold",
                 "ssl_forced": "ssl_force_https",
+                "ssl_enabled": "ssl_enabled",
                 "ssl_cert_id": "certificate_id",
                 "cache_enabled": "cache_enabled",
                 "cache_static_only": "cache_static_only",
@@ -1083,6 +1094,15 @@ async def npg_update_proxy_host(
                 "ddns_proxied": "ddns_proxied",
                 "forward_container_name": "forward_container_name",
                 "forward_container_network": "forward_container_network",
+                "proxy_type": "proxy_type",
+                "stream_listen_host": "stream_listen_host",
+                "stream_listen_port": "stream_listen_port",
+                "stream_protocol": "stream_protocol",
+                "stream_ssl_preread": "stream_ssl_preread",
+                "stream_accept_proxy_protocol": "stream_accept_proxy_protocol",
+                "stream_send_proxy_protocol": "stream_send_proxy_protocol",
+                "stream_proxy_connect_timeout": "stream_proxy_connect_timeout",
+                "stream_proxy_timeout": "stream_proxy_timeout",
                 "tags": "tags",
             },
             id_fields={"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"},
@@ -1134,7 +1154,7 @@ async def npg_create_proxy_host_simple(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_simple", description="UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host.")
+@mcp.tool(name="npg_update_proxy_host_simple", description="UPDATE a proxy host's common settings (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: domain_names, forward_host, forward_port, forward_scheme, enabled, ssl_enabled, ssl_forced, ssl_cert_id. For advanced options use npg_update_proxy_host.")
 async def npg_update_proxy_host_simple(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -1143,6 +1163,7 @@ async def npg_update_proxy_host_simple(
     forward_scheme: str | None = None,
     enabled: bool | None = None,
     ssl_forced: bool | None = None,
+    ssl_enabled: bool | None = None,
     ssl_cert_id: str | int | None = None,
 ) -> dict:
     try:
@@ -1157,6 +1178,7 @@ async def npg_update_proxy_host_simple(
                 "forward_scheme": "forward_scheme",
                 "enabled": "enabled",
                 "ssl_forced": "ssl_force_https",
+                "ssl_enabled": "ssl_enabled",
                 "ssl_cert_id": "certificate_id",
             },
             id_fields={"ssl_cert_id"},
@@ -2620,7 +2642,7 @@ async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_cloud_provider", description="Update a cloud provider by its slug. Pass only fields to change in kwargs: name, description, ip_ranges, ip_ranges_url, enabled. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_cloud_provider", description="UPDATE a cloud provider (partial: only the kwargs keys you pass are sent) by slug. REQUIRED: slug. kwargs fields: name, description, ip_ranges, ip_ranges_url, enabled. region and slug are create-only and cannot be changed. Unknown fields rejected unless strict=false.")
 async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("slug", slug)
