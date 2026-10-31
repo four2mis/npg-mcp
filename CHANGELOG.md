@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.3] - 2026-11-01
+
+### What changed
+- `npg_verify_challenge` sent a phantom `solution` field that does not exist in upstream `model.VerifyCaptchaRequest` (`{token, proxy_host_id, challenge_reason}`), and never sent `proxy_host_id`. The request therefore always resolved the **global** CAPTCHA config: every host that had its own CAPTCHA keys got HTTP 503 `Challenge is not enabled` even though its per-host challenge config was live. The body now mirrors the upstream model exactly — `token` (required), `proxy_host_id`, `challenge_reason` — and `proxy_host_id` is sent as a raw string (no percent-encoding) so the service's `if req.ProxyHostID != ""` branch selects the per-host config.
+- The same tool reported a **rejected** CAPTCHA as a successful call. Upstream answers a failed verification with HTTP 200 `{"success": false, "error": "CAPTCHA verification failed", ...}`, and the tool used to wrap that in `{"success": true, "data": {...}}`. It now returns an envelope `success: false` with the upstream message, keeping the full upstream payload under `data`.
+- `npg_update_proxy_host_challenge` was missing three fields of upstream `ChallengeConfigRequest`: `secret_key`, `page_message` and `theme`. Without `secret_key` no CAPTCHA could be configured through MCP at all (`has_secret_key` stayed false, so every verification returned 503 `Challenge is not configured`). All three are optional and `None`-defaulted, so the tool remains a partial update — omitted fields are never written.
+- Both `description=` strings were rewritten in the same commit as the signature changes, as the publish workflow's description-sync gate requires (`npg_verify_challenge` 407 chars, `npg_update_proxy_host_challenge` 431 chars, under the 460-char cap).
+- 12 new regression tests in `tests/test_challenge_verify_config.py` pin the verify request body (including "`solution` is never sent"), the client-side empty-token rejection, the upstream-`success:false` envelope mapping, the three new challenge-config fields, partial-update behaviour and the route. Full suite: 503 passed.
+- `tool-schemas.yaml` regenerated for the new parameters. This was needed because the docs drift gate compares tool *names* only, so a parameter-only change is invisible to `--check` and would otherwise have shipped stale parameter documentation.
+- Verified on the isolated test stack (NPG 2.65.4) against a HEAD-pinned local image `local/npg-mcp:452f340@sha256:7a2a26fb…` — not the stale published image. 21/21 checks passed on a throwaway host with its own Turnstile challenge config: schema checks (3 verify params, no `solution`), `secret_key` persisted (`has_secret_key: true`), `page_message`/`theme` round-tripped, a `theme`-only call left `challenge_type`/`has_secret_key`/`page_message` untouched, verify **without** `proxy_host_id` → 503 `Challenge is not enabled` (global config, as expected), verify **with** `proxy_host_id` → HTTP 200 plus a 64-char bypass token (`expires_in: 86400`), a rejected CAPTCHA → envelope `success: false` with `data.error`, and an empty token → client-side rejection with no API call. The throwaway host was deleted and confirmed gone afterwards.
+
+### What's new
+- `npg_verify_challenge` can now verify a CAPTCHA against a **per-host** challenge config via `proxy_host_id` (previously impossible from MCP), and can tag the verification with `challenge_reason` (`bot_filter` / `geo_restriction`), which upstream records on the issued bypass token and in the challenge log.
+- `npg_update_proxy_host_challenge` can now fully configure a CAPTCHA: `secret_key` (the missing piece that made verification impossible), plus the challenge-page `page_message` and `theme` options.
+- No new tools: the surface stays at 308 tools, same names, same tiers (read=139 / standard=261 / full=308).
+
+### Breaking changes
+- `npg_verify_challenge` no longer accepts `solution` — drop it from any call and pass the CAPTCHA provider response as `token`. The parameter never reached the API (upstream has no such field), so removals only fix validation errors; verification behaviour improves. Callers that relied on `{"success": true}` for a rejected CAPTCHA must now check `success: false` (and may read `data.error`).
+
 ## [1.4.2] - 2026-10-31
 
 ### What changed
