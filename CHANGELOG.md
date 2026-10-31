@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.4] - 2026-11-01
+
+### What changed
+- `swagger.yaml` (the bundled upstream API reference tracked in this repo) was synced from NPG **2.65.3** to **2.65.4**. The file is now byte-identical to the upstream v2.65.4 tag (`sha256 f2c72ff6…`), so the spec shipped with the server no longer lags the API the tools are written against.
+- The `POST /challenge/verify` operation — the endpoint behind `npg_verify_challenge` — was corrected in the spec to the contract the tool has implemented since v1.4.3: request body `required: [token]` (the phantom `solution` property is gone), with `proxy_host_id` (uuid, "selects the config") and `challenge_reason` documented. The 200 response now documents that a **rejected** CAPTCHA comes back as `success: false` with `error`/`score`, and that a success carries the bypass `token` plus `expires_at`/`expires_in`; `400` (malformed body / bad `proxy_host_id`) and `503` (challenge not enabled or no CAPTCHA configured) are now described. Previously the spec advertised the wrong request shape, so anyone reading it instead of `tool-schemas.yaml` was steered into the exact bug fixed in v1.4.3.
+- Exploit-rule exclusion operations had their error contracts tightened in the spec: `400` now reads "Host or rule ID missing **or not a valid ID**" (matching the upstream UUID validation), and the per-host exclusion paths gained the `404 Proxy host not found` response they already returned. The rule-not-found `404` wording was simplified to "Proxy host or rule not found".
+- File hygiene: the spec now ends with a trailing newline instead of `\ No newline at end of file`.
+- No server code changed in this release. Re-confirmed on the release commit: 308 tools with 0 duplicates, `ruff check .` clean, docs `--check` exit 0 (including the 460-char description cap, longest `npg_bulk_import_proxy_hosts` at 460), and tier counts read=139 / standard=261 / full=308 matching `tier_allowed()`.
+
+### What's new
+- No new tools, parameters or capabilities — this is a reference-spec sync only. The tool surface stays at 308 tools, same names, same tiers (read=139 / standard=261 / full=308), and every tool behaves exactly as in 1.4.3.
+- The bundled `swagger.yaml` now documents the per-host CAPTCHA verification contract (`proxy_host_id`, `challenge_reason`, rejected-token `success: false`) that `npg_verify_challenge` actually implements, so spec readers and tool callers agree.
+
+### Breaking changes
+- (none) No tool, parameter, default, auth or config requirement changed.
+
 ## [1.4.3] - 2026-11-01
 
 ### What changed
