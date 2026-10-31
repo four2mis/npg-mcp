@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.2] - 2026-10-31
+
+### What changed
+- `npg_update_proxy_host`'s `description=` advertised SSL toggling and stream configuration, but its signature could not accept them: `ssl_enabled`, `proxy_type` and the eight `stream_*` params (`stream_listen_host`, `stream_listen_port`, `stream_protocol`, `stream_ssl_preread`, `stream_accept_proxy_protocol`, `stream_send_proxy_protocol`, `stream_proxy_connect_timeout`, `stream_proxy_timeout`) were unreachable. Any agent following the published description hit a Pydantic validation error (`npg_update_proxy_host() got an unexpected keyword argument`), and there was no other way to switch an existing host to stream proxy mode or toggle its SSL through the MCP surface. All 10 are now real parameters wired into the existing param→API field map (50 params served, up from 40).
+- The same `ssl_enabled` gap was closed on `npg_update_proxy_host_simple` (9 params served), so the simple/advanced pair stays consistent.
+- The `description=` of all three changed tools was rewritten in the same commit as the signatures, as the publish workflow's description-sync gate requires: `npg_update_proxy_host` now names the stream surface explicitly, `npg_update_proxy_host_simple` lists `ssl_enabled`, and `npg_update_cloud_provider` states the upstream update contract (`region` and `slug` are create-only; `enabled` is a real update field) instead of implying every creation field is updatable.
+- `npg_mcp/upstream_models.py` now records why the `npg_update_cloud_provider` kwargs whitelist is correct: `PUT /cloud-providers/{slug}` binds upstream `model.UpdateCloudProviderRequest`, not `CreateCloudProvider` — the swagger `$ref` is stale. The static preflight scan had twice reported `enabled` there as a phantom field; the comment stops that false positive from recurring.
+- 11 new regression tests in `tests/test_proxy_host_update_ssl_stream.py` pin the reachable parameter sets, the param→body mapping (including `ssl_forced`→`ssl_force_https`), the partial-update no-op behaviour, and description↔signature agreement. Full suite: 491 passed.
+- `tool-schemas.yaml` regenerated. It was stale for all three tools — the docs drift gate compares tool *names* only, so a parameter-only change is invisible to `--check` and would otherwise have shipped parameter documentation missing 10 params.
+- Verified on the isolated test stack (NPG on 192.168.0.140) against a HEAD-pinned local image `local/npg-mcp:a7b0fd7@sha256:7c5266ef…`, not the stale published image — target identity proven by comparing the container's installed `main.py` sha256 with the workspace file at HEAD. 21/21 fix-claim checks passed on fresh `verify-` fixtures: `ssl_enabled` toggled false→true→false with each step confirmed by an independent GET, all nine `proxy_type`/`stream_*` values round-tripped exactly (`mismatch={}`), a `host_id`-only body remained a strict no-op (unrelated fields survived), wrong-typed arguments were rejected at the schema layer, and `npg_update_cloud_provider` flipped `enabled` false→true while `region` stayed unchanged after client-side rejection of `region`/`slug`. Gates: 308 tools, 0 duplicates, ruff + mypy clean, pytest 491 passed, docs `--check` exit 0 including the 460-char description cap, tier counts read=139 / standard=261 / full=308, 5 unrelated read-only tools called without regression. All fixtures and the throwaway container were deleted afterwards.
+- Verification also surfaced three upstream-semantics observations that are *not* MCP-layer bugs and are not fixed here: switching `proxy_type` back from `stream` to `http` additionally requires `forward_scheme="http"` in the same call (upstream rewrites the stored scheme to `tcp` for stream hosts), `stream_listen_port` range validation is lazy (an `http` host stores an out-of-range port silently; only a stream host rejects it), and `npg_list_cloud_providers` reports `paging: "unexpected upstream shape"` when upstream returns JSON `null` for an empty collection (cosmetic, pre-existing).
+
+### What's new
+- `npg_update_proxy_host` can now switch an existing host between HTTP and stream proxy modes (`proxy_type`) and configure stream listeners (`stream_listen_host`, `stream_listen_port`, `stream_protocol`, `stream_ssl_preread`, `stream_accept_proxy_protocol`, `stream_send_proxy_protocol`, `stream_proxy_connect_timeout`, `stream_proxy_timeout`) — configuration that previously required hand-crafted API requests.
+- `npg_update_proxy_host` and `npg_update_proxy_host_simple` can now toggle `ssl_enabled` on an existing host, matching what both descriptions had already promised.
+- No new tools: the surface stays at 308 tools, same names, same tiers (read=139 / standard=261 / full=308).
+
+### Breaking changes
+- (none) No tool, parameter, or default was renamed or removed. Every added parameter is optional and `None`-defaulted, so omitted fields are still left unchanged — existing calls behave identically.
+
 ## [1.4.1] - 2026-10-31
 
 ### What changed
