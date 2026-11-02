@@ -133,6 +133,33 @@ class TestTruncationBoundaries:
         assert out["data"] == []
         assert out["truncated"]["omitted_items"] == 1
 
+    def test_oversized_head_item_drops_the_tail_it_cannot_help(self):
+        """A list whose FIRST item alone busts the budget loses the array.
+
+        Trailing-item dropping cannot fit an oversized leading item, so the
+        array is emptied rather than returning a partial item or a gutted one
+        (a row with silently-empty nested arrays would be misleading data).
+        The metadata reports the omission and the hint points at the tool's
+        own paging parameters, which is the documented way out.
+        """
+        huge_item = {f"k{i}": i for i in range(4000)}
+        original = {
+            "success": True,
+            "data": [huge_item, {"id": "small-1"}, {"id": "small-2"}],
+        }
+        out = resultcap.cap_result(
+            original,
+            tool_name="npg_list_proxy_hosts",
+            params=frozenset({"limit", "offset"}),
+            limit=LIMIT,
+        )
+
+        self._assert_common(out, LIMIT, original)
+        assert out["data"] == []
+        assert out["truncated"]["omitted_items"] == 3
+        assert "limit" in out["truncated"]["hint"]
+        assert "offset" in out["truncated"]["hint"]
+
     def test_one_huge_string_value_is_clamped(self):
         blob = "A" * 200_000
         original = {"success": True, "data": {"id": "x", "content": blob}}
