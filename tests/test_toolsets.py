@@ -34,6 +34,7 @@ def _sample_tools() -> set[str]:
         "npg_view_log_file",
         "npg_download_backup",
         "npg_check_update",
+        # read prefix but denylisted from the read tier (POST body)
         "npg_detect_telegram_chats",
         # mutations (only at standard/full)
         "npg_create_proxy_host",
@@ -84,7 +85,6 @@ class TestTierAllowed:
             "npg_view_log_file",
             "npg_download_backup",
             "npg_check_update",
-            "npg_detect_telegram_chats",
         }
         # every allowed name must match one of the read prefixes
         for name in allowed:
@@ -92,6 +92,43 @@ class TestTierAllowed:
                 ("npg_get_", "npg_list_", "npg_view_",
                  "npg_download_", "npg_check_", "npg_detect_")
             )
+
+    def test_read_prefix_without_denylist_entry_is_kept(self):
+        # Guard against over-broad exclusions: a plain check/detect tool that
+        # is NOT denylisted still lands in the read tier.
+        assert tier_allowed({"npg_check_update"}, "read") == {"npg_check_update"}
+        assert tier_allowed({"npg_detect_telegram_chats"}, "read") == set()
+
+    def test_read_tier_denylist_entries(self):
+        from npg_mcp.toolsets import _READ_TIER_DENYLIST
+
+        assert _READ_TIER_DENYLIST == frozenset(
+            {
+                "npg_check_log_archive",
+                "npg_detect_telegram_chats",
+                "npg_check_backup_restore",
+            }
+        )
+        for name in _READ_TIER_DENYLIST:
+            # denylisted tools are hidden at read but still available above it
+            assert tier_allowed({name}, "read") == set()
+            assert tier_allowed({name}, "standard") == {name}
+            assert tier_allowed({name}, "full") == {name}
+
+    def test_read_tier_denylist_entries_match_read_regex(self):
+        # A denylist entry that the read regex never matches would be dead
+        # weight and would silently stop protecting anything.
+        from npg_mcp.toolsets import _READ_NAME_RE, _READ_TIER_DENYLIST
+
+        for name in _READ_TIER_DENYLIST:
+            assert _READ_NAME_RE.match(name), name
+
+    def test_read_tier_denylist_entries_exist_in_main(self):
+        from npg_mcp.toolsets import _READ_TIER_DENYLIST, _discover_tool_names
+
+        all_tools = _discover_tool_names()
+        for name in _READ_TIER_DENYLIST:
+            assert name in all_tools, name
 
     def test_read_excludes_all_mutations(self):
         allowed = tier_allowed(_sample_tools(), "read")
@@ -204,8 +241,30 @@ class TestDerivedDestructiveTools:
 
         all_tools = _discover_tool_names()
         assert len(tier_allowed(all_tools, "standard")) == 261
-        assert len(tier_allowed(all_tools, "read")) == 139
+        assert len(tier_allowed(all_tools, "read")) == 136
         assert len(tier_allowed(all_tools, "full")) == 308
+
+    def test_read_tier_has_no_mutating_verbs(self):
+        """The read tier's contract: every exposed tool only issues GETs.
+
+        Regression guard for the preflight finding that two POST-routed probes
+        (``npg_check_log_archive``, ``npg_detect_telegram_chats``) were
+        exposed at ``NPG_TOOL_LEVEL=read``. A new ``check_*``/``detect_*`` tool
+        with a mutating body now fails here instead of silently shipping.
+        """
+        from npg_mcp.toolsets import (
+            _READ_VERBS,
+            _discover_tool_names,
+            _tool_verbs,
+        )
+
+        verbs = _tool_verbs()
+        offenders = []
+        for name in sorted(tier_allowed(_discover_tool_names(), "read")):
+            tool_verbs = verbs.get(name)
+            if not tool_verbs or not tool_verbs <= _READ_VERBS:
+                offenders.append((name, sorted(tool_verbs or [])))
+        assert offenders == []
 
     def test_docstring_documents_naming_convention(self):
         import inspect

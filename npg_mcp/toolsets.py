@@ -4,8 +4,11 @@ Users can vary the number and scope of tools exposed to the MCP client by
 setting ``NPG_TOOL_LEVEL`` in the environment (e.g. in ``.env``):
 
 * ``read``     — read-only tools (GET-only namespaces: get/list/view/
-                 download/check/detect). For monitoring or read-only agents
-                 that must not mutate NPG state.
+                 download/check/detect), minus the documented
+                 ``_READ_TIER_DENYLIST`` probes whose names follow that
+                 convention but whose bodies issue a mutating verb or write.
+                 For monitoring or read-only agents that must not mutate NPG
+                 state.
 * ``standard`` — everything except the destructive tools. For everyday admin
                  work.
 * ``full``     — all tools (the default; unchanged from legacy behavior).
@@ -15,6 +18,16 @@ which removes the hidden tools from the FastMCP tool manager *before* the
 server starts, so hidden tools are neither listed nor callable. The tool
 counts are exact at commit time and are verified by the pipeline's static
 checks (see the ``tier_allowed`` helper — used by tests, not by the server).
+
+Read-tier exclusions
+--------------------
+``_READ_NAME_RE`` is a naming convention, not proof of purity: a few probing
+tools are named ``check_*`` / ``detect_*`` although their bodies issue a
+mutating HTTP verb or write to the NPG instance. Every such tool is listed in
+``_READ_TIER_DENYLIST`` and removed from the ``read`` tier, so that tier's
+contract — "must not mutate NPG state" — holds for every tool it exposes.
+Excluding beats renaming: renaming is a breaking change for every MCP client
+and for the hundreds of descriptions that cross-reference tool names.
 
 Destructive-tool naming convention
 ----------------------------------
@@ -81,9 +94,36 @@ DEFAULT_LEVEL = "full"
 VALID_LEVELS = ("read", "standard", "full")
 
 # Every tool whose name starts with one of these prefixes is treated as
-# read-only. Derived from npg_mcp/main.py naming contract (2026-08-16):
-# all get/list/view/scan/check/detect tools call NPG GET endpoints only.
+# read-only, EXCEPT the names in _READ_TIER_DENYLIST below. Derived from the
+# npg_mcp/main.py naming contract, which is a convention rather than proof:
+# the denylist carries the probes that break it.
 _READ_NAME_RE = re.compile(r"^npg_(get|list|view|download|check|detect)")
+
+# Names that match _READ_NAME_RE but must NOT be exposed at the ``read`` level.
+# The read tier promises "monitoring agents that must not mutate NPG state",
+# so a name-prefix match is not enough: each entry here issues a mutating HTTP
+# verb (POST) or writes to the NPG instance. Document any entry with a reason.
+# (Kept separate from _READONLY_DENYLIST below, which is about the
+# readOnlyHint annotation and covers a subset of this set.)
+_READ_TIER_DENYLIST: frozenset[str] = frozenset(
+    {
+        # POST /system-settings/log-files/archive/check — runs a write test
+        # against the archive dir (mount type/size/marker/probe). The tool is a
+        # diagnostic probe, but the body is a POST and it touches the archive
+        # filesystem, so a read-only agent must not be able to call it.
+        "npg_check_log_archive",
+        # POST /notification-channels/detect-telegram-chats — sends the caller's
+        # bot token to the Telegram Bot API. Read-only for NPG state, but a
+        # mutating verb plus an outbound third-party call with a credential.
+        "npg_detect_telegram_chats",
+        # GET /test/backup-restore — creates a throwaway backup row, lists it,
+        # then deletes it: a transient DB write, not a pure read. GET-routed, so
+        # the verb check cannot catch it; this entry does. (Also listed in
+        # _READONLY_DENYLIST for the readOnlyHint=false annotation.)
+        "npg_check_backup_restore",
+    }
+)
+
 
 # Destructive-prefix regex — see "Destructive-tool naming convention" in the
 # module docstring. A tool is destructive iff its name matches this regex,
@@ -165,8 +205,12 @@ def tier_allowed(tool_names: set[str], level: str) -> set[str]:
         return set(tool_names)
     if level == "standard":
         return {n for n in tool_names if n not in DESTRUCTIVE_TOOLS}
-    # read
-    return {n for n in tool_names if _READ_NAME_RE.match(n)}
+    # read — name convention minus the documented side-effecting probes
+    return {
+        n
+        for n in tool_names
+        if _READ_NAME_RE.match(n) and n not in _READ_TIER_DENYLIST
+    }
 
 
 def configure_toolset(mcp, level: str | None = None) -> int:
