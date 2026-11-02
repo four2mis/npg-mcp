@@ -1,5 +1,5 @@
 npg_list_proxy_hosts:
-  description: "LIST proxy hosts. Optional: page, limit (API per_page), search (domain/forward host text), tags (list, AND), domain (parent-domain bucket, not substring), upstream (exact forward_host), enabled, sort_by (name|created|updated; unknown ignored, default created_at desc), sort_order (asc|desc, applied only when sort_by is accepted). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg = full unpaginated list."
+  description: "LIST proxy hosts. Optional: page, limit (API per_page), search (domain/forward text), tags (list, AND), domain (parent-domain bucket, not substring), upstream (exact forward_host), enabled, sort_by (name|created|updated; unknown ignored, default created_at desc), sort_order (asc|desc, only when sort_by is accepted). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg = full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -28,9 +28,13 @@ npg_list_proxy_hosts:
     - name: sort_order
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_proxy_host_groups:
-  description: "LIST filter groups for npg_list_proxy_hosts: tag counts, distinct domains, distinct upstreams, enabled/disabled counts. Optional: limit/offset — MCP-side window on the tags list only (other counts always complete). Read-only; feed the values back as npg_list_proxy_hosts filters."
+  description: "LIST filter groups for npg_list_proxy_hosts: tag counts, distinct domains, distinct upstreams, enabled/disabled counts. Optional: limit/offset — MCP-side window on the tags list only (other counts always complete). Read-only; feed the values back as npg_list_proxy_hosts filters. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -38,23 +42,35 @@ npg_list_proxy_host_groups:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_proxy_host:
-  description: "Get a single proxy host by its ID. REQUIRED: host_id."
+  description: "Get a single proxy host by its ID. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_proxy_host_by_domain:
-  description: "LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here)."
+  description: "LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here). expand=true lifts the result cap."
   parameters:
     - name: domain
       type: string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_proxy_host_full:
-  description: "GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section."
+  description: "GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
@@ -62,6 +78,10 @@ npg_get_proxy_host_full:
     - name: sections
       type: array<string>
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_proxy_host:
   description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Also: tags (<=10, lowercased, <=32 chars, alnum/._-), ssl (ssl_http3), cache, timeouts, buffering, access, auth, ddns, stream_*; WAF tuning when waf_use_global=false: waf_mode (detection|blocking), waf_paranoia_level, waf_anomaly_threshold."
@@ -510,7 +530,7 @@ npg_bulk_set_proxy_hosts_enabled:
       default: true
 
 npg_bulk_get_proxy_host_full:
-  description: "GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch."
+  description: "GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch. expand=true lifts the result cap."
   parameters:
     - name: host_ids
       type: array<st> | int]
@@ -518,13 +538,21 @@ npg_bulk_get_proxy_host_full:
     - name: sections
       type: array<string>
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_export_proxy_host:
-  description: "EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host."
+  description: "EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_import_proxy_host:
   description: "IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=true creates the host + sub-configs; default apply=false = dry-run plan. Inherit-state sections skipped; source host untouched."
@@ -556,7 +584,7 @@ npg_bulk_import_proxy_hosts:
       default: true
 
 npg_list_certificates:
-  description: "LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -579,13 +607,21 @@ npg_list_certificates:
     - name: sort_order
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_certificate:
-  description: "Get a certificate by its ID. REQUIRED: cert_id."
+  description: "Get a certificate by its ID. REQUIRED: cert_id. expand=true lifts the result cap."
   parameters:
     - name: cert_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_certificate:
   description: "Request a new Let's Encrypt certificate (upstream takes the ACME account email from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (e.g. 'letsencrypt'), dns_provider_id."
@@ -634,7 +670,7 @@ npg_validate_nginx_config:
   parameters: []
 
 npg_list_redirect_hosts:
-  description: "LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -642,13 +678,21 @@ npg_list_redirect_hosts:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_redirect_host:
-  description: "Get a redirect host by its ID. REQUIRED: host_id."
+  description: "Get a redirect host by its ID. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_redirect_host:
   description: "Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, 301/302/307/308 only — 303 rejected by API v2.44.0+, default 301)."
@@ -702,11 +746,15 @@ npg_delete_redirect_host:
       required: true
 
 npg_get_proxy_host_rate_limit:
-  description: "GET rate limit configuration for a proxy host. REQUIRED: host_id."
+  description: "GET rate limit configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_rate_limit:
   description: "UPDATE rate limit for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, requests_per_second, burst_size, zone_size, limit_by (ip/uri/ip_uri), limit_response, disable_global (omit=inherit, false=inherit, true=disable), whitelist_ips (omit=keep stored list), whitelist_hostnames (domain/DDNS names whose addresses count as whitelist_ips; omit=keep, []=clear — a domain name sent in whitelist_ips now 400s hostname_in_ip_field)."
@@ -743,11 +791,15 @@ npg_update_proxy_host_rate_limit:
       required: false
 
 npg_get_proxy_host_bot_filter:
-  description: "GET bot filter configuration for a proxy host. REQUIRED: host_id."
+  description: "GET bot filter configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_bot_filter:
   description: "UPDATE bot filter for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked/allowed_agents (csv), disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
@@ -787,11 +839,15 @@ npg_update_proxy_host_bot_filter:
       required: false
 
 npg_get_proxy_host_security_headers:
-  description: "GET security headers configuration for a proxy host. REQUIRED: host_id."
+  description: "GET security headers configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_security_headers:
   description: "UPDATE security headers for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, hsts_*, x_frame_options (DENY/SAMEORIGIN), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy, disable_global (omit=inherit, false=inherit, true=disable)."
@@ -844,11 +900,15 @@ npg_apply_security_header_preset:
       required: true
 
 npg_get_proxy_host_upstream:
-  description: "GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id."
+  description: "GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_upstream:
   description: "UPDATE upstream/load-balancing for a proxy host. REQUIRED: host_id. Optional: scheme (http/https), servers (list of {address, port, weight, is_backup} - port separate field), load_balance (round_robin/least_conn/ip_hash/random), health_check_*."
@@ -876,11 +936,15 @@ npg_update_proxy_host_upstream:
       required: false
 
 npg_get_proxy_host_uri_block:
-  description: "GET URI block configuration for a proxy host. REQUIRED: host_id."
+  description: "GET URI block configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_uri_block:
   description: "UPDATE URI block config (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips, exception_hostnames (domain/DDNS names counted as exception_ips; omit=keep, []=clear; a domain in exception_ips 400s hostname_in_ip_field), skip_reload (skip nginx regen; batch then npg_sync_proxy_hosts)."
@@ -924,8 +988,12 @@ npg_confirm_proxy_host_dns:
       required: true
 
 npg_get_settings:
-  description: "GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset."
-  parameters: []
+  description: "GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_settings:
   description: "Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false. See npg_get_settings for current values."
@@ -939,8 +1007,12 @@ npg_update_settings:
       default: true
 
 npg_get_system_settings:
-  description: "Get system settings (server name, timezone, locale)."
-  parameters: []
+  description: "Get system settings (server name, timezone, locale). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_system_settings:
   description: "UPDATE system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domain/DDNS names trusted like global_trusted_ips; omit=keep, []=clear; a domain in global_trusted_ips 400s hostname_in_ip_field), UI, dns_entry_settings for DDNS entries). Partial: omitted or null keys keep stored values. Pass only changed fields in kwargs; unknown fields rejected unless strict=false."
@@ -967,22 +1039,34 @@ npg_confirm_trusted_dns:
       required: true
 
 npg_get_dashboard:
-  description: "Get dashboard data (summary of proxy hosts, certificates, etc.)."
-  parameters: []
+  description: "Get dashboard data (summary of proxy hosts, certificates, etc.). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dashboard_health:
-  description: "GET a system health snapshot (nginx status/connections, DB, CPU/memory/disk). One sample — history via npg_get_dashboard_health_history, deep diagnostics via npg_get_health_detailed."
-  parameters: []
+  description: "GET a system health snapshot (nginx status/connections, DB, CPU/memory/disk). One sample — history via npg_get_dashboard_health_history, deep diagnostics via npg_get_health_detailed. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dashboard_geoip_stats:
-  description: "GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24)."
+  description: "GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24). expand=true lifts the result cap."
   parameters:
     - name: hours
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_access_lists:
-  description: "LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -990,13 +1074,21 @@ npg_list_access_lists:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_access_list:
-  description: "Get an access list by its ID. REQUIRED: list_id."
+  description: "Get an access list by its ID. REQUIRED: list_id. expand=true lifts the result cap."
   parameters:
     - name: list_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_access_list:
   description: "CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address, description. hostname = domain allow rule, address is a DDNS name, deny refused; legacy = old name-rule resent as-is; without kind address must be IP/CIDR/all)."
@@ -1063,26 +1155,38 @@ npg_confirm_access_list_dns:
       required: true
 
 npg_get_dns_entries:
-  description: "GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure."
-  parameters: []
+  description: "GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_apply_dns_entries:
   description: "Force-apply the domain (DDNS) entries to nginx NOW (writes include files, runs nginx -t + reload immediately, ignoring the retry schedule). No params. 200 returns DNSApplyResponse (outcome: accepted/unconfirmed/signalled/skipped/blocked/failed/not_up, with detail/blocking_file); 409 code=nginx_reload_rejected. Publishes or removes nothing — it applies what the DB already says."
   parameters: []
 
 npg_list_dns_providers:
-  description: "LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back."
+  description: "LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dns_provider:
-  description: "Get a DNS provider by its ID. REQUIRED: provider_id."
+  description: "Get a DNS provider by its ID. REQUIRED: provider_id. expand=true lifts the result cap."
   parameters:
     - name: provider_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_dns_provider:
   description: "Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict, e.g. {'api_token': '...'}; ionos: {'api_key_prefix': '...public prefix', 'api_key': '...secret'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false). NOTE: IONOS can issue certificates but has NO DDNS updater (DDNS-restricted values: cloudflare/duckdns/dynu)."
@@ -1142,7 +1246,7 @@ npg_test_dns_provider:
       required: false
 
 npg_list_cloud_providers:
-  description: "LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the full catalogue is ~700 KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region."
+  description: "LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the catalogue is ~700KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -1154,13 +1258,21 @@ npg_list_cloud_providers:
       type: boolean
       required: false
       default: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_cloud_provider:
-  description: "GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region."
+  description: "GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region. expand=true lifts the result cap."
   parameters:
     - name: slug
       type: string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_cloud_provider:
   description: "Create a cloud provider (IP-range database entry). Required: name, slug, ip_ranges (list of CIDR). Optional: region (us/eu/cn/kr/other), description, ip_ranges_url (kwargs extras rejected unless strict=false)."
@@ -1210,11 +1322,15 @@ npg_delete_cloud_provider:
       required: true
 
 npg_get_proxy_host_cloud_blocking:
-  description: "GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id."
+  description: "GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_cloud_blocking:
   description: "UPDATE per-host cloud blocking (endpoint full-replaces; tool merges current + provided, so omitted fields left as-is). REQUIRED: host_id. Optional: blocked_providers (slugs), challenge_mode, allow_search_bots, cloud_disable_global (omit=inherit, false=inherit, true=disable). skip_reload=true saves without nginx regen for this host — batch changes then call npg_sync_proxy_hosts once."
@@ -1239,23 +1355,35 @@ npg_update_proxy_host_cloud_blocking:
       required: false
 
 npg_get_geoip_status:
-  description: "GET GeoIP database status (enabled, active/inactive/updating/error, country_db/asn_db presence, last_updated). After npg_update_geoip, poll this until it leaves 'updating'."
-  parameters: []
+  description: "GET GeoIP database status (enabled, active/inactive/updating/error, country_db/asn_db presence, last_updated). After npg_update_geoip, poll this until it leaves 'updating'. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_geoip:
   description: "TRIGGER a GeoIP database update now (country/ASN DBs). Track the run with npg_get_geoip_status and npg_get_geoip_history."
   parameters: []
 
 npg_list_countries:
-  description: "List available country codes for GeoIP blocking."
-  parameters: []
+  description: "List available country codes for GeoIP blocking. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_proxy_host_geo:
-  description: "GET geo restriction configuration for a proxy host. REQUIRED: host_id."
+  description: "GET geo restriction configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_proxy_host_geo:
   description: "CREATE geo restriction for a proxy host. REQUIRED: host_id, countries (ISO codes, min 1). Optional: mode (whitelist|blacklist, default blacklist), allowed_ips, allowed_hostnames (domain/DDNS names counted as allowed_ips; omit=keep, []=clear; a domain in allowed_ips 400s hostname_in_ip_field), challenge_mode, disable_global (true=disable global, false=inherit), allow_private_ips, allow_search_bots, skip_reload (batch, then npg_sync_proxy_hosts)."
@@ -1345,11 +1473,15 @@ npg_delete_proxy_host_geo:
       required: false
 
 npg_get_proxy_host_fail2ban:
-  description: "GET fail2ban configuration for a proxy host. REQUIRED: host_id."
+  description: "GET fail2ban configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_fail2ban:
   description: "UPDATE fail2ban config (partial update — only provided fields change). Body: enabled, max_retries, find_time (sec), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes, e.g. \"401,403\"), action (block=log-and-ban, log=record only, notify=alert only; invalid values/codes rejected 400). REQUIRED: host_id."
@@ -1377,11 +1509,15 @@ npg_update_proxy_host_fail2ban:
       required: false
 
 npg_get_proxy_host_challenge:
-  description: "GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id."
+  description: "GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_proxy_host_challenge:
   description: "UPDATE CAPTCHA/challenge config for a proxy host (partial — only provided fields change; omitted left as-is). REQUIRED: host_id. Optional: enabled, challenge_type (recaptcha_v2|recaptcha_v3|hcaptcha|turnstile), site_key, secret_key (required for verification — without it every verify is 503), token_validity (sec), min_score (recaptcha_v3), apply_to (bot_filter|geo_restriction|both), page_title, page_message, theme (light|dark)."
@@ -1441,7 +1577,7 @@ npg_verify_challenge:
       required: false
 
 npg_list_banned_ips:
-  description: "LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: filter
       type: string
@@ -1455,6 +1591,10 @@ npg_list_banned_ips:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_ban_ip:
   description: "Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address."
@@ -1496,15 +1636,23 @@ npg_update_ban_duration:
       required: true
 
 npg_get_bots_known:
-  description: "GET the known bot user-agent signatures (good and bad) the bot filter matches against — reference when reading a bot-filter config or npg_get_logs bot entries."
-  parameters: []
+  description: "GET the known bot user-agent signatures (good and bad) the bot filter matches against — reference when reading a bot-filter config or npg_get_logs bot entries. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_security_headers_presets:
-  description: "LIST the built-in security header presets (moderate/relaxed/strict) — exactly these names are accepted by npg_apply_security_header_preset."
-  parameters: []
+  description: "LIST the built-in security header presets (moderate/relaxed/strict) — exactly these names are accepted by npg_apply_security_header_preset. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_exploit_rules:
-  description: "LIST the exploit block rules, grouped by category (block_exploits rule catalog). Optional: limit/offset — MCP-side slice of each category's rules list (upstream ignores paging). Zero-arg returns all. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host."
+  description: "LIST the exploit block rules, grouped by category (block_exploits rule catalog). Optional: limit/offset — MCP-side slice of each category's rules list (upstream ignores paging). Zero-arg returns all. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -1512,13 +1660,21 @@ npg_list_exploit_rules:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_exploit_rule:
-  description: "Get an exploit rule by its ID. REQUIRED: rule_id."
+  description: "Get an exploit rule by its ID. REQUIRED: rule_id. expand=true lifts the result cap."
   parameters:
     - name: rule_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_exploit_rule:
   description: "Create an exploit block rule. REQUIRED: category (sql_injection/xss/rfi/path_traversal/scanner/http_method/custom), name (max 100 chars), pattern, pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced). severity: info|warning|critical (default warning). Optional: description; unknown kwargs rejected unless strict=false."
@@ -1578,7 +1734,7 @@ npg_toggle_exploit_rule:
       required: true
 
 npg_list_waf_rules:
-  description: "LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules."
+  description: "LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules. expand=true lifts the result cap."
   parameters:
     - name: proxy_host_id
       type: string
@@ -1589,17 +1745,29 @@ npg_list_waf_rules:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_hosts:
-  description: "GET the WAF config for every proxy host (per-host effective view). One host deep-dive via npg_get_waf_host_config; rules via npg_list_waf_rules."
-  parameters: []
+  description: "GET the WAF config for every proxy host (per-host effective view). One host deep-dive via npg_get_waf_host_config; rules via npg_list_waf_rules. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_host_config:
-  description: "GET a proxy host's WAF config. REQUIRED: host_id. NOTE: returns the EFFECTIVE (resolved) config — global values are merged in; for the host's STORED per-host WAF values use npg_get_proxy_host. Verify rules state with npg_get_waf_host_config after npg_disable_waf_rule."
+  description: "GET a proxy host's WAF config. REQUIRED: host_id. NOTE: returns the EFFECTIVE (resolved) config — global values are merged in; for the host's STORED per-host WAF values use npg_get_proxy_host. Verify rules state with npg_get_waf_host_config after npg_disable_waf_rule. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_disable_waf_rule:
   description: "Disable a WAF rule for a specific proxy host. REQUIRED: host_id, rule_id."
@@ -1622,7 +1790,7 @@ npg_enable_waf_rule:
       required: true
 
 npg_get_logs:
-  description: "GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params. No args = last 24h."
+  description: "GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params. No args = last 24h. expand=true lifts the result cap."
   parameters:
     - name: host
       type: string
@@ -1744,10 +1912,18 @@ npg_get_logs:
     - name: sort_order
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_settings:
-  description: "GET log retention settings (retention_days, max_logs_per_type, auto_cleanup_enabled) — the cut-off npg_cleanup_logs uses. Update with npg_update_log_settings."
-  parameters: []
+  description: "GET log retention settings (retention_days, max_logs_per_type, auto_cleanup_enabled) — the cut-off npg_cleanup_logs uses. Update with npg_update_log_settings. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_log_settings:
   description: "Update log settings. Pass only fields to change in kwargs: retention_days, max_logs_per_type, auto_cleanup_enabled. Unknown fields rejected unless strict=false."
@@ -1761,7 +1937,7 @@ npg_update_log_settings:
       default: true
 
 npg_get_log_stats:
-  description: "GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats)."
+  description: "GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats). expand=true lifts the result cap."
   parameters:
     - name: log_type
       type: string
@@ -1787,9 +1963,13 @@ npg_get_log_stats:
     - name: search
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_audit_logs:
-  description: "LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set."
+  description: "LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -1818,9 +1998,13 @@ npg_list_audit_logs:
     - name: end_time
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_system_logs:
-  description: "LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set."
+  description: "LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set. expand=true lifts the result cap."
   parameters:
     - name: source
       type: string
@@ -1849,9 +2033,13 @@ npg_list_system_logs:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_backups:
-  description: "LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -1859,13 +2047,21 @@ npg_list_backups:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_backup:
-  description: "GET one backup row by its ID. REQUIRED: backup_id. This is also how you poll npg_create_backup until status leaves in_progress. Download the archive with npg_download_backup."
+  description: "GET one backup row by its ID. REQUIRED: backup_id. This is also how you poll npg_create_backup until status leaves in_progress. Download the archive with npg_download_backup. expand=true lifts the result cap."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_backup:
   description: "CREATE a backup — returns immediately with status in_progress; the archive is written in the background. Poll with npg_get_backup(backup_id) until completed/failed, retrieve with npg_download_backup(backup_id), enumerate with npg_list_backups."
@@ -1886,7 +2082,7 @@ npg_restore_backup:
       required: true
 
 npg_list_api_tokens:
-  description: "LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens."
+  description: "LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -1894,13 +2090,21 @@ npg_list_api_tokens:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_api_token:
-  description: "Get an API token by its ID. REQUIRED: token_id."
+  description: "Get an API token by its ID. REQUIRED: token_id. expand=true lifts the result cap."
   parameters:
     - name: token_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_api_token:
   description: "Create a new API token. Required: name, permissions (array). Optional: expires_in — '<n>' + unit suffix (e.g. '30d', '12h', '1y') or 'never'; omit = never expires."
@@ -1944,7 +2148,7 @@ npg_delete_api_token:
       required: true
 
 npg_list_notification_channels:
-  description: "LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything."
+  description: "LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -1952,6 +2156,10 @@ npg_list_notification_channels:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_notification_channel:
   description: "CREATE a notification channel. REQUIRED: name, channel_type (webhook/discord/telegram). Optional: config (dict: url for webhook/discord; bot_token+chat_id for telegram), events (at least one event or digest_enabled), allow_private_target, digest_enabled, digest_hour (0-23)."
@@ -2039,11 +2247,15 @@ npg_test_notification_channel:
       required: true
 
 npg_get_notification_deliveries:
-  description: "Get delivery history for a notification channel. REQUIRED: channel_id."
+  description: "Get delivery history for a notification channel. REQUIRED: channel_id. expand=true lifts the result cap."
   parameters:
     - name: channel_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_detect_telegram_chats:
   description: "DETECT available Telegram chats for notification delivery. REQUIRED: bot_token (Telegram bot API token). Optional: channel_id (existing channel ID to look up stored token). Sends bot_token in the request body; Telegram must be reachable from the NPG server."
@@ -2056,7 +2268,7 @@ npg_detect_telegram_chats:
       required: false
 
 npg_list_users:
-  description: "LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles)."
+  description: "LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles). expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -2064,13 +2276,21 @@ npg_list_users:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_user:
-  description: "Get a user by their ID. REQUIRED: user_id."
+  description: "Get a user by their ID. REQUIRED: user_id. expand=true lifts the result cap."
   parameters:
     - name: user_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_user:
   description: "CREATE a new user. REQUIRED: username, email, password, role_id (UUID of a valid role — use npg_list_roles to find one). Created users are active immediately (upstream has no is_active option). The API rejects creation without a valid role_id (empty string causes 500)."
@@ -2113,7 +2333,7 @@ npg_delete_user:
       required: true
 
 npg_list_roles:
-  description: "LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user."
+  description: "LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -2121,6 +2341,10 @@ npg_list_roles:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_role:
   description: "CREATE a new role. REQUIRED: name. Optional: description, permissions (array of 'area:verb' strings, e.g. ['proxy:read','proxy:write']). Use npg_get_permission_areas to list valid areas and verbs."
@@ -2160,7 +2384,7 @@ npg_delete_role:
       required: true
 
 npg_list_sso_providers:
-  description: "LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider."
+  description: "LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -2168,6 +2392,10 @@ npg_list_sso_providers:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_sso_provider:
   description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers."
@@ -2280,7 +2508,7 @@ npg_test_sso_provider:
       required: false
 
 npg_list_log_files:
-  description: "LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file."
+  description: "LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file. expand=true lifts the result cap."
   parameters:
     - name: location
       type: string
@@ -2292,6 +2520,10 @@ npg_list_log_files:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_download_log_file:
   description: "Download a log file by filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Content is capped at 256 KB: at-or-below returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes, returned_bytes and a hint to page the rest via npg_view_log_file."
@@ -2305,7 +2537,7 @@ npg_download_log_file:
       default: "local"
 
 npg_view_log_file:
-  description: "View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s."
+  description: "View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s. expand=true lifts the result cap."
   parameters:
     - name: filename
       type: string
@@ -2318,6 +2550,10 @@ npg_view_log_file:
       type: string
       required: false
       default: "local"
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_rotate_log_file:
   description: "ROTATE all raw log files now — regenerates the logrotate config, force-rotates every raw log (no parameters; upstream also rotates hourly). Response {status: completed|skipped, reason: empty|already_rotated|busy} — 200 with status=skipped is NOT an error. HTTP 500 'logrotate failed' when raw log files are disabled in System Settings."
@@ -2347,11 +2583,15 @@ npg_run_log_archive:
   parameters: []
 
 npg_get_raw_log_reclaim:
-  description: "GET the raw log reclaim job's status (job strips verbatim access/error lines from compressed log history; WAF events keep theirs). status: idle|running|paused|done|failed; supported=false = this DB cannot run it. Optional: estimate ('true'/'1') adds remaining work + DB free space (cached 10 min); without it, cheap enough to poll every few seconds."
+  description: "GET the raw log reclaim job's status (job strips verbatim access/error lines from compressed log history; WAF events keep theirs). status: idle|running|paused|done|failed; supported=false = this DB cannot run it. Optional: estimate ('true'/'1') adds remaining work + DB free space (cached 10 min); without it, cheap enough to poll every few seconds. expand=true lifts the result cap."
   parameters:
     - name: estimate
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_start_raw_log_reclaim:
   description: "START the raw log reclaim job. DESTRUCTIVE + IRREVERSIBLE for the DB copy: verbatim access/error lines are removed from compressed log days (raw log files keep them); VACUUM FULL per day (~1 min) blocks that day's queries. Optional max_chunks caps days per request. Errors: 409 already_running, 400 max_chunks range, 412 cannot start. Track via npg_get_raw_log_reclaim / npg_stop_raw_log_reclaim."
@@ -2365,14 +2605,18 @@ npg_stop_raw_log_reclaim:
   parameters: []
 
 npg_get_expiring_certificates:
-  description: "GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes)."
+  description: "GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes). expand=true lifts the result cap."
   parameters:
     - name: days
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_certificate_history:
-  description: "GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates."
+  description: "GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates. expand=true lifts the result cap."
   parameters:
     - name: certificate_id
       type: string
@@ -2383,6 +2627,10 @@ npg_get_certificate_history:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_upload_certificate:
   description: "Upload a certificate file. Required: domain_names, cert_content, key_content."
@@ -2398,7 +2646,7 @@ npg_upload_certificate:
       required: true
 
 npg_list_uri_blocks:
-  description: "LIST the global URI block config plus per-host URI block summaries. Optional: limit/offset — MCP-side slice of the per-host summary list (upstream ignores paging; global config always complete). Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule."
+  description: "LIST the global URI block config plus per-host URI block summaries. Optional: limit/offset — MCP-side slice of the per-host summary list (upstream ignores paging; global config always complete). Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -2406,6 +2654,10 @@ npg_list_uri_blocks:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_bulk_add_uri_block_rule:
   description: "Bulk add a URI block rule to multiple or all proxy hosts. REQUIRED: pattern. Optional: match_type ('exact'/'prefix'/'regex', default 'exact'), description, host_ids (list of host UUIDs; empty = all enabled hosts)."
@@ -2425,8 +2677,12 @@ npg_bulk_add_uri_block_rule:
       required: false
 
 npg_get_global_uri_block:
-  description: "GET the global URI block configuration (enabled, rules, exception_ips, allow_private_ips). Update with npg_update_global_uri_block; list all (global+per-host) with npg_list_uri_blocks."
-  parameters: []
+  description: "GET the global URI block configuration (enabled, rules, exception_ips, allow_private_ips). Update with npg_update_global_uri_block; list all (global+per-host) with npg_list_uri_blocks. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_uri_block:
   description: "UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. Re-allow a needs_review domain with npg_confirm_global_uri_block_dns."
@@ -2486,30 +2742,50 @@ npg_delete_global_uri_block_rule:
       required: true
 
 npg_get_upstream_health:
-  description: "GET health status of an upstream pool. REQUIRED: upstream_id (UUID string)."
+  description: "GET health status of an upstream pool. REQUIRED: upstream_id (UUID string). expand=true lifts the result cap."
   parameters:
     - name: upstream_id
       type: string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_cloud_providers_by_region:
-  description: "LIST enabled cloud providers grouped by region (us/eu/cn/kr; optional region= to keep one bucket). Compact summaries (ip_count, no ranges) — full objects via npg_list_cloud_providers."
+  description: "LIST enabled cloud providers grouped by region (us/eu/cn/kr; optional region= to keep one bucket). Compact summaries (ip_count, no ranges) — full objects via npg_list_cloud_providers. expand=true lifts the result cap."
   parameters:
     - name: region
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_catalog:
-  description: "Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows."
-  parameters: []
+  description: "Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_docker_containers:
-  description: "Get status of all Docker containers managed by NPG."
-  parameters: []
+  description: "Get status of all Docker containers managed by NPG. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_check_update:
-  description: "CHECK for a newer NPG release (GET system-settings/update/check — this is the v0.3.19 reroute; older docs calling /update/check are stale). Result is cached upstream; a failed lookup returns 200 with check_failed=true, not an error."
-  parameters: []
+  description: "CHECK for a newer NPG release (GET system-settings/update/check — this is the v0.3.19 reroute; older docs calling /update/check are stale). Result is cached upstream; a failed lookup returns 200 with check_failed=true, not an error. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_test_acme:
   description: "VALIDATE the stored ACME configuration (POST system-settings/acme/test — this is the v0.3.19 reroute; older docs calling /acme/test are stale). Local consistency check only — contacts no ACME server. Returns status disabled/pending/ok."
@@ -2519,15 +2795,23 @@ npg_test_acme:
       required: false
 
 npg_get_public_ui_settings:
-  description: "Get public UI settings (accessible without auth)."
-  parameters: []
+  description: "Get public UI settings (accessible without auth). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dashboard_containers:
-  description: "Get Docker container statistics for the dashboard."
-  parameters: []
+  description: "Get Docker container statistics for the dashboard. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dashboard_stats:
-  description: "GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host)."
+  description: "GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap."
   parameters:
     - name: start
       type: string
@@ -2538,9 +2822,13 @@ npg_get_dashboard_stats:
     - name: proxy_host_id
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dashboard_health_history:
-  description: "GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100)."
+  description: "GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100). expand=true lifts the result cap."
   parameters:
     - name: hours
       type: integer
@@ -2548,10 +2836,18 @@ npg_get_dashboard_health_history:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_cloudflare_tunnel:
-  description: "Get Cloudflare Tunnel configuration."
-  parameters: []
+  description: "Get Cloudflare Tunnel configuration. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_cloudflare_tunnel:
   description: "Update Cloudflare Tunnel configuration. Pass only fields to change in kwargs: enabled, token, mode (token/managed), api_token, catchall_enabled. Unknown fields rejected unless strict=false."
@@ -2565,12 +2861,20 @@ npg_update_cloudflare_tunnel:
       default: true
 
 npg_get_cloudflare_tunnel_status:
-  description: "GET Cloudflare Tunnel connector runtime status (disabled/connected/starting/error + connection count), cached ~15s upstream. Always succeeds — failures come back as a state. Config itself via npg_get_cloudflare_tunnel."
-  parameters: []
+  description: "GET Cloudflare Tunnel connector runtime status (disabled/connected/starting/error + connection count), cached ~15s upstream. Always succeeds — failures come back as a state. Config itself via npg_get_cloudflare_tunnel. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_global_security_headers:
-  description: "GET the global security headers default that hosts inherit (HSTS, X-Frame-Options, CSP, etc.). Update with npg_update_global_security_headers; per-host override via npg_update_proxy_host_security_headers."
-  parameters: []
+  description: "GET the global security headers default that hosts inherit (HSTS, X-Frame-Options, CSP, etc.). Update with npg_update_global_security_headers; per-host override via npg_update_proxy_host_security_headers. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_security_headers:
   description: "UPDATE global security headers configuration (partial update). Optional: enabled, hsts_enabled, hsts_max_age, hsts_include_subdomains, hsts_preload, x_frame_options, x_content_type_options, x_xss_protection, referrer_policy, content_security_policy."
@@ -2607,8 +2911,12 @@ npg_update_global_security_headers:
       required: false
 
 npg_get_global_bot_filter:
-  description: "GET the global bot filter default that hosts inherit (enabled, block_bad_bots, block_ai_bots, etc.). Update with npg_update_global_bot_filter; per-host override via npg_update_proxy_host_bot_filter."
-  parameters: []
+  description: "GET the global bot filter default that hosts inherit (enabled, block_bad_bots, block_ai_bots, etc.). Update with npg_update_global_bot_filter; per-host override via npg_update_proxy_host_bot_filter. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_bot_filter:
   description: "UPDATE global bot filter configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, block_bad_bots, block_ai_bots, allow_search_engines, block_suspicious_clients, challenge_suspicious, custom_blocked_agents, custom_allowed_agents."
@@ -2639,8 +2947,12 @@ npg_update_global_bot_filter:
       required: false
 
 npg_get_global_cloud_providers:
-  description: "GET the global cloud provider blocking default (blocked_providers, challenge_mode, allow_search_bots). Update with npg_update_global_cloud_providers (full replace — send all 3 fields)."
-  parameters: []
+  description: "GET the global cloud provider blocking default (blocked_providers, challenge_mode, allow_search_bots). Update with npg_update_global_cloud_providers (full replace — send all 3 fields). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_cloud_providers:
   description: "UPDATE global cloud providers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool)."
@@ -2656,8 +2968,12 @@ npg_update_global_cloud_providers:
       required: false
 
 npg_get_global_geo:
-  description: "GET the global GeoIP restriction default that hosts inherit (enabled, mode, countries, allowed_ips, allow_private_ips). Update with npg_update_global_geo; per-host override via npg_create/update_proxy_host_geo."
-  parameters: []
+  description: "GET the global GeoIP restriction default that hosts inherit (enabled, mode, countries, allowed_ips, allow_private_ips). Update with npg_update_global_geo; per-host override via npg_create/update_proxy_host_geo. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_geo:
   description: "UPDATE global GeoIP restriction (partial update; hosts without their own override inherit this global default). Optional: enabled, mode (whitelist|blacklist), countries (ISO codes), allowed_ips, allowed_hostnames (domain/DDNS names counted as allowed_ips - the priority allow list; omit=keep, []=clear; a domain in allowed_ips 400s hostname_in_ip_field), allow_private_ips, allow_search_bots, challenge_mode. Re-allow needs_review: npg_confirm_global_geo_dns."
@@ -2701,8 +3017,12 @@ npg_confirm_global_geo_dns:
       required: true
 
 npg_get_global_rate_limit:
-  description: "GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit."
-  parameters: []
+  description: "GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_rate_limit:
   description: "UPDATE global rate limit config (partial update - omitted fields left as-is). Optional: enabled, requests_per_second, burst_size, zone_size, limit_by, limit_response, whitelist_ips (omit=keep, empty string=clear; IP/CIDR, invalid 400), whitelist_hostnames (domain/DDNS names counted as whitelist_ips; omit=keep, []=clear; a domain in whitelist_ips 400s hostname_in_ip_field). Re-allow needs_review via npg_confirm_global_rate_limit_dns."
@@ -2746,8 +3066,12 @@ npg_confirm_global_rate_limit_dns:
       required: true
 
 npg_get_global_fail2ban:
-  description: "GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log."
-  parameters: []
+  description: "GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_fail2ban:
   description: "UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify. Unknown fields rejected unless strict=false. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host."
@@ -2761,8 +3085,12 @@ npg_update_global_fail2ban:
       default: true
 
 npg_get_global_waf:
-  description: "GET the global WAF default (enabled, mode, paranoia_level, anomaly_threshold) that hosts inherit when waf_use_global=true. Update with npg_update_global_waf."
-  parameters: []
+  description: "GET the global WAF default (enabled, mode, paranoia_level, anomaly_threshold) that hosts inherit when waf_use_global=true. Update with npg_update_global_waf. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_global_waf:
   description: "UPDATE global WAF configuration (partial update). Optional: enabled, mode (detection|blocking), paranoia_level (1-4), anomaly_threshold. NOTE: per-host WAF changes require npg_sync_proxy_hosts; WAF changes take effect after a proxy container restart."
@@ -2781,11 +3109,15 @@ npg_update_global_waf:
       required: false
 
 npg_download_backup:
-  description: "DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID."
+  description: "DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID. expand=true lifts the result cap."
   parameters:
     - name: backup_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_upload_restore_backup:
   description: "UPLOAD and restore a backup (multipart). REQUIRED: file_content (.tar.gz backup) and encoding ('base64' default or 'raw'). Use npg_create_backup + npg_download_backup to get a backup file first. DESTRUCTIVE: replaces current NPG configuration."
@@ -2799,30 +3131,50 @@ npg_upload_restore_backup:
       default: "base64"
 
 npg_get_backup_stats:
-  description: "GET backup statistics (counts, sizes, latest run). Related: npg_list_backups to enumerate, npg_create_backup to start one."
-  parameters: []
+  description: "GET backup statistics (counts, sizes, latest run). Related: npg_list_backups to enumerate, npg_create_backup to start one. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_auth_status:
-  description: "GET authentication status — returns whether the current session is authenticated and basic user info."
-  parameters: []
+  description: "GET authentication status — returns whether the current session is authenticated and basic user info. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_auth_me:
-  description: "GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Use to check what the current API token can actually do."
-  parameters: []
+  description: "GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Use to check what the current API token can actually do. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_auth_sso_providers:
-  description: "List SSO providers available for the login screen (public-facing)."
-  parameters: []
+  description: "List SSO providers available for the login screen (public-facing). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_auth_sso_start:
-  description: "Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}."
+  description: "Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}. expand=true lifts the result cap."
   parameters:
     - name: slug
       type: string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_list_auth_providers:
-  description: "LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list."
+  description: "LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -2830,6 +3182,10 @@ npg_list_auth_providers:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_auth_provider:
   description: "CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (Docker-backed: provider_url resolved from container)."
@@ -2866,11 +3222,15 @@ npg_create_auth_provider:
       required: false
 
 npg_get_auth_provider:
-  description: "Get a ForwardAuth provider by its ID. REQUIRED: provider_id."
+  description: "Get a ForwardAuth provider by its ID. REQUIRED: provider_id. expand=true lifts the result cap."
   parameters:
     - name: provider_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_auth_provider:
   description: "UPDATE a ForwardAuth provider (partial update — omitted fields left as-is). REQUIRED: provider_id. Optional: name, provider_url, config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme."
@@ -2914,7 +3274,7 @@ npg_delete_auth_provider:
       required: true
 
 npg_list_ddns_records:
-  description: "LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -2922,6 +3282,10 @@ npg_list_ddns_records:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_ddns_record:
   description: "CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool)."
@@ -2946,11 +3310,15 @@ npg_create_ddns_record:
       default: true
 
 npg_get_ddns_record:
-  description: "Get a DDNS record by its ID. REQUIRED: record_id."
+  description: "Get a DDNS record by its ID. REQUIRED: record_id. expand=true lifts the result cap."
   parameters:
     - name: record_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_ddns_record:
   description: "UPDATE a DDNS record (partial update — omitted fields left as-is). REQUIRED: record_id. Optional: hostname, dns_provider_id, proxied (bool), ttl (int), enabled (bool)."
@@ -3006,7 +3374,7 @@ npg_import_ddns_from_hosts:
       required: true
 
 npg_list_filter_subscriptions:
-  description: "LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list."
+  description: "LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -3014,6 +3382,10 @@ npg_list_filter_subscriptions:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_subscribe_filter_catalog:
   description: "Subscribe to one or more catalog filter lists. REQUIRED: paths (list of catalog list paths, e.g. 'lists/ips/web-scanners.json')."
@@ -3033,11 +3405,15 @@ npg_create_filter_subscription:
       required: false
 
 npg_get_filter_subscription:
-  description: "Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id."
+  description: "Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id. expand=true lifts the result cap."
   parameters:
     - name: subscription_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_filter_subscription:
   description: "Update a filter subscription (partial update). Pass only fields to change. Optional: name, enabled, refresh_type ('interval'|'daily'|'cron'), refresh_value (interval: '6h'/'12h'/'24h'/'48h'; daily: 'HH:MM'; cron: cron expression), exclude_private_ips. NOTE: no url change — the list URL is create-only upstream. REQUIRED: subscription_id."
@@ -3076,11 +3452,15 @@ npg_refresh_filter_subscription:
       required: true
 
 npg_get_filter_subscription_exclusions:
-  description: "List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id."
+  description: "List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id. expand=true lifts the result cap."
   parameters:
     - name: subscription_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_add_filter_subscription_exclusion:
   description: "Exclude a proxy host from a filter subscription. REQUIRED: subscription_id, host_id."
@@ -3103,11 +3483,15 @@ npg_remove_filter_subscription_exclusion:
       required: true
 
 npg_get_filter_subscription_entry_exclusions:
-  description: "List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id."
+  description: "List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id. expand=true lifts the result cap."
   parameters:
     - name: subscription_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_add_filter_subscription_entry_exclusion:
   description: "Exclude a single entry value from a filter subscription. REQUIRED: subscription_id, entry_value (the entry value to exclude; sent as 'value' to the NPG API)."
@@ -3130,7 +3514,7 @@ npg_remove_filter_subscription_entry_exclusion:
       required: true
 
 npg_match_filter_subscriptions:
-  description: "MATCH an IP and/or user-agent against ALL subscribed filter lists to find WHICH subscription blocked a client. Optional: ip, user_agent — pass at least one (client-side error when both empty). Returns ip_matches[] and user_agent_matches[]. Read-only; invalid IP → HTTP 400 (pass verbatim)."
+  description: "MATCH an IP and/or user-agent against ALL subscribed filter lists to find WHICH subscription blocked a client. Optional: ip, user_agent — pass at least one (client-side error when both empty). Returns ip_matches[] and user_agent_matches[]. Read-only; invalid IP → HTTP 400 (pass verbatim). expand=true lifts the result cap."
   parameters:
     - name: ip
       type: string
@@ -3138,17 +3522,29 @@ npg_match_filter_subscriptions:
     - name: user_agent
       type: string
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_exploit_rules_hosts:
-  description: "List proxy hosts that have exploit blocking enabled."
-  parameters: []
+  description: "List proxy hosts that have exploit blocking enabled. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_exploit_rules_for_host:
-  description: "List exploit rules with this host's exclusion status. REQUIRED: host_id."
+  description: "List exploit rules with this host's exclusion status. REQUIRED: host_id. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_exclude_exploit_rule_from_host:
   description: "Exclude an exploit rule on ONE proxy host (stop it blocking there). REQUIRED: host_id, rule_id."
@@ -3209,22 +3605,34 @@ npg_upload_certificate_pem:
       required: true
 
 npg_get_certificate_logs:
-  description: "Get the issuance log stream for a certificate. REQUIRED: cert_id."
+  description: "Get the issuance log stream for a certificate. REQUIRED: cert_id. expand=true lifts the result cap."
   parameters:
     - name: cert_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_certificate_download:
-  description: "Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data."
+  description: "Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data. expand=true lifts the result cap."
   parameters:
     - name: cert_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_challenge_config:
-  description: "GET the global CAPTCHA challenge configuration."
-  parameters: []
+  description: "GET the global CAPTCHA challenge configuration. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_challenge_config:
   description: "UPDATE the global CAPTCHA challenge configuration (partial update). Fields: enabled, challenge_type (recaptcha_v2/recaptcha_v3/turnstile), site_key, secret_key (write-only, never returned). Pass only fields to change."
@@ -3243,12 +3651,20 @@ npg_update_challenge_config:
       required: false
 
 npg_get_challenge_stats:
-  description: "GET CAPTCHA challenge statistics aggregated over a FIXED 24-hour window upstream (not configurable). Config via npg_get_challenge_config."
-  parameters: []
+  description: "GET CAPTCHA challenge statistics aggregated over a FIXED 24-hour window upstream (not configurable). Config via npg_get_challenge_config. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_dns_provider_default:
-  description: "Get the default DNS provider for certificate issuance."
-  parameters: []
+  description: "Get the default DNS provider for certificate issuance. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_post_log:
   description: "INSERT a log entry manually (CreateLog model). REQUIRED: log_type — access|error|modsec (default access). Optional fields are type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead."
@@ -3362,7 +3778,7 @@ npg_cleanup_logs:
   parameters: []
 
 npg_get_log_autocomplete_hosts:
-  description: "Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  description: "Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap."
   parameters:
     - name: q
       type: string
@@ -3370,9 +3786,13 @@ npg_get_log_autocomplete_hosts:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_autocomplete_ips:
-  description: "Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  description: "Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap."
   parameters:
     - name: q
       type: string
@@ -3380,9 +3800,13 @@ npg_get_log_autocomplete_ips:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_autocomplete_user_agents:
-  description: "Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  description: "Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap."
   parameters:
     - name: q
       type: string
@@ -3390,9 +3814,13 @@ npg_get_log_autocomplete_user_agents:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_autocomplete_uris:
-  description: "Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before."
+  description: "Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap."
   parameters:
     - name: q
       type: string
@@ -3400,24 +3828,40 @@ npg_get_log_autocomplete_uris:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_autocomplete_countries:
-  description: "Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) - applied MCP-side as a window because the upstream endpoint accepts NO query params (no q/limit). Omitted = full list, as before; with limit the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so you can see how many values exist beyond the window."
+  description: "Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) - applied MCP-side as a window because the upstream endpoint accepts NO query params (no q/limit). Omitted = full list, as before; with limit the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so you can see how many values exist beyond the window. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_autocomplete_methods:
-  description: "Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window."
+  description: "Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params. Omitted = full unfiltered list; with limit the envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_log_filter_presets:
-  description: "LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs."
-  parameters: []
+  description: "LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_create_log_filter_preset:
   description: "Save a log filter preset. REQUIRED: name, filter (dict)."
@@ -3454,20 +3898,36 @@ npg_cleanup_system_logs:
   parameters: []
 
 npg_get_system_log_sources:
-  description: "Get selectable system log sources (docker_api, docker_nginx, health_check, etc.)."
-  parameters: []
+  description: "Get selectable system log sources (docker_api, docker_nginx, health_check, etc.). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_system_log_levels:
-  description: "Get selectable system log levels (debug, info, warn, error, fatal)."
-  parameters: []
+  description: "Get selectable system log levels (debug, info, warn, error, fatal). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_system_log_stats:
-  description: "Get system log statistics (counts by source/level)."
-  parameters: []
+  description: "Get system log statistics (counts by source/level). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_system_settings_logs:
-  description: "GET the container log collector configuration (what the system-logs pipeline ingests). Update with npg_update_system_settings_logs; raw nginx log files via npg_list_log_files."
-  parameters: []
+  description: "GET the container log collector configuration (what the system-logs pipeline ingests). Update with npg_update_system_settings_logs; raw nginx log files via npg_list_log_files. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_update_system_settings_logs:
   description: "UPDATE the container log collector config. REQUIRED: at least one field. Optional: enabled (bool), levels (dict: container_name -> min level debug|info|warn|error), exclude_patterns (list of regex patterns), stdout_excluded (list of container names). Read-modify-write: the upstream PUT is FULL-REPLACE (absent keys are written as zero values and DISABLE the collector), so the live config is fetched and merged - never send a partial body yourself."
@@ -3486,15 +3946,23 @@ npg_update_system_settings_logs:
       required: false
 
 npg_get_audit_log_actions:
-  description: "List the action values present in the audit log (for filtering)."
-  parameters: []
+  description: "List the action values present in the audit log (for filtering). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_audit_log_resource_types:
-  description: "List the resource types present in the audit log (for filtering)."
-  parameters: []
+  description: "List the resource types present in the audit log (for filtering). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_audit_log_api_tokens:
-  description: "LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage."
+  description: "LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage. expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
@@ -3502,6 +3970,10 @@ npg_get_audit_log_api_tokens:
     - name: offset
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_set_proxy_host_favorite:
   description: "Toggle a proxy host as a favorite. REQUIRED: host_id, favorite (bool)."
@@ -3567,7 +4039,7 @@ npg_bulk_unban_ips:
       required: true
 
 npg_get_ban_history:
-  description: "GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20)."
+  description: "GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20). expand=true lifts the result cap."
   parameters:
     - name: ip_address
       type: string
@@ -3593,13 +4065,21 @@ npg_get_ban_history:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_ban_history_stats:
-  description: "GET ban/unban history statistics (counts by event type/source). Enumerate events with npg_get_ban_history, one IP with npg_get_ban_history_for_ip."
-  parameters: []
+  description: "GET ban/unban history statistics (counts by event type/source). Enumerate events with npg_get_ban_history, one IP with npg_get_ban_history_for_ip. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_ban_history_for_ip:
-  description: "GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20)."
+  description: "GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20). expand=true lifts the result cap."
   parameters:
     - name: ip
       type: string
@@ -3610,9 +4090,13 @@ npg_get_ban_history_for_ip:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_ip_traffic_stats:
-  description: "Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default)."
+  description: "Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default). expand=true lifts the result cap."
   parameters:
     - name: ip
       type: string
@@ -3620,6 +4104,10 @@ npg_get_ip_traffic_stats:
     - name: days
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_add_proxy_host_uri_block_rule:
   description: "Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description."
@@ -3653,8 +4141,12 @@ npg_reset_settings:
   parameters: []
 
 npg_get_settings_presets:
-  description: "List available global settings presets that can be applied."
-  parameters: []
+  description: "List available global settings presets that can be applied. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_apply_settings_preset:
   description: "Apply a global settings preset. REQUIRED: preset (preset name/identifier)."
@@ -3664,59 +4156,107 @@ npg_apply_settings_preset:
       required: true
 
 npg_get_health:
-  description: "GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot."
-  parameters: []
+  description: "GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_health_detailed:
-  description: "GET a detailed health snapshot (detailed version of health check)."
-  parameters: []
+  description: "GET a detailed health snapshot (detailed version of health check). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_status:
-  description: "GET component status — health of all NPG subsystems (API, database, nginx)."
-  parameters: []
+  description: "GET component status — health of all NPG subsystems (API, database, nginx). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_server_info:
-  description: "GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything."
-  parameters: []
+  description: "GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_stack_features:
-  description: "REPORT-ONLY probe of the optional NPG feature families the deployed stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, never a call error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail."
-  parameters: []
+  description: "REPORT-ONLY probe of optional NPG feature families the stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, not an error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_system_self_check:
-  description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'."
-  parameters: []
+  description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_check_backup_restore:
   description: "TEST the backup create/list/delete round-trip (GET /test/backup-restore): creates a throwaway backup row, lists it, deletes it. NO archive written, NOTHING restored — safe anytime. Returns status=passed/failed with details. For real backups use npg_create_backup / npg_list_backups."
   parameters: []
 
 npg_get_metrics:
-  description: "GET Prometheus metrics (GET /metrics): raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics. Unauthenticated origin-root endpoint, safe read-only. For health status use npg_get_status or npg_get_health_detailed."
-  parameters: []
+  description: "GET Prometheus metrics (GET /metrics): raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics. Unauthenticated origin-root endpoint, safe read-only. For health status use npg_get_status or npg_get_health_detailed. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_check_dashboard_queries:
-  description: "TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query, reports per-query status/timings — read-only, safe anytime. Use when the dashboard/charts load slowly or error. For component health use npg_get_status or npg_system_self_check."
-  parameters: []
+  description: "TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query, reports per-query status/timings — read-only, safe anytime. Use when the dashboard/charts load slowly or error. For component health use npg_get_status or npg_system_self_check. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_permission_areas:
-  description: "Get the permission area/verb matrix — all available permission scopes."
-  parameters: []
+  description: "Get the permission area/verb matrix — all available permission scopes. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_global_rules:
-  description: "List all OWASP CRS rules with their GLOBAL exclusion status."
-  parameters: []
+  description: "List all OWASP CRS rules with their GLOBAL exclusion status. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_global_exclusions:
-  description: "LIST the CRS rules disabled for every host (global WAF exclusions). Toggle a rule globally with npg_disable_waf_global_rule / npg_enable_waf_global_rule."
-  parameters: []
+  description: "LIST the CRS rules disabled for every host (global WAF exclusions). Toggle a rule globally with npg_disable_waf_global_rule / npg_enable_waf_global_rule. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_global_history:
-  description: "GET the global WAF policy change history. Optional: limit (max entries returned)."
+  description: "GET the global WAF policy change history. Optional: limit (max entries returned). expand=true lifts the result cap."
   parameters:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_disable_waf_global_rule:
   description: "Disable a CRS rule for EVERY host (globally). REQUIRED: rule_id."
@@ -3733,7 +4273,7 @@ npg_enable_waf_global_rule:
       required: true
 
 npg_get_waf_host_history:
-  description: "GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned)."
+  description: "GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned). expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
@@ -3741,9 +4281,13 @@ npg_get_waf_host_history:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_event_rules:
-  description: "GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope."
+  description: "GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope. expand=true lifts the result cap."
   parameters:
     - name: log_id
       type: integer | string
@@ -3751,6 +4295,10 @@ npg_get_waf_event_rules:
     - name: at
       type: string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_disable_waf_rule_by_host:
   description: "Disable a CRS rule on the host that owns a domain name. REQUIRED: domain_name (the host's domain), rule_id (CRS rule ID, e.g. 200000). Sends host + rule_id (int) to the API."
@@ -3763,19 +4311,31 @@ npg_disable_waf_rule_by_host:
       required: true
 
 npg_get_api_token_permissions:
-  description: "List the permission strings an API token may carry (reference list)."
-  parameters: []
+  description: "List the permission strings an API token may carry (reference list). expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_api_token_usage:
-  description: "Get recent usage for an API token. REQUIRED: token_id."
+  description: "Get recent usage for an API token. REQUIRED: token_id. expand=true lifts the result cap."
   parameters:
     - name: token_id
       type: integer | string
       required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_get_waf_test_patterns:
-  description: "LIST the 12 built-in WAF attack patterns (hard-coded, no DB). Each entry's id is the attack_type value for npg_test_waf_pattern; fire all of them with npg_test_waf_all_patterns."
-  parameters: []
+  description: "LIST the 12 built-in WAF attack patterns (hard-coded, no DB). Each entry's id is the attack_type value for npg_test_waf_pattern; fire all of them with npg_test_waf_all_patterns. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_test_waf_pattern:
   description: "Fire one attack payload at a target URL for WAF testing. REQUIRED: target_url, attack_type (attack type name or index)."
@@ -3795,7 +4355,7 @@ npg_test_waf_all_patterns:
       required: true
 
 npg_get_geoip_history:
-  description: "List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows)."
+  description: "List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows). expand=true lifts the result cap."
   parameters:
     - name: page
       type: integer
@@ -3803,6 +4363,10 @@ npg_get_geoip_history:
     - name: limit
       type: integer
       required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
 
 npg_set_user_role:
   description: "Assign a role to a user account. REQUIRED: user_id, role_id."

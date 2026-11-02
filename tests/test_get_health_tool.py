@@ -86,7 +86,10 @@ class TestNpgGetHealth:
 
     def test_zero_parameters(self):
         sig = inspect.signature(main_mod.npg_get_health)
-        assert list(sig.parameters) == []
+        # Callable with no arguments: the only parameter is the optional
+        # result-cap escape hatch (`expand: bool = False`).
+        assert list(sig.parameters) == ["expand"]
+        assert sig.parameters["expand"].default is False
 
     def test_lands_in_read_tier(self):
         names = toolsets_mod._discover_tool_names()

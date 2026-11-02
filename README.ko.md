@@ -263,6 +263,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 137개), `standard`(파괴적 작업 제외 262개), `full`(전체 309개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
 | `NPG_DRY_RUN` | `0` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 | `NPG_HTTP_TIMEOUT` | `30` | 발신 NPG API 요청 타임아웃(초). 대용량 액세스 로그 다운로드, 백업 내보내기/복원, 인증서 업로드, 전체 프록시 호스트 동기화 등 오래 걸리는 엔드포인트에서 `ReadTimeout` 실패를 피하려면 값을 높이세요. `[1, 600]` 범위로 제한되며, 잘못된 값은 경고와 함께 `30`으로 대체됩니다. |
+| `NPG_MAX_RESULT_CHARS` | `65536` | 읽기/목록/조회 도구 결과의 직렬화 크기 상한(압축 JSON 문자 수). 초과한 페이로드는 데이터 경계에서만 잘라내고 `truncated` 메타 객체를 덧붙입니다. 호출 시 `expand=true`를 주면 해당 호출만 상한이 해제됩니다. `[1024, 8000000]` 범위로 제한되며, 잘못된 값은 경고와 함께 `65536`으로 대체됩니다. 아래 "결과 봉투와 잘라내기" 참고. |
 
 ### 컨테이너 로그
 
@@ -300,6 +301,24 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `idempotentHint` | GET 전용 도구와 멱등 `PUT` 업데이트 — 같은 호출을 반복해도 동일한 최종 상태에 도달합니다. 생성/테스트/삭제는 `false`입니다. |
 | `openWorldHint` | 폐쇄형 카탈로그 읽기(국가 목록, 프리셋, 권한 영역, 알려진 봇, WAF 테스트 패턴, 로그 소스/수준, 감사 로그 액션)만 `false`이며, 그 외에는 업스트림·ACME·DNS 공급자·Telegram에 접근하므로 `true`입니다. |
 
+### 결과 봉투와 잘라내기(Result Envelope & Truncation)
+
+모든 도구는 동일한 봉투로 응답합니다: `{"success": true, "data": <payload>}` (도구별 부가 키인 `message`, `encoding`, 페이징 키 등이 함께 올 수 있습니다). 실패 시에는 `{"success": false, "error": "...", "hint": "..."}`를 반환하므로, JSON-RPC `isError` 플래그만 보지 말고 항상 중첩된 `success` 필드를 확인하십시오.
+
+**결과 상한.** 읽기/목록/조회 도구의 단일 결과는 `NPG_MAX_RESULT_CHARS`(기본 `65536`) 문자(압축 JSON 기준)를 초과할 수 없습니다. 초과한 페이로드는 **데이터 경계에서만** 잘라냅니다 — 배열의 꼬리 항목을 버리고, 과도하게 긴 문자열 값은 `... [clamped N chars]` 표식과 함께 줄입니다 — 그리고 `data` 옆에 `truncated` 객체를 추가합니다:
+
+| 필드 | 의미 |
+|------|------|
+| `total_chars` | 잘라내기 전 결과의 크기(압축 JSON 문자 수) |
+| `returned_chars` | 실제로 반환된 결과의 크기(`truncated` 객체 포함) |
+| `omitted_items` | 페이로드에서 버려진 배열 꼬리 항목 수 |
+| `clamped_strings` | 표식과 함께 줄어든 문자열 값의 개수 |
+| `hint` | 나머지를 얻는 방법 — 이 도구가 실제로 가진 더 좁은 매개변수(`limit`/`offset`/`sections`/`lines`) 이름을 알려주며, 없으면 `expand=true`를 안내합니다 |
+
+잘라내기는 구조나 문자열 중간에서 절대 일어나지 않습니다: 축소된 객체에서 봉투를 다시 구성하므로 클라이언트가 받는 JSON은 항상 완전하고 파싱 가능합니다. 상한 이하의 결과는 바이트 단위로 그대로 반환되며 `truncated` 키가 붙지 않습니다.
+
+**예외 경로.** 상한이 적용되는 모든 도구는 `expand: bool = False`를 받습니다. `expand=true`를 주면 해당 호출만 상한이 해제되어 전체 페이로드를 반환합니다 — 잘린 base64 페이로드는 디코딩할 수 없으므로 `npg_download_backup`, `npg_get_certificate_download` 같은 일회성 다운로드에 사용하십시오. `npg_download_log_file`은 일반 상한 대신 자체 256 KB 상한(`truncated: true`, `total_bytes`, `returned_bytes`, `hint` → `npg_view_log_file`)을 유지합니다.
+
 ## 프로젝트 구조
 
 ```
@@ -307,6 +326,7 @@ npg_mcp/
   main.py       # 309개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   toolsets.py   # 도구 수준(NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
+  resultcap.py  # 공용 결과 상한(NPG_MAX_RESULT_CHARS) + `expand` 예외 경로
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml

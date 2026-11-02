@@ -32,6 +32,7 @@ from mcp.server import transport_security  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 import npg_mcp.client as client_mod  # noqa: E402
+import npg_mcp.resultcap as resultcap  # noqa: E402
 import npg_mcp.toolsets as toolsets  # noqa: E402
 from npg_mcp.upstream_models import _validate_kwargs  # noqa: E402
 
@@ -785,7 +786,7 @@ def _compact_cloud_provider_list(data):
 
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (API per_page), search (domain/forward host text), tags (list, AND), domain (parent-domain bucket, not substring), upstream (exact forward_host), enabled, sort_by (name|created|updated; unknown ignored, default created_at desc), sort_order (asc|desc, applied only when sort_by is accepted). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg = full unpaginated list.")
+@mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (API per_page), search (domain/forward text), tags (list, AND), domain (parent-domain bucket, not substring), upstream (exact forward_host), enabled, sort_by (name|created|updated; unknown ignored, default created_at desc), sort_order (asc|desc, only when sort_by is accepted). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg = full list. expand=true lifts the result cap.")
 async def npg_list_proxy_hosts(
     page: int | None = None,
     limit: int | None = None,
@@ -796,6 +797,7 @@ async def npg_list_proxy_hosts(
     enabled: bool | None = None,
     sort_by: str | None = None,
     sort_order: str | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -819,8 +821,8 @@ async def npg_list_proxy_hosts(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_proxy_host_groups", description="LIST filter groups for npg_list_proxy_hosts: tag counts, distinct domains, distinct upstreams, enabled/disabled counts. Optional: limit/offset — MCP-side window on the tags list only (other counts always complete). Read-only; feed the values back as npg_list_proxy_hosts filters.")
-async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_proxy_host_groups", description="LIST filter groups for npg_list_proxy_hosts: tag counts, distinct domains, distinct upstreams, enabled/disabled counts. Optional: limit/offset — MCP-side window on the tags list only (other counts always complete). Read-only; feed the values back as npg_list_proxy_hosts filters. expand=true lifts the result cap.")
+async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -829,8 +831,8 @@ async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id.")
-async def npg_get_proxy_host(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -839,8 +841,8 @@ async def npg_get_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_by_domain", description="LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here).")
-async def npg_get_proxy_host_by_domain(domain: str) -> dict:
+@mcp.tool(name="npg_get_proxy_host_by_domain", description="LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here). expand=true lifts the result cap.")
+async def npg_get_proxy_host_by_domain(domain: str, expand: bool = False) -> dict:
     try:
         _validate_required("domain", domain)
         c = _get_client()
@@ -905,8 +907,8 @@ def _select_section_paths(
     return {s: section_paths[s] for s in selected}
 
 
-@mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section.")
-async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None = None) -> dict:
+@mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section. expand=true lifts the result cap.")
+async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None = None, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -1424,8 +1426,8 @@ async def npg_bulk_set_proxy_hosts_enabled(host_ids: list[str | int], enabled: b
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch.")
-async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None) -> dict:
+@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch. expand=true lifts the result cap.")
+async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None, expand: bool = False) -> dict:
     try:
         _validate_required("host_ids", host_ids)
         if len(host_ids) > _BULK_HOST_LIMIT:
@@ -1608,8 +1610,8 @@ def _should_apply_section(name: str, payload: dict) -> bool:
     return bool(payload.get("enabled"))
 
 
-@mcp.tool(name="npg_export_proxy_host", description="EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host.")
-async def npg_export_proxy_host(host_id: str | int) -> dict:
+@mcp.tool(name="npg_export_proxy_host", description="EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host. expand=true lifts the result cap.")
+async def npg_export_proxy_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -1968,7 +1970,7 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
 
 # ── Certificates ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_certificates", description="LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list.")
+@mcp.tool(name="npg_list_certificates", description="LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
 async def npg_list_certificates(
     page: int | None = None,
     limit: int | None = None,
@@ -1977,6 +1979,7 @@ async def npg_list_certificates(
     provider: Literal["letsencrypt", "selfsigned", "custom"] | None = None,
     sort_by: Literal["domain", "expires", "created"] | None = None,
     sort_order: Literal["asc", "desc"] | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -1996,8 +1999,8 @@ async def npg_list_certificates(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate", description="Get a certificate by its ID. REQUIRED: cert_id.")
-async def npg_get_certificate(cert_id: str | int) -> dict:
+@mcp.tool(name="npg_get_certificate", description="Get a certificate by its ID. REQUIRED: cert_id. expand=true lifts the result cap.")
+async def npg_get_certificate(cert_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
@@ -2107,8 +2110,8 @@ async def npg_validate_nginx_config() -> dict:
 
 # ── Redirect Hosts ────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_redirect_hosts", description="LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
-async def npg_list_redirect_hosts(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_redirect_hosts", description="LIST redirect hosts. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_redirect_hosts(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -2117,8 +2120,8 @@ async def npg_list_redirect_hosts(page: int | None = None, limit: int | None = N
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_redirect_host", description="Get a redirect host by its ID. REQUIRED: host_id.")
-async def npg_get_redirect_host(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_redirect_host", description="Get a redirect host by its ID. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_redirect_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2194,8 +2197,8 @@ async def npg_delete_redirect_host(host_id: str | int) -> dict:
 
 # ── Security Features (per proxy host) ────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_rate_limit", description="GET rate limit configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_rate_limit(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_rate_limit", description="GET rate limit configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_rate_limit(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2228,8 +2231,8 @@ async def npg_update_proxy_host_rate_limit(host_id: str | int, enabled: bool | N
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_bot_filter", description="GET bot filter configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_bot_filter(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_bot_filter", description="GET bot filter configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_bot_filter(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2263,8 +2266,8 @@ async def npg_update_proxy_host_bot_filter(host_id: str | int, enabled: bool | N
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_security_headers", description="GET security headers configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_security_headers(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_security_headers", description="GET security headers configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_security_headers(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2310,8 +2313,8 @@ async def npg_apply_security_header_preset(host_id: str | int, preset: Literal["
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_upstream", description="GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_upstream(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_upstream", description="GET upstream/load balancing configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_upstream(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2341,8 +2344,8 @@ async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_uri_block", description="GET URI block configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_uri_block(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_uri_block", description="GET URI block configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_uri_block(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2390,8 +2393,8 @@ async def npg_confirm_proxy_host_dns(host_id: str | int, hostname: str, expected
 
 # ── Settings ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_settings", description="GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset.")
-async def npg_get_settings() -> dict:
+@mcp.tool(name="npg_get_settings", description="GET the global nginx settings object (workers, gzip, SSL, proxy buffers, etc. — one flattened row). Update individual fields with npg_update_settings; presets via npg_get_settings_presets + npg_apply_settings_preset. expand=true lifts the result cap.")
+async def npg_get_settings(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings")
@@ -2409,8 +2412,8 @@ async def npg_update_settings(kwargs: dict | None = None, strict: bool = True) -
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_settings", description="Get system settings (server name, timezone, locale).")
-async def npg_get_system_settings() -> dict:
+@mcp.tool(name="npg_get_system_settings", description="Get system settings (server name, timezone, locale). expand=true lifts the result cap.")
+async def npg_get_system_settings(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-settings")
@@ -2442,8 +2445,8 @@ async def npg_confirm_trusted_dns(hostname: str, expected_addresses: list[str], 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard", description="Get dashboard data (summary of proxy hosts, certificates, etc.).")
-async def npg_get_dashboard() -> dict:
+@mcp.tool(name="npg_get_dashboard", description="Get dashboard data (summary of proxy hosts, certificates, etc.). expand=true lifts the result cap.")
+async def npg_get_dashboard(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/dashboard")
@@ -2451,8 +2454,8 @@ async def npg_get_dashboard() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_health", description="GET a system health snapshot (nginx status/connections, DB, CPU/memory/disk). One sample — history via npg_get_dashboard_health_history, deep diagnostics via npg_get_health_detailed.")
-async def npg_get_dashboard_health() -> dict:
+@mcp.tool(name="npg_get_dashboard_health", description="GET a system health snapshot (nginx status/connections, DB, CPU/memory/disk). One sample — history via npg_get_dashboard_health_history, deep diagnostics via npg_get_health_detailed. expand=true lifts the result cap.")
+async def npg_get_dashboard_health(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/dashboard/health")
@@ -2460,8 +2463,8 @@ async def npg_get_dashboard_health() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_geoip_stats", description="GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24).")
-async def npg_get_dashboard_geoip_stats(hours: int | None = None) -> dict:
+@mcp.tool(name="npg_get_dashboard_geoip_stats", description="GET GeoIP statistics by country for the dashboard. Optional: hours (lookback window, API default 24). expand=true lifts the result cap.")
+async def npg_get_dashboard_geoip_stats(hours: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -2476,8 +2479,8 @@ async def npg_get_dashboard_geoip_stats(hours: int | None = None) -> dict:
 
 # ── Access Lists ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
-async def npg_list_access_lists(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_access_lists(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -2486,8 +2489,8 @@ async def npg_list_access_lists(page: int | None = None, limit: int | None = Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id.")
-async def npg_get_access_list(list_id: str | int) -> dict:
+@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id. expand=true lifts the result cap.")
+async def npg_get_access_list(list_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("list_id", list_id)
         c = _get_client()
@@ -2560,8 +2563,8 @@ async def npg_confirm_access_list_dns(list_id: str | int, hostname: str, expecte
 
 # ── Domain Entries (DDNS) ─────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_dns_entries", description="GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure.")
-async def npg_get_dns_entries() -> dict:
+@mcp.tool(name="npg_get_dns_entries", description="GET the domain (DDNS) entry overview: effective domain-entry settings, env switches (env_disabled/env_interval_seconds), total_names, apply state, and per-domain entries (status, addresses, review_reason, uses). A use is listed only where the caller may read its list; others are counted in hidden_uses. 500 on read failure. expand=true lifts the result cap.")
+async def npg_get_dns_entries(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/dns-entries")
@@ -2581,8 +2584,8 @@ async def npg_apply_dns_entries() -> dict:
 
 # ── DNS Providers ─────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_dns_providers", description="LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back.")
-async def npg_list_dns_providers(page: int | None = None) -> dict:
+@mcp.tool(name="npg_list_dns_providers", description="LIST DNS providers configured for DNS-01 challenges. Optional: page (upstream paginated, default 1). Use npg_create_dns_provider to add one; credentials are never echoed back. expand=true lifts the result cap.")
+async def npg_list_dns_providers(page: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(page=page)
@@ -2591,8 +2594,8 @@ async def npg_list_dns_providers(page: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dns_provider", description="Get a DNS provider by its ID. REQUIRED: provider_id.")
-async def npg_get_dns_provider(provider_id: str | int) -> dict:
+@mcp.tool(name="npg_get_dns_provider", description="Get a DNS provider by its ID. REQUIRED: provider_id. expand=true lifts the result cap.")
+async def npg_get_dns_provider(provider_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
@@ -2654,8 +2657,8 @@ async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict
 
 # ── Cloud Providers ───────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_cloud_providers", description="LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the full catalogue is ~700 KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region.")
-async def npg_list_cloud_providers(limit: int | None = None, offset: int | None = None, compact: bool = True) -> dict:
+@mcp.tool(name="npg_list_cloud_providers", description="LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the catalogue is ~700KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region. expand=true lifts the result cap.")
+async def npg_list_cloud_providers(limit: int | None = None, offset: int | None = None, compact: bool = True, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -2666,8 +2669,8 @@ async def npg_list_cloud_providers(limit: int | None = None, offset: int | None 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_cloud_provider", description="GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region.")
-async def npg_get_cloud_provider(slug: str) -> dict:
+@mcp.tool(name="npg_get_cloud_provider", description="GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region. expand=true lifts the result cap.")
+async def npg_get_cloud_provider(slug: str, expand: bool = False) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
@@ -2719,8 +2722,8 @@ async def npg_delete_cloud_provider(slug: str) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_cloud_blocking", description="GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id.")
-async def npg_get_proxy_host_cloud_blocking(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_cloud_blocking", description="GET per-host cloud provider blocking configuration. Returns blocked_providers, challenge_mode, allow_search_bots, cloud_disable_global. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_cloud_blocking(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2751,8 +2754,8 @@ async def npg_update_proxy_host_cloud_blocking(host_id: str | int, blocked_provi
 
 # ── GeoIP ─────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_geoip_status", description="GET GeoIP database status (enabled, active/inactive/updating/error, country_db/asn_db presence, last_updated). After npg_update_geoip, poll this until it leaves 'updating'.")
-async def npg_get_geoip_status() -> dict:
+@mcp.tool(name="npg_get_geoip_status", description="GET GeoIP database status (enabled, active/inactive/updating/error, country_db/asn_db presence, last_updated). After npg_update_geoip, poll this until it leaves 'updating'. expand=true lifts the result cap.")
+async def npg_get_geoip_status(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-settings/geoip/status")
@@ -2769,8 +2772,8 @@ async def npg_update_geoip() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_countries", description="List available country codes for GeoIP blocking.")
-async def npg_list_countries() -> dict:
+@mcp.tool(name="npg_list_countries", description="List available country codes for GeoIP blocking. expand=true lifts the result cap.")
+async def npg_list_countries(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/geo/countries")
@@ -2778,8 +2781,8 @@ async def npg_list_countries() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_geo", description="GET geo restriction configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_geo(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_geo", description="GET geo restriction configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_geo(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2842,8 +2845,8 @@ async def npg_delete_proxy_host_geo(host_id: str | int, skip_reload: bool | None
 
 # ── Fail2ban (per proxy host) ─────────────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_fail2ban", description="GET fail2ban configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_fail2ban(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_fail2ban", description="GET fail2ban configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_fail2ban(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2876,8 +2879,8 @@ async def npg_update_proxy_host_fail2ban(host_id: str | int, enabled: bool | Non
 
 # ── Challenge/CAPTCHA (per proxy host) ────────────────────────────────
 
-@mcp.tool(name="npg_get_proxy_host_challenge", description="GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id.")
-async def npg_get_proxy_host_challenge(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_proxy_host_challenge", description="GET CAPTCHA/challenge configuration for a proxy host. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_proxy_host_challenge(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -2967,12 +2970,13 @@ async def npg_verify_challenge(
 
 # ── Security (banned IPs, etc.) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
+@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
 async def npg_list_banned_ips(
     filter: Literal["global", "host"] | None = None,
     proxy_host_id: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -3028,8 +3032,8 @@ async def npg_update_ban_duration(ban_id: str | int, ban_time: int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_bots_known", description="GET the known bot user-agent signatures (good and bad) the bot filter matches against — reference when reading a bot-filter config or npg_get_logs bot entries.")
-async def npg_get_bots_known() -> dict:
+@mcp.tool(name="npg_get_bots_known", description="GET the known bot user-agent signatures (good and bad) the bot filter matches against — reference when reading a bot-filter config or npg_get_logs bot entries. expand=true lifts the result cap.")
+async def npg_get_bots_known(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/bots/known")
@@ -3037,8 +3041,8 @@ async def npg_get_bots_known() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_security_headers_presets", description="LIST the built-in security header presets (moderate/relaxed/strict) — exactly these names are accepted by npg_apply_security_header_preset.")
-async def npg_get_security_headers_presets() -> dict:
+@mcp.tool(name="npg_get_security_headers_presets", description="LIST the built-in security header presets (moderate/relaxed/strict) — exactly these names are accepted by npg_apply_security_header_preset. expand=true lifts the result cap.")
+async def npg_get_security_headers_presets(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/security-headers/presets")
@@ -3049,8 +3053,8 @@ async def npg_get_security_headers_presets() -> dict:
 
 # ── Exploit Rules ─────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules, grouped by category (block_exploits rule catalog). Optional: limit/offset — MCP-side slice of each category's rules list (upstream ignores paging). Zero-arg returns all. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host.")
-async def npg_list_exploit_rules(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_exploit_rules", description="LIST the exploit block rules, grouped by category (block_exploits rule catalog). Optional: limit/offset — MCP-side slice of each category's rules list (upstream ignores paging). Zero-arg returns all. Create/modify with npg_create_exploit_rule / npg_update_exploit_rule; per-host exclusions via npg_get_exploit_rules_for_host. expand=true lifts the result cap.")
+async def npg_list_exploit_rules(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3059,8 +3063,8 @@ async def npg_list_exploit_rules(limit: int | None = None, offset: int | None = 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_exploit_rule", description="Get an exploit rule by its ID. REQUIRED: rule_id.")
-async def npg_get_exploit_rule(rule_id: str | int) -> dict:
+@mcp.tool(name="npg_get_exploit_rule", description="Get an exploit rule by its ID. REQUIRED: rule_id. expand=true lifts the result cap.")
+async def npg_get_exploit_rule(rule_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("rule_id", rule_id)
         c = _get_client()
@@ -3124,8 +3128,8 @@ async def npg_toggle_exploit_rule(rule_id: str | int) -> dict:
 
 # ── WAF ───────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_waf_rules", description="LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules.")
-async def npg_list_waf_rules(proxy_host_id: str | None = None, limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_waf_rules", description="LIST WAF (OWASP CRS) rules. Optional: proxy_host_id (UUID — return only that host's rules instead of the full 500+ rule set); limit/offset — MCP-side slice of the rules list in EACH category object (categories preserved; paging applied MCP-side — upstream ignores paging query params; combine with proxy_host_id for a bounded per-host view). Zero-arg returns all rules. expand=true lifts the result cap.")
+async def npg_list_waf_rules(proxy_host_id: str | None = None, limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3137,8 +3141,8 @@ async def npg_list_waf_rules(proxy_host_id: str | None = None, limit: int | None
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_hosts", description="GET the WAF config for every proxy host (per-host effective view). One host deep-dive via npg_get_waf_host_config; rules via npg_list_waf_rules.")
-async def npg_get_waf_hosts() -> dict:
+@mcp.tool(name="npg_get_waf_hosts", description="GET the WAF config for every proxy host (per-host effective view). One host deep-dive via npg_get_waf_host_config; rules via npg_list_waf_rules. expand=true lifts the result cap.")
+async def npg_get_waf_hosts(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/waf/hosts")
@@ -3146,8 +3150,8 @@ async def npg_get_waf_hosts() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_host_config", description="GET a proxy host's WAF config. REQUIRED: host_id. NOTE: returns the EFFECTIVE (resolved) config — global values are merged in; for the host's STORED per-host WAF values use npg_get_proxy_host. Verify rules state with npg_get_waf_host_config after npg_disable_waf_rule.")
-async def npg_get_waf_host_config(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_waf_host_config", description="GET a proxy host's WAF config. REQUIRED: host_id. NOTE: returns the EFFECTIVE (resolved) config — global values are merged in; for the host's STORED per-host WAF values use npg_get_proxy_host. Verify rules state with npg_get_waf_host_config after npg_disable_waf_rule. expand=true lifts the result cap.")
+async def npg_get_waf_host_config(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -3180,7 +3184,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params. No args = last 24h.")
+@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params. No args = last 24h. expand=true lifts the result cap.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -3222,6 +3226,7 @@ async def npg_get_logs(
     exclude_countries: list[str] | None = None,
     sort_by: str | None = None,
     sort_order: Literal["asc", "desc"] | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -3313,8 +3318,8 @@ async def npg_get_logs(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_settings", description="GET log retention settings (retention_days, max_logs_per_type, auto_cleanup_enabled) — the cut-off npg_cleanup_logs uses. Update with npg_update_log_settings.")
-async def npg_get_log_settings() -> dict:
+@mcp.tool(name="npg_get_log_settings", description="GET log retention settings (retention_days, max_logs_per_type, auto_cleanup_enabled) — the cut-off npg_cleanup_logs uses. Update with npg_update_log_settings. expand=true lifts the result cap.")
+async def npg_get_log_settings(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/logs/settings")
@@ -3332,7 +3337,7 @@ async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = Tru
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_stats", description="GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats).")
+@mcp.tool(name="npg_get_log_stats", description="GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats). expand=true lifts the result cap.")
 async def npg_get_log_stats(
     log_type: Literal["access", "error", "modsec"] | None = None,
     host: str | None = None,
@@ -3342,6 +3347,7 @@ async def npg_get_log_stats(
     proxy_host_id: str | None = None,
     block_reason: str | None = None,
     search: str | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -3367,7 +3373,7 @@ async def npg_get_log_stats(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set.")
+@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set. expand=true lifts the result cap.")
 async def npg_list_audit_logs(
     page: int | None = None,
     limit: int | None = None,
@@ -3378,6 +3384,7 @@ async def npg_list_audit_logs(
     user_id: str | None = None,
     start_time: str | None = None,
     end_time: str | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -3399,7 +3406,7 @@ async def npg_list_audit_logs(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_system_logs", description="LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set.")
+@mcp.tool(name="npg_list_system_logs", description="LIST system logs. Optional filters: source, level, container, component, search (text), start_time, end_time (RFC3339 strings passed verbatim), limit (default 100), offset. REQUIRED: none — zero-arg call returns the full system log set. expand=true lifts the result cap.")
 async def npg_list_system_logs(
     source: str | None = None,
     level: str | None = None,
@@ -3410,6 +3417,7 @@ async def npg_list_system_logs(
     start_time: str | None = None,
     end_time: str | None = None,
     offset: int | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -3436,8 +3444,8 @@ async def npg_list_system_logs(
 
 # ── Backups ───────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_backups", description="LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
-async def npg_list_backups(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_backups", description="LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_backups(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -3446,8 +3454,8 @@ async def npg_list_backups(page: int | None = None, limit: int | None = None) ->
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_backup", description="GET one backup row by its ID. REQUIRED: backup_id. This is also how you poll npg_create_backup until status leaves in_progress. Download the archive with npg_download_backup.")
-async def npg_get_backup(backup_id: str | int) -> dict:
+@mcp.tool(name="npg_get_backup", description="GET one backup row by its ID. REQUIRED: backup_id. This is also how you poll npg_create_backup until status leaves in_progress. Download the archive with npg_download_backup. expand=true lifts the result cap.")
+async def npg_get_backup(backup_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
@@ -3488,8 +3496,8 @@ async def npg_restore_backup(backup_id: str | int) -> dict:
 
 # ── API Tokens ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens.")
-async def npg_list_api_tokens(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens. expand=true lifts the result cap.")
+async def npg_list_api_tokens(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3498,8 +3506,8 @@ async def npg_list_api_tokens(limit: int | None = None, offset: int | None = Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_api_token", description="Get an API token by its ID. REQUIRED: token_id.")
-async def npg_get_api_token(token_id: str | int) -> dict:
+@mcp.tool(name="npg_get_api_token", description="Get an API token by its ID. REQUIRED: token_id. expand=true lifts the result cap.")
+async def npg_get_api_token(token_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
@@ -3555,8 +3563,8 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
 
 # ── Notification Channels ──────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything.")
-async def npg_list_notification_channels(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything. expand=true lifts the result cap.")
+async def npg_list_notification_channels(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3648,8 +3656,8 @@ async def npg_test_notification_channel(channel_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel. REQUIRED: channel_id.")
-async def npg_get_notification_deliveries(channel_id: str | int) -> dict:
+@mcp.tool(name="npg_get_notification_deliveries", description="Get delivery history for a notification channel. REQUIRED: channel_id. expand=true lifts the result cap.")
+async def npg_get_notification_deliveries(channel_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("channel_id", channel_id)
         c = _get_client()
@@ -3674,8 +3682,8 @@ async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: st
 
 # ── Users ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_users", description="LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles).")
-async def npg_list_users(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_users", description="LIST user accounts (no secrets in responses). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get sign-in history, sessions and API tokens per account with npg_get_user(user_id); create with npg_create_user (role_id from npg_list_roles). expand=true lifts the result cap.")
+async def npg_list_users(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3684,8 +3692,8 @@ async def npg_list_users(limit: int | None = None, offset: int | None = None) ->
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_user", description="Get a user by their ID. REQUIRED: user_id.")
-async def npg_get_user(user_id: str | int) -> dict:
+@mcp.tool(name="npg_get_user", description="Get a user by their ID. REQUIRED: user_id. expand=true lifts the result cap.")
+async def npg_get_user(user_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
@@ -3742,8 +3750,8 @@ async def npg_delete_user(user_id: str | int) -> dict:
 
 # ── Roles ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user.")
-async def npg_list_roles(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user. expand=true lifts the result cap.")
+async def npg_list_roles(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3790,8 +3798,8 @@ async def npg_delete_role(role_id: str | int) -> dict:
 
 # ── SSO Providers ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider.")
-async def npg_list_sso_providers(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider. expand=true lifts the result cap.")
+async def npg_list_sso_providers(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -3904,8 +3912,8 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
 
 # ── Log Files ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file.")
-async def npg_list_log_files(location: str = "local", limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file. expand=true lifts the result cap.")
+async def npg_list_log_files(location: str = "local", limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {"location": location}
@@ -3930,8 +3938,8 @@ async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_view_log_file", description="View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s.")
-async def npg_view_log_file(filename: str, lines: int = 100, location: str = "local") -> dict:
+@mcp.tool(name="npg_view_log_file", description="View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s. expand=true lifts the result cap.")
+async def npg_view_log_file(filename: str, lines: int = 100, location: str = "local", expand: bool = False) -> dict:
     try:
         _validate_required("filename", filename)
         c = _get_client()
@@ -3986,8 +3994,8 @@ async def npg_run_log_archive() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_raw_log_reclaim", description="GET the raw log reclaim job's status (job strips verbatim access/error lines from compressed log history; WAF events keep theirs). status: idle|running|paused|done|failed; supported=false = this DB cannot run it. Optional: estimate ('true'/'1') adds remaining work + DB free space (cached 10 min); without it, cheap enough to poll every few seconds.")
-async def npg_get_raw_log_reclaim(estimate: str | None = None) -> dict:
+@mcp.tool(name="npg_get_raw_log_reclaim", description="GET the raw log reclaim job's status (job strips verbatim access/error lines from compressed log history; WAF events keep theirs). status: idle|running|paused|done|failed; supported=false = this DB cannot run it. Optional: estimate ('true'/'1') adds remaining work + DB free space (cached 10 min); without it, cheap enough to poll every few seconds. expand=true lifts the result cap.")
+async def npg_get_raw_log_reclaim(estimate: str | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -4020,8 +4028,8 @@ async def npg_stop_raw_log_reclaim() -> dict:
 
 # ── Certificates ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_expiring_certificates", description="GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes).")
-async def npg_get_expiring_certificates(days: int | None = None) -> dict:
+@mcp.tool(name="npg_get_expiring_certificates", description="GET certificates expiring within the lookahead window. Optional: days (integer lookahead, API default 30 — pass e.g. days=365 to catch far-future expiries the default window excludes). expand=true lifts the result cap.")
+async def npg_get_expiring_certificates(days: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -4033,8 +4041,8 @@ async def npg_get_expiring_certificates(days: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates.")
-async def npg_get_certificate_history(certificate_id: str | None = None, page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_certificate_history", description="GET the certificate issuance/renewal history log. Optional: certificate_id (UUID — scope the log to one certificate, from npg_list_certificates), page (upstream paginated — default page 1), limit (per_page). Sent only when set; use npg_get_expiring_certificates for upcoming expiry dates. expand=true lifts the result cap.")
+async def npg_get_certificate_history(certificate_id: str | None = None, page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -4061,8 +4069,8 @@ async def npg_upload_certificate(domain_names: list[str], cert_content: str, key
 
 # ── URI Blocks ─────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus per-host URI block summaries. Optional: limit/offset — MCP-side slice of the per-host summary list (upstream ignores paging; global config always complete). Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule.")
-async def npg_list_uri_blocks(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_uri_blocks", description="LIST the global URI block config plus per-host URI block summaries. Optional: limit/offset — MCP-side slice of the per-host summary list (upstream ignores paging; global config always complete). Manage global rules with npg_update_global_uri_block; per-host rules with npg_get/update_proxy_host_uri_block and npg_add_proxy_host_uri_block_rule. expand=true lifts the result cap.")
+async def npg_list_uri_blocks(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
@@ -4090,8 +4098,8 @@ async def npg_bulk_add_uri_block_rule(pattern: str, match_type: str = "exact", d
 
 # ── Global URI Block ───────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_uri_block", description="GET the global URI block configuration (enabled, rules, exception_ips, allow_private_ips). Update with npg_update_global_uri_block; list all (global+per-host) with npg_list_uri_blocks.")
-async def npg_get_global_uri_block() -> dict:
+@mcp.tool(name="npg_get_global_uri_block", description="GET the global URI block configuration (enabled, rules, exception_ips, allow_private_ips). Update with npg_update_global_uri_block; list all (global+per-host) with npg_list_uri_blocks. expand=true lifts the result cap.")
+async def npg_get_global_uri_block(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/global-uri-block")
@@ -4159,8 +4167,8 @@ async def npg_delete_global_uri_block_rule(rule_id: str | int) -> dict:
 
 # ── Upstream Health ────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream pool. REQUIRED: upstream_id (UUID string).")
-async def npg_get_upstream_health(upstream_id: str) -> dict:
+@mcp.tool(name="npg_get_upstream_health", description="GET health status of an upstream pool. REQUIRED: upstream_id (UUID string). expand=true lifts the result cap.")
+async def npg_get_upstream_health(upstream_id: str, expand: bool = False) -> dict:
     try:
         _validate_id("upstream_id", upstream_id)
         c = _get_client()
@@ -4172,8 +4180,8 @@ async def npg_get_upstream_health(upstream_id: str) -> dict:
 
 # ── Cloud Providers by Region ──────────────────────────────────────────
 
-@mcp.tool(name="npg_list_cloud_providers_by_region", description="LIST enabled cloud providers grouped by region (us/eu/cn/kr; optional region= to keep one bucket). Compact summaries (ip_count, no ranges) — full objects via npg_list_cloud_providers.")
-async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
+@mcp.tool(name="npg_list_cloud_providers_by_region", description="LIST enabled cloud providers grouped by region (us/eu/cn/kr; optional region= to keep one bucket). Compact summaries (ip_count, no ranges) — full objects via npg_list_cloud_providers. expand=true lifts the result cap.")
+async def npg_list_cloud_providers_by_region(region: str | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = {"region": region} if region else None
@@ -4185,8 +4193,8 @@ async def npg_list_cloud_providers_by_region(region: str | None = None) -> dict:
 
 # ── Catalog ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_catalog", description="Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows.")
-async def npg_get_catalog() -> dict:
+@mcp.tool(name="npg_get_catalog", description="Get the curated filter subscription catalog. Returns metadata (name, description, type, path, entry count) from the public npg-filters index — no entries or database rows. expand=true lifts the result cap.")
+async def npg_get_catalog(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/filter-subscriptions/catalog")
@@ -4197,8 +4205,8 @@ async def npg_get_catalog() -> dict:
 
 # ── Docker Containers ──────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_docker_containers", description="Get status of all Docker containers managed by NPG.")
-async def npg_get_docker_containers() -> dict:
+@mcp.tool(name="npg_get_docker_containers", description="Get status of all Docker containers managed by NPG. expand=true lifts the result cap.")
+async def npg_get_docker_containers(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/docker/containers")
@@ -4209,8 +4217,8 @@ async def npg_get_docker_containers() -> dict:
 
 # ── Update Check ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_check_update", description="CHECK for a newer NPG release (GET system-settings/update/check — this is the v0.3.19 reroute; older docs calling /update/check are stale). Result is cached upstream; a failed lookup returns 200 with check_failed=true, not an error.")
-async def npg_check_update() -> dict:
+@mcp.tool(name="npg_check_update", description="CHECK for a newer NPG release (GET system-settings/update/check — this is the v0.3.19 reroute; older docs calling /update/check are stale). Result is cached upstream; a failed lookup returns 200 with check_failed=true, not an error. expand=true lifts the result cap.")
+async def npg_check_update(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-settings/update/check")
@@ -4234,8 +4242,8 @@ async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
 
 # ── Public UI Settings ─────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_public_ui_settings", description="Get public UI settings (accessible without auth).")
-async def npg_get_public_ui_settings() -> dict:
+@mcp.tool(name="npg_get_public_ui_settings", description="Get public UI settings (accessible without auth). expand=true lifts the result cap.")
+async def npg_get_public_ui_settings(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/public/ui-settings")
@@ -4246,8 +4254,8 @@ async def npg_get_public_ui_settings() -> dict:
 
 # ── Dashboard ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_dashboard_containers", description="Get Docker container statistics for the dashboard.")
-async def npg_get_dashboard_containers() -> dict:
+@mcp.tool(name="npg_get_dashboard_containers", description="Get Docker container statistics for the dashboard. expand=true lifts the result cap.")
+async def npg_get_dashboard_containers(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/dashboard/containers")
@@ -4255,11 +4263,12 @@ async def npg_get_dashboard_containers() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_stats", description="GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host).")
+@mcp.tool(name="npg_get_dashboard_stats", description="GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap.")
 async def npg_get_dashboard_stats(
     start: str | None = None,
     end: str | None = None,
     proxy_host_id: str | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -4275,8 +4284,8 @@ async def npg_get_dashboard_stats(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_health_history", description="GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100).")
-async def npg_get_dashboard_health_history(hours: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_dashboard_health_history", description="GET system health history for the dashboard. Optional: hours (lookback window, API default 1), limit (max samples, API default 100). expand=true lifts the result cap.")
+async def npg_get_dashboard_health_history(hours: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -4294,8 +4303,8 @@ async def npg_get_dashboard_health_history(hours: int | None = None, limit: int 
 
 # ── Cloudflare Tunnel ──────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_cloudflare_tunnel", description="Get Cloudflare Tunnel configuration.")
-async def npg_get_cloudflare_tunnel() -> dict:
+@mcp.tool(name="npg_get_cloudflare_tunnel", description="Get Cloudflare Tunnel configuration. expand=true lifts the result cap.")
+async def npg_get_cloudflare_tunnel(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/cloudflare-tunnel")
@@ -4313,8 +4322,8 @@ async def npg_update_cloudflare_tunnel(kwargs: dict | None = None, strict: bool 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_cloudflare_tunnel_status", description="GET Cloudflare Tunnel connector runtime status (disabled/connected/starting/error + connection count), cached ~15s upstream. Always succeeds — failures come back as a state. Config itself via npg_get_cloudflare_tunnel.")
-async def npg_get_cloudflare_tunnel_status() -> dict:
+@mcp.tool(name="npg_get_cloudflare_tunnel_status", description="GET Cloudflare Tunnel connector runtime status (disabled/connected/starting/error + connection count), cached ~15s upstream. Always succeeds — failures come back as a state. Config itself via npg_get_cloudflare_tunnel. expand=true lifts the result cap.")
+async def npg_get_cloudflare_tunnel_status(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/cloudflare-tunnel/status")
@@ -4325,8 +4334,8 @@ async def npg_get_cloudflare_tunnel_status() -> dict:
 
 # ── Global Security Headers ────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_security_headers", description="GET the global security headers default that hosts inherit (HSTS, X-Frame-Options, CSP, etc.). Update with npg_update_global_security_headers; per-host override via npg_update_proxy_host_security_headers.")
-async def npg_get_global_security_headers() -> dict:
+@mcp.tool(name="npg_get_global_security_headers", description="GET the global security headers default that hosts inherit (HSTS, X-Frame-Options, CSP, etc.). Update with npg_update_global_security_headers; per-host override via npg_update_proxy_host_security_headers. expand=true lifts the result cap.")
+async def npg_get_global_security_headers(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-security-headers")
@@ -4361,8 +4370,8 @@ async def npg_update_global_security_headers(enabled: bool | None = None, hsts_e
 
 # ── Global Bot Filter ──────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_bot_filter", description="GET the global bot filter default that hosts inherit (enabled, block_bad_bots, block_ai_bots, etc.). Update with npg_update_global_bot_filter; per-host override via npg_update_proxy_host_bot_filter.")
-async def npg_get_global_bot_filter() -> dict:
+@mcp.tool(name="npg_get_global_bot_filter", description="GET the global bot filter default that hosts inherit (enabled, block_bad_bots, block_ai_bots, etc.). Update with npg_update_global_bot_filter; per-host override via npg_update_proxy_host_bot_filter. expand=true lifts the result cap.")
+async def npg_get_global_bot_filter(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-bot-filter")
@@ -4395,8 +4404,8 @@ async def npg_update_global_bot_filter(enabled: bool | None = None, block_bad_bo
 
 # ── Global Cloud Providers ─────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_cloud_providers", description="GET the global cloud provider blocking default (blocked_providers, challenge_mode, allow_search_bots). Update with npg_update_global_cloud_providers (full replace — send all 3 fields).")
-async def npg_get_global_cloud_providers() -> dict:
+@mcp.tool(name="npg_get_global_cloud_providers", description="GET the global cloud provider blocking default (blocked_providers, challenge_mode, allow_search_bots). Update with npg_update_global_cloud_providers (full replace — send all 3 fields). expand=true lifts the result cap.")
+async def npg_get_global_cloud_providers(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-cloud-providers")
@@ -4424,8 +4433,8 @@ async def npg_update_global_cloud_providers(blocked_providers: list[str] | None 
 
 # ── Global Geo ─────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_geo", description="GET the global GeoIP restriction default that hosts inherit (enabled, mode, countries, allowed_ips, allow_private_ips). Update with npg_update_global_geo; per-host override via npg_create/update_proxy_host_geo.")
-async def npg_get_global_geo() -> dict:
+@mcp.tool(name="npg_get_global_geo", description="GET the global GeoIP restriction default that hosts inherit (enabled, mode, countries, allowed_ips, allow_private_ips). Update with npg_update_global_geo; per-host override via npg_create/update_proxy_host_geo. expand=true lifts the result cap.")
+async def npg_get_global_geo(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-geo")
@@ -4472,8 +4481,8 @@ async def npg_confirm_global_geo_dns(hostname: str, expected_addresses: list[str
 
 # ── Global Rate Limit ──────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_rate_limit", description="GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit.")
-async def npg_get_global_rate_limit() -> dict:
+@mcp.tool(name="npg_get_global_rate_limit", description="GET the global rate limit default that hosts inherit (requests_per_second, burst_size, etc.). Update with npg_update_global_rate_limit; per-host override via npg_update_proxy_host_rate_limit. expand=true lifts the result cap.")
+async def npg_get_global_rate_limit(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-rate-limit")
@@ -4517,8 +4526,8 @@ async def npg_confirm_global_rate_limit_dns(hostname: str, expected_addresses: l
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log.")
-async def npg_get_global_fail2ban() -> dict:
+@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log. expand=true lifts the result cap.")
+async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-fail2ban")
@@ -4539,8 +4548,8 @@ async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = 
 
 # ── Global WAF ─────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_global_waf", description="GET the global WAF default (enabled, mode, paranoia_level, anomaly_threshold) that hosts inherit when waf_use_global=true. Update with npg_update_global_waf.")
-async def npg_get_global_waf() -> dict:
+@mcp.tool(name="npg_get_global_waf", description="GET the global WAF default (enabled, mode, paranoia_level, anomaly_threshold) that hosts inherit when waf_use_global=true. Update with npg_update_global_waf. expand=true lifts the result cap.")
+async def npg_get_global_waf(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/global-waf")
@@ -4569,8 +4578,8 @@ async def npg_update_global_waf(enabled: bool | None = None, mode: str | None = 
 
 # ── Backups ────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID.")
-async def npg_download_backup(backup_id: str | int) -> dict:
+@mcp.tool(name="npg_download_backup", description="DOWNLOAD a backup file by its ID. REQUIRED: backup_id. Returns base64-encoded gzip (encoding=base64) — decode before writing to disk; text/* responses return plain data. Use npg_list_backups to find the ID. expand=true lifts the result cap.")
+async def npg_download_backup(backup_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("backup_id", backup_id)
         c = _get_client()
@@ -4606,8 +4615,8 @@ async def npg_upload_restore_backup(file_content: str, encoding: str = "base64")
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_backup_stats", description="GET backup statistics (counts, sizes, latest run). Related: npg_list_backups to enumerate, npg_create_backup to start one.")
-async def npg_get_backup_stats() -> dict:
+@mcp.tool(name="npg_get_backup_stats", description="GET backup statistics (counts, sizes, latest run). Related: npg_list_backups to enumerate, npg_create_backup to start one. expand=true lifts the result cap.")
+async def npg_get_backup_stats(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/backups/stats")
@@ -4652,8 +4661,8 @@ def _bearer_auth_middleware(app, expected_token: str):
 
 # ── Auth Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_auth_status", description="GET authentication status — returns whether the current session is authenticated and basic user info.")
-async def npg_get_auth_status() -> dict:
+@mcp.tool(name="npg_get_auth_status", description="GET authentication status — returns whether the current session is authenticated and basic user info. expand=true lifts the result cap.")
+async def npg_get_auth_status(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/auth/status")
@@ -4661,8 +4670,8 @@ async def npg_get_auth_status() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_auth_me", description="GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Use to check what the current API token can actually do.")
-async def npg_get_auth_me() -> dict:
+@mcp.tool(name="npg_get_auth_me", description="GET the current authenticated identity — returns the token owner's info and effective_permissions (token scopes ∩ owner role). Use to check what the current API token can actually do. expand=true lifts the result cap.")
+async def npg_get_auth_me(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/auth/me")
@@ -4670,8 +4679,8 @@ async def npg_get_auth_me() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_auth_sso_providers", description="List SSO providers available for the login screen (public-facing).")
-async def npg_get_auth_sso_providers() -> dict:
+@mcp.tool(name="npg_get_auth_sso_providers", description="List SSO providers available for the login screen (public-facing). expand=true lifts the result cap.")
+async def npg_get_auth_sso_providers(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/auth/sso/providers")
@@ -4679,8 +4688,8 @@ async def npg_get_auth_sso_providers() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_auth_sso_start", description="Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}.")
-async def npg_auth_sso_start(slug: str) -> dict:
+@mcp.tool(name="npg_auth_sso_start", description="Begin an SSO login flow. REQUIRED: slug (the SSO provider identifier). Returns the identity provider redirect URL (Location header from the NPG API's 302 response) as {\"redirect_url\": ...}. expand=true lifts the result cap.")
+async def npg_auth_sso_start(slug: str, expand: bool = False) -> dict:
     try:
         _validate_id("slug", slug)
         c = _get_client()
@@ -4694,8 +4703,8 @@ async def npg_auth_sso_start(slug: str) -> dict:
 
 # ── Auth Providers (ForwardAuth) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_auth_providers", description="LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list.")
-async def npg_list_auth_providers(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_auth_providers", description="LIST ForwardAuth (Authelia, Authentik, custom) providers. Optional: page, limit (per_page, no upper bound, default 20). Paginated responses include metadata (data/total/page/per_page/total_pages). Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_auth_providers(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -4725,8 +4734,8 @@ async def npg_create_auth_provider(name: str, provider_type: str, provider_url: 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_auth_provider", description="Get a ForwardAuth provider by its ID. REQUIRED: provider_id.")
-async def npg_get_auth_provider(provider_id: str | int) -> dict:
+@mcp.tool(name="npg_get_auth_provider", description="Get a ForwardAuth provider by its ID. REQUIRED: provider_id. expand=true lifts the result cap.")
+async def npg_get_auth_provider(provider_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("provider_id", provider_id)
         c = _get_client()
@@ -4772,8 +4781,8 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
 
 # ── DDNS Records ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_ddns_records", description="LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
-async def npg_list_ddns_records(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_ddns_records", description="LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_ddns_records(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -4794,8 +4803,8 @@ async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, prox
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ddns_record", description="Get a DDNS record by its ID. REQUIRED: record_id.")
-async def npg_get_ddns_record(record_id: str | int) -> dict:
+@mcp.tool(name="npg_get_ddns_record", description="Get a DDNS record by its ID. REQUIRED: record_id. expand=true lifts the result cap.")
+async def npg_get_ddns_record(record_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("record_id", record_id)
         c = _get_client()
@@ -4870,8 +4879,8 @@ async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id:
 
 # ── Filter Subscriptions ───────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_filter_subscriptions", description="LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list.")
-async def npg_list_filter_subscriptions(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_list_filter_subscriptions", description="LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+async def npg_list_filter_subscriptions(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -4903,8 +4912,8 @@ async def npg_create_filter_subscription(url: str, name: str | None = None) -> d
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_filter_subscription", description="Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id.")
-async def npg_get_filter_subscription(subscription_id: str | int) -> dict:
+@mcp.tool(name="npg_get_filter_subscription", description="Get a filter subscription with its entries and exclusions. REQUIRED: subscription_id. expand=true lifts the result cap.")
+async def npg_get_filter_subscription(subscription_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
@@ -4960,8 +4969,8 @@ async def npg_refresh_filter_subscription(subscription_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_filter_subscription_exclusions", description="List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id.")
-async def npg_get_filter_subscription_exclusions(subscription_id: str | int) -> dict:
+@mcp.tool(name="npg_get_filter_subscription_exclusions", description="List host exclusions of a filter subscription (hosts that skip this subscription). REQUIRED: subscription_id. expand=true lifts the result cap.")
+async def npg_get_filter_subscription_exclusions(subscription_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
@@ -4992,8 +5001,8 @@ async def npg_remove_filter_subscription_exclusion(subscription_id: str | int, h
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_filter_subscription_entry_exclusions", description="List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id.")
-async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | int) -> dict:
+@mcp.tool(name="npg_get_filter_subscription_entry_exclusions", description="List entry exclusions of a filter subscription (specific entries that are skipped). REQUIRED: subscription_id. expand=true lifts the result cap.")
+async def npg_get_filter_subscription_entry_exclusions(subscription_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("subscription_id", subscription_id)
         c = _get_client()
@@ -5025,8 +5034,8 @@ async def npg_remove_filter_subscription_entry_exclusion(subscription_id: str | 
         return _error_result(e)
 
 
-@mcp.tool(name="npg_match_filter_subscriptions", description="MATCH an IP and/or user-agent against ALL subscribed filter lists to find WHICH subscription blocked a client. Optional: ip, user_agent — pass at least one (client-side error when both empty). Returns ip_matches[] and user_agent_matches[]. Read-only; invalid IP → HTTP 400 (pass verbatim).")
-async def npg_match_filter_subscriptions(ip: str | None = None, user_agent: str | None = None) -> dict:
+@mcp.tool(name="npg_match_filter_subscriptions", description="MATCH an IP and/or user-agent against ALL subscribed filter lists to find WHICH subscription blocked a client. Optional: ip, user_agent — pass at least one (client-side error when both empty). Returns ip_matches[] and user_agent_matches[]. Read-only; invalid IP → HTTP 400 (pass verbatim). expand=true lifts the result cap.")
+async def npg_match_filter_subscriptions(ip: str | None = None, user_agent: str | None = None, expand: bool = False) -> dict:
     try:
         if not (ip or user_agent):
             raise ValueError("ip or user_agent is required (got: both empty)")
@@ -5044,8 +5053,8 @@ async def npg_match_filter_subscriptions(ip: str | None = None, user_agent: str 
 
 # ── Exploit Rules Extras ───────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_exploit_rules_hosts", description="List proxy hosts that have exploit blocking enabled.")
-async def npg_get_exploit_rules_hosts() -> dict:
+@mcp.tool(name="npg_get_exploit_rules_hosts", description="List proxy hosts that have exploit blocking enabled. expand=true lifts the result cap.")
+async def npg_get_exploit_rules_hosts(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/exploit-rules/hosts")
@@ -5053,8 +5062,8 @@ async def npg_get_exploit_rules_hosts() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_exploit_rules_for_host", description="List exploit rules with this host's exclusion status. REQUIRED: host_id.")
-async def npg_get_exploit_rules_for_host(host_id: str | int) -> dict:
+@mcp.tool(name="npg_get_exploit_rules_for_host", description="List exploit rules with this host's exclusion status. REQUIRED: host_id. expand=true lifts the result cap.")
+async def npg_get_exploit_rules_for_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -5140,8 +5149,8 @@ async def npg_upload_certificate_pem(cert_id: str | int, pem_content: str, priva
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_logs", description="Get the issuance log stream for a certificate. REQUIRED: cert_id.")
-async def npg_get_certificate_logs(cert_id: str | int) -> dict:
+@mcp.tool(name="npg_get_certificate_logs", description="Get the issuance log stream for a certificate. REQUIRED: cert_id. expand=true lifts the result cap.")
+async def npg_get_certificate_logs(cert_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
@@ -5150,8 +5159,8 @@ async def npg_get_certificate_logs(cert_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data.")
-async def npg_get_certificate_download(cert_id: str | int) -> dict:
+@mcp.tool(name="npg_get_certificate_download", description="Download certificate material (PEM/zip). REQUIRED: cert_id. Returns base64-encoded content (encoding=base64) for binary payloads (zip) — decode before writing to disk; text/* responses return plain data. expand=true lifts the result cap.")
+async def npg_get_certificate_download(cert_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("cert_id", cert_id)
         c = _get_client()
@@ -5168,8 +5177,8 @@ async def npg_get_certificate_download(cert_id: str | int) -> dict:
 
 # ── Challenge Config ───────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_challenge_config", description="GET the global CAPTCHA challenge configuration.")
-async def npg_get_challenge_config() -> dict:
+@mcp.tool(name="npg_get_challenge_config", description="GET the global CAPTCHA challenge configuration. expand=true lifts the result cap.")
+async def npg_get_challenge_config(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/challenge-config")
@@ -5195,8 +5204,8 @@ async def npg_update_challenge_config(enabled: bool | None = None, secret_key: s
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_challenge_stats", description="GET CAPTCHA challenge statistics aggregated over a FIXED 24-hour window upstream (not configurable). Config via npg_get_challenge_config.")
-async def npg_get_challenge_stats() -> dict:
+@mcp.tool(name="npg_get_challenge_stats", description="GET CAPTCHA challenge statistics aggregated over a FIXED 24-hour window upstream (not configurable). Config via npg_get_challenge_config. expand=true lifts the result cap.")
+async def npg_get_challenge_stats(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/challenge-config/stats")
@@ -5207,8 +5216,8 @@ async def npg_get_challenge_stats() -> dict:
 
 # ── DNS Providers Extras ───────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_dns_provider_default", description="Get the default DNS provider for certificate issuance.")
-async def npg_get_dns_provider_default() -> dict:
+@mcp.tool(name="npg_get_dns_provider_default", description="Get the default DNS provider for certificate issuance. expand=true lifts the result cap.")
+async def npg_get_dns_provider_default(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/dns-providers/default")
@@ -5276,8 +5285,8 @@ async def npg_cleanup_logs() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_hosts", description="Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
-async def npg_get_log_autocomplete_hosts(q: str | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_hosts", description="Get distinct hosts seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_hosts(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -5290,8 +5299,8 @@ async def npg_get_log_autocomplete_hosts(q: str | None = None, limit: int | None
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
-async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -5304,8 +5313,8 @@ async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None =
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
-async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -5318,8 +5327,8 @@ async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before.")
-async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -5332,8 +5341,8 @@ async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) - applied MCP-side as a window because the upstream endpoint accepts NO query params (no q/limit). Omitted = full list, as before; with limit the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so you can see how many values exist beyond the window.")
-async def npg_get_log_autocomplete_countries(limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) - applied MCP-side as a window because the upstream endpoint accepts NO query params (no q/limit). Omitted = full list, as before; with limit the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so you can see how many values exist beyond the window. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_countries(limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, None)
@@ -5346,8 +5355,8 @@ async def npg_get_log_autocomplete_countries(limit: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_methods", description="Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params (no q/limit). Omitted = full unfiltered list, same as before; when limit is given the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window.")
-async def npg_get_log_autocomplete_methods(limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_log_autocomplete_methods", description="Get distinct HTTP methods seen in nginx access logs (for autocomplete). Optional: limit (max entries, int) — applied MCP-side as a window on the full list because the upstream endpoint accepts NO query params. Omitted = full unfiltered list; with limit the envelope is unchanged and a paging dict (total/returned/offset/unit) is added so the agent can see how many values exist beyond the window. expand=true lifts the result cap.")
+async def npg_get_log_autocomplete_methods(limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, None)
@@ -5360,8 +5369,8 @@ async def npg_get_log_autocomplete_methods(limit: int | None = None) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_filter_presets", description="LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs.")
-async def npg_get_log_filter_presets() -> dict:
+@mcp.tool(name="npg_get_log_filter_presets", description="LIST saved log filter presets (shared by all users). Create with npg_create_log_filter_preset; they are applied when querying npg_get_logs. expand=true lifts the result cap.")
+async def npg_get_log_filter_presets(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/log-filter-presets")
@@ -5414,8 +5423,8 @@ async def npg_cleanup_system_logs() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_log_sources", description="Get selectable system log sources (docker_api, docker_nginx, health_check, etc.).")
-async def npg_get_system_log_sources() -> dict:
+@mcp.tool(name="npg_get_system_log_sources", description="Get selectable system log sources (docker_api, docker_nginx, health_check, etc.). expand=true lifts the result cap.")
+async def npg_get_system_log_sources(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-logs/sources")
@@ -5423,8 +5432,8 @@ async def npg_get_system_log_sources() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_log_levels", description="Get selectable system log levels (debug, info, warn, error, fatal).")
-async def npg_get_system_log_levels() -> dict:
+@mcp.tool(name="npg_get_system_log_levels", description="Get selectable system log levels (debug, info, warn, error, fatal). expand=true lifts the result cap.")
+async def npg_get_system_log_levels(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-logs/levels")
@@ -5432,8 +5441,8 @@ async def npg_get_system_log_levels() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_log_stats", description="Get system log statistics (counts by source/level).")
-async def npg_get_system_log_stats() -> dict:
+@mcp.tool(name="npg_get_system_log_stats", description="Get system log statistics (counts by source/level). expand=true lifts the result cap.")
+async def npg_get_system_log_stats(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-logs/stats")
@@ -5441,8 +5450,8 @@ async def npg_get_system_log_stats() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_settings_logs", description="GET the container log collector configuration (what the system-logs pipeline ingests). Update with npg_update_system_settings_logs; raw nginx log files via npg_list_log_files.")
-async def npg_get_system_settings_logs() -> dict:
+@mcp.tool(name="npg_get_system_settings_logs", description="GET the container log collector configuration (what the system-logs pipeline ingests). Update with npg_update_system_settings_logs; raw nginx log files via npg_list_log_files. expand=true lifts the result cap.")
+async def npg_get_system_settings_logs(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/system-settings/logs")
@@ -5492,8 +5501,8 @@ async def npg_update_system_settings_logs(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_audit_log_actions", description="List the action values present in the audit log (for filtering).")
-async def npg_get_audit_log_actions() -> dict:
+@mcp.tool(name="npg_get_audit_log_actions", description="List the action values present in the audit log (for filtering). expand=true lifts the result cap.")
+async def npg_get_audit_log_actions(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/audit-logs/actions")
@@ -5501,8 +5510,8 @@ async def npg_get_audit_log_actions() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_audit_log_resource_types", description="List the resource types present in the audit log (for filtering).")
-async def npg_get_audit_log_resource_types() -> dict:
+@mcp.tool(name="npg_get_audit_log_resource_types", description="List the resource types present in the audit log (for filtering). expand=true lifts the result cap.")
+async def npg_get_audit_log_resource_types(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/audit-logs/resource-types")
@@ -5510,8 +5519,8 @@ async def npg_get_audit_log_resource_types() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_audit_log_api_tokens", description="LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage.")
-async def npg_get_audit_log_api_tokens(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_get_audit_log_api_tokens", description="LIST per-request API token usage across ALL tokens (joined with token name/prefix). Hard upstream caps: last 7 days, max 100 rows per token. Optional: limit — rows per page, upstream clamps into 1–100 (default 50); offset — rows to skip, clamped into 0–10000. Omit both for the default full first page. Single-token view via npg_get_api_token_usage. expand=true lifts the result cap.")
+async def npg_get_audit_log_api_tokens(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params(limit=limit, offset=offset)
@@ -5616,7 +5625,7 @@ async def npg_bulk_unban_ips(ids: list[str | int]) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ban_history", description="GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20).")
+@mcp.tool(name="npg_get_ban_history", description="GET ban/unban event history. Optional filters: ip_address, event_type, source, proxy_host_id, start_date, end_date (date strings passed verbatim), page (default 1), limit (page size, mapped to API per_page, default 20). expand=true lifts the result cap.")
 async def npg_get_ban_history(
     ip_address: str | None = None,
     event_type: str | None = None,
@@ -5626,6 +5635,7 @@ async def npg_get_ban_history(
     end_date: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
@@ -5653,8 +5663,8 @@ async def npg_get_ban_history(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ban_history_stats", description="GET ban/unban history statistics (counts by event type/source). Enumerate events with npg_get_ban_history, one IP with npg_get_ban_history_for_ip.")
-async def npg_get_ban_history_stats() -> dict:
+@mcp.tool(name="npg_get_ban_history_stats", description="GET ban/unban history statistics (counts by event type/source). Enumerate events with npg_get_ban_history, one IP with npg_get_ban_history_for_ip. expand=true lifts the result cap.")
+async def npg_get_ban_history_stats(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/banned-ips/history/stats")
@@ -5662,8 +5672,8 @@ async def npg_get_ban_history_stats() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ban_history_for_ip", description="GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20).")
-async def npg_get_ban_history_for_ip(ip: str, page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_ban_history_for_ip", description="GET ban history for a specific IP address. REQUIRED: ip. Optional: page (default 1), limit (page size, mapped to API per_page, default 20). expand=true lifts the result cap.")
+async def npg_get_ban_history_for_ip(ip: str, page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
@@ -5679,8 +5689,8 @@ async def npg_get_ban_history_for_ip(ip: str, page: int | None = None, limit: in
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_ip_traffic_stats", description="Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default).")
-async def npg_get_ip_traffic_stats(ip: str, days: int | None = None) -> dict:
+@mcp.tool(name="npg_get_ip_traffic_stats", description="Get traffic and ban summary for one IP address. Returns geolocation, request volume, top hosts/URIs, and ban counts. REQUIRED: ip. Optional: days (window for traffic figures — must be 1, 7, or 30; defaults to server default). expand=true lifts the result cap.")
+async def npg_get_ip_traffic_stats(ip: str, days: int | None = None, expand: bool = False) -> dict:
     try:
         _validate_required("ip", ip)
         c = _get_client()
@@ -5730,8 +5740,8 @@ async def npg_reset_settings() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_settings_presets", description="List available global settings presets that can be applied.")
-async def npg_get_settings_presets() -> dict:
+@mcp.tool(name="npg_get_settings_presets", description="List available global settings presets that can be applied. expand=true lifts the result cap.")
+async def npg_get_settings_presets(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/settings/presets")
@@ -5752,8 +5762,8 @@ async def npg_apply_settings_preset(preset: str) -> dict:
 
 # ── System Extras ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_health", description="GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot.")
-async def npg_get_health() -> dict:
+@mcp.tool(name="npg_get_health", description="GET basic NPG liveness — the API origin-root /health (outside /api/v1): status, database, cache, uptime, version. No auth required upstream. Cheapest NPG reachability probe for monitoring; use npg_get_health_detailed for the full diagnostic snapshot. expand=true lifts the result cap.")
+async def npg_get_health(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/health")
@@ -5761,8 +5771,8 @@ async def npg_get_health() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_health_detailed", description="GET a detailed health snapshot (detailed version of health check).")
-async def npg_get_health_detailed() -> dict:
+@mcp.tool(name="npg_get_health_detailed", description="GET a detailed health snapshot (detailed version of health check). expand=true lifts the result cap.")
+async def npg_get_health_detailed(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/health/detailed")
@@ -5770,8 +5780,8 @@ async def npg_get_health_detailed() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_status", description="GET component status — health of all NPG subsystems (API, database, nginx).")
-async def npg_get_status() -> dict:
+@mcp.tool(name="npg_get_status", description="GET component status — health of all NPG subsystems (API, database, nginx). expand=true lifts the result cap.")
+async def npg_get_status(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/status")
@@ -5779,8 +5789,8 @@ async def npg_get_status() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_server_info", description="GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything.")
-async def npg_get_server_info() -> dict:
+@mcp.tool(name="npg_get_server_info", description="GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything. expand=true lifts the result cap.")
+async def npg_get_server_info(expand: bool = False) -> dict:
     """Compose MCP-side and NPG-side server facts in one read-only result.
 
     Returns ``{"success": True, "data": {"npg_version", "api_base_url",
@@ -5820,8 +5830,8 @@ async def npg_get_server_info() -> dict:
         },
     }
 
-@mcp.tool(name="npg_get_stack_features", description="REPORT-ONLY probe of the optional NPG feature families the deployed stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, never a call error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail.")
-async def npg_get_stack_features() -> dict:
+@mcp.tool(name="npg_get_stack_features", description="REPORT-ONLY probe of optional NPG feature families the stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, not an error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail. expand=true lifts the result cap.")
+async def npg_get_stack_features(expand: bool = False) -> dict:
     """Probe ten optional feature families with one GET each — never raises.
 
     REPORT-ONLY: this tool exists to tell an agent what the deployed NPG
@@ -5943,8 +5953,8 @@ async def npg_get_stack_features() -> dict:
         },
     }
 
-@mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'.")
-async def npg_system_self_check() -> dict:
+@mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'. expand=true lifts the result cap.")
+async def npg_system_self_check(expand: bool = False) -> dict:
     """Run the upstream system self-check (DB + nginx -t + backup dir)."""
     c = _get_client()
     try:
@@ -5963,8 +5973,8 @@ async def npg_check_backup_restore() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_metrics", description="GET Prometheus metrics (GET /metrics): raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics. Unauthenticated origin-root endpoint, safe read-only. For health status use npg_get_status or npg_get_health_detailed.")
-async def npg_get_metrics() -> dict:
+@mcp.tool(name="npg_get_metrics", description="GET Prometheus metrics (GET /metrics): raw Prometheus text exposition from the NPG API — Go runtime stats plus npg_* app metrics. Unauthenticated origin-root endpoint, safe read-only. For health status use npg_get_status or npg_get_health_detailed. expand=true lifts the result cap.")
+async def npg_get_metrics(expand: bool = False) -> dict:
     """Fetch the upstream Prometheus metrics exposition text."""
     c = _get_client()
     try:
@@ -5973,8 +5983,8 @@ async def npg_get_metrics() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query, reports per-query status/timings — read-only, safe anytime. Use when the dashboard/charts load slowly or error. For component health use npg_get_status or npg_system_self_check.")
-async def npg_check_dashboard_queries() -> dict:
+@mcp.tool(name="npg_check_dashboard_queries", description="TEST the dashboard aggregation queries (GET /test/dashboard/queries): runs each dashboard query, reports per-query status/timings — read-only, safe anytime. Use when the dashboard/charts load slowly or error. For component health use npg_get_status or npg_system_self_check. expand=true lifts the result cap.")
+async def npg_check_dashboard_queries(expand: bool = False) -> dict:
     """Run the upstream dashboard aggregation-query self-test."""
     c = _get_client()
     try:
@@ -5983,8 +5993,8 @@ async def npg_check_dashboard_queries() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes.")
-async def npg_get_permission_areas() -> dict:
+@mcp.tool(name="npg_get_permission_areas", description="Get the permission area/verb matrix — all available permission scopes. expand=true lifts the result cap.")
+async def npg_get_permission_areas(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/permission-areas")
@@ -5992,8 +6002,8 @@ async def npg_get_permission_areas() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_global_rules", description="List all OWASP CRS rules with their GLOBAL exclusion status.")
-async def npg_get_waf_global_rules() -> dict:
+@mcp.tool(name="npg_get_waf_global_rules", description="List all OWASP CRS rules with their GLOBAL exclusion status. expand=true lifts the result cap.")
+async def npg_get_waf_global_rules(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/waf/global/rules")
@@ -6001,8 +6011,8 @@ async def npg_get_waf_global_rules() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_global_exclusions", description="LIST the CRS rules disabled for every host (global WAF exclusions). Toggle a rule globally with npg_disable_waf_global_rule / npg_enable_waf_global_rule.")
-async def npg_get_waf_global_exclusions() -> dict:
+@mcp.tool(name="npg_get_waf_global_exclusions", description="LIST the CRS rules disabled for every host (global WAF exclusions). Toggle a rule globally with npg_disable_waf_global_rule / npg_enable_waf_global_rule. expand=true lifts the result cap.")
+async def npg_get_waf_global_exclusions(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/waf/global/exclusions")
@@ -6010,8 +6020,8 @@ async def npg_get_waf_global_exclusions() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_global_history", description="GET the global WAF policy change history. Optional: limit (max entries returned).")
-async def npg_get_waf_global_history(limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_waf_global_history", description="GET the global WAF policy change history. Optional: limit (max entries returned). expand=true lifts the result cap.")
+async def npg_get_waf_global_history(limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params: dict = {}
@@ -6043,8 +6053,8 @@ async def npg_enable_waf_global_rule(rule_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_host_history", description="GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned).")
-async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_waf_host_history", description="GET the WAF policy change history for a proxy host. REQUIRED: host_id. Optional: limit (max entries returned). expand=true lifts the result cap.")
+async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
@@ -6057,8 +6067,8 @@ async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None)
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_event_rules", description="GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope.")
-async def npg_get_waf_event_rules(log_id: str | int, at: str) -> dict:
+@mcp.tool(name="npg_get_waf_event_rules", description="GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope. expand=true lifts the result cap.")
+async def npg_get_waf_event_rules(log_id: str | int, at: str, expand: bool = False) -> dict:
     try:
         _validate_id("log_id", log_id)
         _validate_required("at", at)
@@ -6082,8 +6092,8 @@ async def npg_disable_waf_rule_by_host(domain_name: str, rule_id: str | int) -> 
 
 # ── API Tokens Extras ──────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_api_token_permissions", description="List the permission strings an API token may carry (reference list).")
-async def npg_get_api_token_permissions() -> dict:
+@mcp.tool(name="npg_get_api_token_permissions", description="List the permission strings an API token may carry (reference list). expand=true lifts the result cap.")
+async def npg_get_api_token_permissions(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/api-tokens/permissions")
@@ -6091,8 +6101,8 @@ async def npg_get_api_token_permissions() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_api_token_usage", description="Get recent usage for an API token. REQUIRED: token_id.")
-async def npg_get_api_token_usage(token_id: str | int) -> dict:
+@mcp.tool(name="npg_get_api_token_usage", description="Get recent usage for an API token. REQUIRED: token_id. expand=true lifts the result cap.")
+async def npg_get_api_token_usage(token_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
@@ -6104,8 +6114,8 @@ async def npg_get_api_token_usage(token_id: str | int) -> dict:
 
 # ── WAF Test ───────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_waf_test_patterns", description="LIST the 12 built-in WAF attack patterns (hard-coded, no DB). Each entry's id is the attack_type value for npg_test_waf_pattern; fire all of them with npg_test_waf_all_patterns.")
-async def npg_get_waf_test_patterns() -> dict:
+@mcp.tool(name="npg_get_waf_test_patterns", description="LIST the 12 built-in WAF attack patterns (hard-coded, no DB). Each entry's id is the attack_type value for npg_test_waf_pattern; fire all of them with npg_test_waf_all_patterns. expand=true lifts the result cap.")
+async def npg_get_waf_test_patterns(expand: bool = False) -> dict:
     c = _get_client()
     try:
         data = await _api(c.get, "/api/v1/waf-test/patterns")
@@ -6137,8 +6147,8 @@ async def npg_test_waf_all_patterns(target_url: str) -> dict:
 
 # ── GeoIP History ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_geoip_history", description="List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows).")
-async def npg_get_geoip_history(page: int | None = None, limit: int | None = None) -> dict:
+@mcp.tool(name="npg_get_geoip_history", description="List GeoIP database update runs and their status. Optional: page (1-based page number), limit (rows per page — mapped to the API's per_page; upstream clamps values below 1 or above 100 to 20). Pagination is SERVER-side: the response carries data/total/page/per_page/total_pages. Omitted = upstream default (page 1, 20 rows). expand=true lifts the result cap.")
+async def npg_get_geoip_history(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
         params = _list_params_per_page(limit=limit, page=page)
@@ -6181,6 +6191,13 @@ def main() -> None:
     # Runs before the tier filter below so every tool is annotated regardless
     # of which subset NPG_TOOL_LEVEL exposes.
     toolsets.annotate_tools(mcp)
+    # Cap the serialized size of every read-only tool result (NPG_MAX_RESULT_CHARS,
+    # default 64 KB) so one oversized list/get cannot flood an agent's context.
+    # Applies to every tool that declares `expand: bool = False` (the per-call
+    # escape hatch); results at or under the cap are returned untouched. Runs
+    # before the tier filter below so every capped tool keeps its wrapper
+    # regardless of which subset NPG_TOOL_LEVEL exposes.
+    resultcap.instrument_tools(mcp)
     # Apply the layered toolset filter (NPG_TOOL_LEVEL) before the server
     # starts. Hidden tools are removed from the FastMCP tool manager, so they
     # are neither listed in tools/list nor callable via tools/call. Unknown

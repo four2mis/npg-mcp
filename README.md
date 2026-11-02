@@ -263,6 +263,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (137 read-only tools), `standard` (262 tools, no destructive ops), `full` (all 309 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`, except three probes that write or POST (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`), which stay at `standard`/`full` only. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 | `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
+| `NPG_MAX_RESULT_CHARS` | `65536` | Ceiling on the serialized size (compact JSON characters) of any read/list/get tool result. Over-budget payloads are truncated at data boundaries only and carry a `truncated` metadata object; `expand=true` on the call lifts the cap. Clamped to `[1024, 8000000]`; invalid values fall back to `65536` with a warning. See Result Envelope & Truncation below. |
 
 ### Container Logs
 
@@ -300,6 +301,24 @@ Every tool is served with standard MCP `ToolAnnotations` — `readOnlyHint`, `de
 | `idempotentHint` | GET-only tools and idempotent `PUT` updates — repeating the call reaches the same end state. Creates, tests, and deletes are `false`. |
 | `openWorldHint` | `false` only for closed-catalog reads (countries, presets, permission areas, known bots, WAF test patterns, log sources/levels, audit-log actions); `true` everywhere else, since the API reaches upstreams, ACME, DNS providers, and Telegram. |
 
+### Result Envelope & Truncation
+
+Every tool answers with the same envelope: `{"success": true, "data": <payload>}` (plus the tool's own extras such as `message`, `encoding` or paging keys). Failures return `{"success": false, "error": "...", "hint": "..."}` — always check the nested `success` field, not just the JSON-RPC `isError` flag.
+
+**Result cap.** No single read/list/get result may exceed `NPG_MAX_RESULT_CHARS` (default `65536`) characters of compact JSON. A larger payload is truncated **at data boundaries only** — trailing array items are dropped and oversized string values are clamped with an `... [clamped N chars]` marker — and a `truncated` object is added next to `data`:
+
+| Field | Meaning |
+|-------|---------|
+| `total_chars` | size of the untruncated result (compact JSON characters) |
+| `returned_chars` | size of what was actually returned, `truncated` object included |
+| `omitted_items` | trailing array items dropped from the payload |
+| `clamped_strings` | number of string values shortened by the clamp marker |
+| `hint` | how to get the rest — names the exact narrower parameters this tool really has (`limit`/`offset`/`sections`/`lines`), or points at `expand=true` when it has none |
+
+Truncation never cuts mid-structure or mid-string: the envelope is rebuilt from a reduced object, so what a client receives is always complete, parseable JSON. Results at or under the cap are returned byte-for-byte unchanged and carry no `truncated` key.
+
+**Escape hatch.** Every capped tool accepts `expand: bool = False`. Passing `expand=true` lifts the cap for that one call and returns the complete payload — use it for one-off downloads (`npg_download_backup`, `npg_get_certificate_download`), where a shortened base64 payload cannot be decoded. `npg_download_log_file` keeps its own 256 KB cap (`truncated: true`, `total_bytes`, `returned_bytes`, `hint` → `npg_view_log_file`) instead of the generic one.
+
 ## Project Structure
 
 ```
@@ -307,6 +326,7 @@ npg_mcp/
   main.py       # All 309 MCP tools
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Toolset levels (NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
+  resultcap.py  # Shared result cap (NPG_MAX_RESULT_CHARS) + `expand` escape hatch
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml

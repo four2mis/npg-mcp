@@ -147,8 +147,10 @@ class TestServerInfo:
     def test_no_required_params(self):
         import inspect
         sig = inspect.signature(main_mod.npg_get_server_info)
+        # Every parameter is optional: None-defaulted query params plus the
+        # result-cap escape hatch (`expand: bool = False`).
         assert all(
-            p.default is inspect.Parameter.empty is False or p.default is None
+            p.default is not inspect.Parameter.empty
             or p.kind == inspect.Parameter.VAR_KEYWORD
             for p in sig.parameters.values()
         )
