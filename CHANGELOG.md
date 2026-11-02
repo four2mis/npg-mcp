@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.5] - 2026-11-02
+
+### What changed
+- `NPG_TOOL_LEVEL=read` selected tools by name prefix alone (`^npg_(get|list|view|download|check|detect)`), and that prefix is a naming convention rather than proof of behaviour. Three probing tools matched it while issuing a POST or writing to the instance, so an agent deployed with the "must not mutate NPG state" tier could still mutate state (or ship a credential to a third party). `npg_mcp/toolsets.py` now carries a documented `_READ_TIER_DENYLIST` that `tier_allowed()` consults, so the read tier exposes 136 tools instead of 139.
+- `npg_check_log_archive` is now excluded from the read tier: its body is `POST /system-settings/log-files/archive/check`, which runs a write test (mount type, size, marker, probe) against the archive directory.
+- `npg_detect_telegram_chats` is now excluded from the read tier: its body is `POST /notification-channels/detect-telegram-chats`, an outbound call to the Telegram Bot API carrying the caller's bot token.
+- `npg_check_backup_restore` is now excluded from the read tier: it is GET-routed but creates a throwaway backup row, lists it, then deletes it — a transient DB write the verb check cannot see. This closes the gap where `_READONLY_DENYLIST` covered the annotation but `tier_allowed()` never consulted it.
+- Excluding was chosen over renaming: a rename is a breaking change for every MCP client and for the hundreds of tool descriptions that cross-reference tool names by exact string.
+- The two denylists are now explicitly distinct and documented as such — `_READ_TIER_DENYLIST` governs tier exposure, `_READONLY_DENYLIST` governs the `readOnlyHint` annotation.
+- Tier counts propagated in the same commit: `.env.example`'s `NPG_TOOL_LEVEL` comment block and the env-var row plus Toolset Levels table in both `README.md` and `README.ko.md` now read 136 (was 139); `standard` (261) and `full` (308) are unchanged.
+- 4 new regression tests in `tests/test_toolsets.py`: every denylist entry must match the read-name regex and exist in `main.py`, each entry must be absent at `read` but present at `standard`/`full`, and `test_read_tier_has_no_mutating_verbs` now fails any future `check_*`/`detect_*` tool whose body issues a mutating verb — the class of bug this release fixes cannot silently return.
+- Verified on the isolated test stack against a HEAD-pinned local image (`local/npg-mcp:e2f7ff8e@sha256:96d5f316…`, container `main.py`/`toolsets.py` sha256 identical to the checkout), not the stale published image, using fresh `verify-*` fixtures: `read` = 136 with all three tools absent from `tools/list` and answering `Unknown tool` on call, `standard` = 261 and `full` = 308 with all three present and callable (archive check `status=ready`, backup-restore `status=passed`, telegram detect → structured upstream 400), `readOnlyHint=false` for all three, and 5 unrelated read tools unaffected. Edge cases covered: upper-cased and invalid `NPG_TOOL_LEVEL` fall back to 136/308 as documented.
+- Release gates on the release commit: 308 tools with 0 duplicates, `ruff check .` clean, `mypy npg_mcp/` clean, `pytest` 508 passed, docs `--check` exit 0 (460-char description cap, longest `npg_bulk_import_proxy_hosts` at 460), tier counts match `tier_allowed()` (read=136 / standard=261 / full=308).
+
+### What's new
+- The `read` toolset tier now actually honours its documented contract: it contains no tool that writes to NPG or performs an outbound credentialed call, and a regression test enforces that for any `check_*`/`detect_*` tool added in future.
+- `_READ_TIER_DENYLIST` is a new, self-documenting extension point in `npg_mcp/toolsets.py` — each entry carries the reason it is excluded, so the next `check_*`/`detect_*` probe with a mutating body only needs one documented line.
+- No new tools: the surface stays at 308 tools with the same names.
+
+### Breaking changes
+- At `NPG_TOOL_LEVEL=read`, three tools are no longer exposed or callable: `npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`. Read-only deployments that relied on them must raise `NPG_TOOL_LEVEL` to `standard` or `full`. Nothing else changes — no tool or parameter was renamed or removed, no default, auth or config requirement changed, and `standard` (261) and `full` (308) are unchanged.
+
 ## [1.4.4] - 2026-11-01
 
 ### What changed
