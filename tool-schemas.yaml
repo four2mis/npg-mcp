@@ -3675,6 +3675,10 @@ npg_get_server_info:
   description: "GET server self-info: the bridged NPG version, API base URL, MCP tool count, dry-run flag, and NPG reachability. Call FIRST when behavior looks version-dependent (e.g. a field fixed in a newer NPG release) or when diagnosing errors — error 'hint' fields point here. Read-only; never mutates anything."
   parameters: []
 
+npg_get_stack_features:
+  description: "REPORT-ONLY probe of the optional NPG feature families the deployed stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, never a call error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail."
+  parameters: []
+
 npg_system_self_check:
   description: "RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'."
   parameters: []

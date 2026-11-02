@@ -145,8 +145,9 @@ class TestHealthIsNotAnMCPTool:
         # 312 → 308: the 4 deprecated alias tools (npg_sync_nginx,
         # npg_reload_nginx, npg_test_nginx, npg_enable_waf_rule_by_host)
         # were removed; canonical replacements cover the same routes.
+        # 308 → 309: npg_get_stack_features (report-only stack probe) added.
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 308
+        assert len(names) == 309
 
 
 class TestAccessLogRequestId:

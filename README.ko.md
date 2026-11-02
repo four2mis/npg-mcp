@@ -207,7 +207,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **308개의 MCP 도구**를 28개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **309개의 MCP 도구**를 28개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
 | 카테고리 | 도구 |
 |----------|-------|
@@ -235,7 +235,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | **Fail2ban 및 챌린지(Fail2ban & Challenge)** | 3개 |
 | **차단 IP 및 봇(Banned IPs & Bots)** | 7개 |
 | **역할(Roles)** | 4개 |
-| **시스템(System)** | 17개 |
+| **시스템(System)** | 18개 |
 | **SSL / Nginx** | 2개 |
 | **시스템 및 상태(System & Health)** | 1개 |
 | **Docker** | 1개 |
@@ -260,7 +260,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `MCP_REBINDING_PROTECTION` | `true` | DNS 리바인딩 보호 활성화(프록시가 깨지는 경우에만 비활성화) |
 | `MCP_TRANSPORT` | `stdio` | 전송 모드: 직접 파이프는 `stdio` (직접 실행 기본값), 네트워크 배포는 `http`. Docker 이미지는 `ENV`로 `http`를 설정합니다. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
-| `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 136개), `standard`(파괴적 작업 제외 261개), `full`(전체 308개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
+| `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 137개), `standard`(파괴적 작업 제외 262개), `full`(전체 309개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
 | `NPG_DRY_RUN` | `0` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 | `NPG_HTTP_TIMEOUT` | `30` | 발신 NPG API 요청 타임아웃(초). 대용량 액세스 로그 다운로드, 백업 내보내기/복원, 인증서 업로드, 전체 프록시 호스트 동기화 등 오래 걸리는 엔드포인트에서 `ReadTimeout` 실패를 피하려면 값을 높이세요. `[1, 600]` 범위로 제한되며, 잘못된 값은 경고와 함께 `30`으로 대체됩니다. |
 
@@ -283,11 +283,11 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 | 수준 | 도구 수 | 범위 |
 |-------|-------|-------|
-| `read` | 136 | 읽기 전용 도구만 (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`) — 단, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되며 `standard`/`full`에만 남습니다. NPG 상태를 변경하지 않는 모니터링 에이전트에 적합합니다. |
-| `standard` | 261 | 파괴적 작업(모든 삭제/제거, IP 차단, 백업 복원/업로드, 비밀번호/역할/이메일 변경, 토큰 폐기, 정리, 초기화, 세션 종료, 로그 회전)을 제외한 모든 도구. 일상적인 관리 작업에 적합합니다. |
-| `full` | 308 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
+| `read` | 137 | 읽기 전용 도구만 (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`) — 단, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되며 `standard`/`full`에만 남습니다. NPG 상태를 변경하지 않는 모니터링 에이전트에 적합합니다. |
+| `standard` | 262 | 파괴적 작업(모든 삭제/제거, IP 차단, 백업 복원/업로드, 비밀번호/역할/이메일 변경, 토큰 폐기, 정리, 초기화, 세션 종료, 로그 회전)을 제외한 모든 도구. 일상적인 관리 작업에 적합합니다. |
+| `full` | 309 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
 
-그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 308개 도구 참조를 문서화합니다.
+그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 309개 도구 참조를 문서화합니다.
 
 ### 도구 애노테이션(Tool Annotations)
 
@@ -304,14 +304,14 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 ```
 npg_mcp/
-  main.py       # 308개의 모든 MCP 도구
+  main.py       # 309개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   toolsets.py   # 도구 수준(NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml
 pyproject.toml  # 의존성: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
-tool-schemas.yaml  # 308개 도구의 전체 입력 매개변수 스키마
+tool-schemas.yaml  # 309개 도구의 전체 입력 매개변수 스키마
 ```
 
 ## 개발 및 테스트

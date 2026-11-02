@@ -5764,6 +5764,129 @@ async def npg_get_server_info() -> dict:
         },
     }
 
+@mcp.tool(name="npg_get_stack_features", description="REPORT-ONLY probe of the optional NPG feature families the deployed stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, never a call error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail.")
+async def npg_get_stack_features() -> dict:
+    """Probe ten optional feature families with one GET each — never raises.
+
+    REPORT-ONLY: this tool exists to tell an agent what the deployed NPG
+    release actually serves before it plans a workflow. It never mutates NPG
+    state and it deliberately does NOT hide, filter, or gate any other tool —
+    the tool surface is identical whether or not the probed families are
+    configured.
+
+    Per-family isolation is the core contract: every probe runs in its own
+    try/except, so a permission-scoped API token (HTTP 403), a family absent
+    from the bridged release (HTTP 404), or a transport failure is returned as
+    ``readable: false`` report data with the sanitized ``error`` — it must
+    never surface as a failed tool call, because one unreadable family says
+    nothing about the others.
+
+    Returns ``{"success": True, "data": {"features": {...}, "counts": {...},
+    "families_probed", "families_readable", "unreadable_families",
+    "report_only": True}}``. ``features`` entries carry the upstream flags
+    (``enabled``/``state``/``mode``/…) and ``counts`` entries carry ``count``;
+    both carry ``readable``.
+    """
+    c = _get_client()
+
+    async def probe(path: str) -> dict:
+        """GET one family endpoint; any failure becomes reportable data."""
+        try:
+            return {"readable": True, "data": await _api(c.get, path)}
+        except Exception as e:
+            # 403 permission scope / 404 absent endpoint / transport — all are
+            # DATA for the report, never call errors.
+            m = re.search(r"NPG API returned HTTP (\d{3})", str(e))
+            return {
+                "readable": False,
+                "http_status": int(m.group(1)) if m else None,
+                "error": str(e),
+            }
+
+    def flags(result: dict, fields: tuple[str, ...]) -> dict:
+        """Flatten the requested flags out of one probe result."""
+        entry = {"readable": result["readable"]}
+        if not result["readable"]:
+            entry["http_status"] = result["http_status"]
+            entry["error"] = result["error"]
+            return entry
+        payload = result["data"] if isinstance(result["data"], dict) else {}
+        for field in fields:
+            entry[field] = payload.get(field)
+        return entry
+
+    def counted(result: dict) -> dict:
+        """Count entries in one probe result, tolerating every list shape."""
+        entry = {"readable": result["readable"]}
+        if not result["readable"]:
+            entry["http_status"] = result["http_status"]
+            entry["error"] = result["error"]
+            return entry
+        payload = result["data"]
+        count = None
+        if payload is None:
+            # 204 / empty body — the API answered with no rows to enumerate.
+            count = 0
+        elif isinstance(payload, list):
+            count = len(payload)
+        elif isinstance(payload, dict):
+            for key in ("data", "providers", "records", "channels", "items"):
+                if isinstance(payload.get(key), list):
+                    count = len(payload[key])
+                    break
+            else:
+                if isinstance(payload.get("total"), int):
+                    count = payload["total"]
+        entry["count"] = count
+        return entry
+
+    features = {
+        "cloudflare_tunnel": flags(
+            await probe("/api/v1/settings/cloudflare-tunnel/status"),
+            ("state", "connections"),
+        ),
+        "global_fail2ban": flags(
+            await probe("/api/v1/settings/global-fail2ban"),
+            ("enabled", "action", "max_retries", "find_time", "ban_time"),
+        ),
+        "global_waf": flags(
+            await probe("/api/v1/settings/global-waf"),
+            ("enabled", "mode", "paranoia_level", "anomaly_threshold"),
+        ),
+        "challenge": flags(
+            await probe("/api/v1/challenge-config"),
+            ("enabled", "challenge_type", "apply_to", "has_secret_key"),
+        ),
+        "geoip": flags(
+            await probe("/api/v1/system-settings/geoip/status"),
+            ("enabled", "status", "country_db", "asn_db", "database_version"),
+        ),
+    }
+    counts = {
+        "sso_providers": counted(await probe("/api/v1/sso-providers")),
+        "dns_providers": counted(await probe("/api/v1/dns-providers")),
+        "cloud_providers": counted(await probe("/api/v1/cloud-providers")),
+        "ddns_records": counted(await probe("/api/v1/ddns-records")),
+        "notification_channels": counted(
+            await probe("/api/v1/notification-channels")
+        ),
+    }
+    entries = {**features, **counts}
+    unreadable = sorted(
+        name for name, entry in entries.items() if not entry["readable"]
+    )
+    return {
+        "success": True,
+        "data": {
+            "features": features,
+            "counts": counts,
+            "families_probed": len(entries),
+            "families_readable": len(entries) - len(unreadable),
+            "unreadable_families": unreadable,
+            "report_only": True,
+        },
+    }
+
 @mcp.tool(name="npg_system_self_check", description="RUN a one-shot system self-check (GET /test/system/self-check): verifies database, runs `nginx -t` in the proxy container, checks the backup directory. Returns status=healthy or degraded (degraded only when nginx fails) with a per-component map. Best first diagnostic for 'what's wrong with NPG?'.")
 async def npg_system_self_check() -> dict:
     """Run the upstream system self-check (DB + nginx -t + backup dir)."""
