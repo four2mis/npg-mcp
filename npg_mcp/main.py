@@ -729,6 +729,60 @@ def _sliced_result(data, limit: int | None, offset: int | None, unit: str = "ite
     return {"success": True, "data": data}
 
 
+_COMPACT_DESCRIPTION_MAX = 160
+
+# Fields a compact cloud-provider row keeps: identity plus configured state.
+_COMPACT_CLOUD_PROVIDER_FIELDS = ("id", "slug", "name", "region", "enabled")
+
+
+def _compact_cloud_provider(item):
+    """Trim one cloud provider to identity + configured state.
+
+    ``GET /api/v1/cloud-providers`` returns every provider with its complete
+    ``ip_ranges`` list and untruncated ``description``; the built-in catalogue
+    alone makes that roughly 700 KB (~170K token-equivalent) in a single call.
+    Compact mode keeps the fields an agent needs to *choose* a provider (id,
+    slug, name, region), its state (``enabled`` plus the derived
+    ``ip_range_count`` so "configured with ranges" is still visible) and a
+    ``description`` clipped to ``_COMPACT_DESCRIPTION_MAX`` chars — the full
+    text is one ``compact=False`` call away.
+
+    Non-dict entries are passed through untouched: compact mode narrows the
+    payload, it never hides or renames a field the upstream contract changed.
+    """
+    if not isinstance(item, dict):
+        return item
+    out = {key: item[key] for key in _COMPACT_CLOUD_PROVIDER_FIELDS if key in item}
+    ranges = item.get("ip_ranges")
+    if isinstance(ranges, list):
+        out["ip_range_count"] = len(ranges)
+    description = item.get("description")
+    if isinstance(description, str) and description.strip():
+        clipped = description[: _COMPACT_DESCRIPTION_MAX - 1].rstrip()
+        out["description"] = (
+            description if len(description) <= _COMPACT_DESCRIPTION_MAX else clipped + "…"
+        )
+    return out
+
+
+def _compact_cloud_provider_list(data):
+    """Apply ``_compact_cloud_provider`` to a bare list or a list under a key.
+
+    The running API answers with a bare list; the dict branch keeps compact
+    mode safe if a future API revision wraps it (``providers``/``data``).
+    Anything else is returned unchanged.
+    """
+    if isinstance(data, list):
+        return [_compact_cloud_provider(item) for item in data]
+    if isinstance(data, dict):
+        for key in ("providers", "data"):
+            if isinstance(data.get(key), list):
+                out = dict(data)
+                out[key] = [_compact_cloud_provider(item) for item in data[key]]
+                return out
+    return data
+
+
 # ── Proxy Hosts ───────────────────────────────────────────────────────
 
 @mcp.tool(name="npg_list_proxy_hosts", description="LIST proxy hosts. Optional: page, limit (API per_page), search (domain/forward host text), tags (list, AND), domain (parent-domain bucket, not substring), upstream (exact forward_host), enabled, sort_by (name|created|updated; unknown ignored, default created_at desc), sort_order (asc|desc, applied only when sort_by is accepted). Paginated responses include metadata (total, page, per_page, total_pages). Zero-arg = full unpaginated list.")
@@ -2600,12 +2654,14 @@ async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict
 
 # ── Cloud Providers ───────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_cloud_providers", description="LIST cloud providers (IP-range DB entries for certificate DNS challenges). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get one by slug with npg_get_cloud_provider; region view with npg_list_cloud_providers_by_region.")
-async def npg_list_cloud_providers(limit: int | None = None, offset: int | None = None) -> dict:
+@mcp.tool(name="npg_list_cloud_providers", description="LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the full catalogue is ~700 KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region.")
+async def npg_list_cloud_providers(limit: int | None = None, offset: int | None = None, compact: bool = True) -> dict:
     c = _get_client()
     try:
         _validate_paging_args(limit, offset)
         data = await _api(c.get, "/api/v1/cloud-providers")
+        if compact:
+            data = _compact_cloud_provider_list(data)
         return _sliced_result(data, limit, offset, unit="providers")
     except Exception as e:
         return _error_result(e)

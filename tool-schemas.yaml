@@ -1142,7 +1142,7 @@ npg_test_dns_provider:
       required: false
 
 npg_list_cloud_providers:
-  description: "LIST cloud providers (IP-range DB entries for certificate DNS challenges). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Get one by slug with npg_get_cloud_provider; region view with npg_list_cloud_providers_by_region."
+  description: "LIST cloud providers (IP-range DB entries). Default compact=true returns id/slug/name/region/enabled/ip_range_count plus description clipped to 160 chars — the full catalogue is ~700 KB. compact=false returns complete objects (full ip_ranges, untruncated description) byte-for-byte as before. Optional limit/offset = MCP-side slice. One provider in full: npg_get_cloud_provider; region view: npg_list_cloud_providers_by_region."
   parameters:
     - name: limit
       type: integer
@@ -1150,6 +1150,10 @@ npg_list_cloud_providers:
     - name: offset
       type: integer
       required: false
+    - name: compact
+      type: boolean
+      required: false
+      default: true
 
 npg_get_cloud_provider:
   description: "GET one cloud provider (IP-range DB entry) by its slug. List slugs with npg_list_cloud_providers; region view with npg_list_cloud_providers_by_region."
