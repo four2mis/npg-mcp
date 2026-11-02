@@ -1333,7 +1333,7 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_delete_proxy_hosts", description="DESTRUCTIVE: DELETE multiple proxy hosts in one call. REQUIRED: host_ids (UUID list, max 50). Per-host result: deleted or success:false/error; one failure doesn't abort. Sub-configs (WAF, geo, fail2ban) cascade-delete. Over the 50-host cap raises ValueError; empty rejected.")
+@mcp.tool(name="npg_bulk_delete_proxy_hosts", description="DESTRUCTIVE: DELETE multiple proxy hosts in one call; sub-configs (WAF, geo, fail2ban) cascade-delete. REQUIRED: host_ids (UUID list, max 50). Per-host deleted/error results, 50-host cap (ValueError) and empty rejection: same bulk semantics as npg_bulk_apply_certificate.")
 async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
     try:
         _validate_required("host_ids", host_ids)
@@ -1970,7 +1970,7 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
 
 # ── Certificates ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_certificates", description="LIST SSL/TLS certificates. Optional: page, limit (per_page, API clamps to 1-100, default 20), search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_certificates", description="LIST SSL/TLS certificates. Optional filters: search (domain substring), status (pending/issued/expired/error/renewing), provider (letsencrypt/selfsigned/custom), sort_by (domain/expires/created), sort_order (asc/desc). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_certificates(
     page: int | None = None,
     limit: int | None = None,
@@ -2048,7 +2048,7 @@ async def npg_renew_certificate(cert_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_renew_certificates", description="RENEW multiple certificates in one call. REQUIRED: cert_ids (UUID list, max 20). Per-cert results: success:true or success:false/error - one failure does not abort the batch. Over the 20-cert cap raises ValueError before any renewal; empty rejected. Watch ACME/Let's Encrypt rate limits.")
+@mcp.tool(name="npg_bulk_renew_certificates", description="RENEW multiple certificates in one call. REQUIRED: cert_ids (UUID list, max 20). Per-cert success:true/error results, one-failure isolation and empty rejection: same as npg_bulk_apply_certificate; the 20-cert cap raises ValueError before any renewal. Watch ACME/Let's Encrypt rate limits.")
 async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
     try:
         _validate_required("cert_ids", cert_ids)
@@ -2375,7 +2375,7 @@ async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | No
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_confirm_proxy_host_dns", description="Re-allow a needs_review domain in a proxy host's exception lists (URI block, priority allow, rate-limit exceptions). REQUIRED: host_id, hostname, expected_addresses (observed IPs), expected_canonical_name (observed CNAME target; no CNAME = own target). Re-looks up (<=3s), publishes only if still matching. 400 not_in_list/not_in_review; 403 no write perm on another list using the domain; 409 lookup_unavailable/observation_changed/nginx_reload_rejected.")
+@mcp.tool(name="npg_confirm_proxy_host_dns", description="Re-allow a needs_review domain in a proxy host's exception lists (URI block, priority allow, rate-limit exceptions). REQUIRED: host_id, hostname, expected_addresses, expected_canonical_name — same shapes, re-lookup (<=3s) and 400/403/409 semantics as npg_confirm_trusted_dns.")
 async def npg_confirm_proxy_host_dns(host_id: str | int, hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2479,7 +2479,7 @@ async def npg_get_dashboard_geoip_stats(hours: int | None = None, expand: bool =
 
 # ── Access Lists ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_access_lists(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -2545,7 +2545,7 @@ async def npg_delete_access_list(list_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_confirm_access_list_dns", description="Re-allow a domain entry that waits for review (needs_review) in an access list. REQUIRED: list_id, hostname, expected_addresses (list of IPs the client observed), expected_canonical_name (the observed CNAME target; a name without a CNAME is its own target). 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
+@mcp.tool(name="npg_confirm_access_list_dns", description="Re-allow a domain entry that waits for review (needs_review) in an access list. REQUIRED: list_id, hostname, expected_addresses, expected_canonical_name — same shapes as npg_confirm_trusted_dns. 200 returns DNSEntryStatus; 400 not_in_list/not_in_review; 409 lookup_unavailable/observation_changed (with observed)/nginx_reload_rejected.")
 async def npg_confirm_access_list_dns(list_id: str | int, hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
     try:
         _validate_id("list_id", list_id)
@@ -2621,7 +2621,7 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. Unknown fields rejected unless strict=false. REQUIRED: provider_id.")
+@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. strict kwargs validation: see npg_update_settings. REQUIRED: provider_id.")
 async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("provider_id", provider_id)
@@ -2701,7 +2701,7 @@ async def npg_create_cloud_provider(name: str, slug: str, ip_ranges: list[str], 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_cloud_provider", description="UPDATE a cloud provider (partial: only the kwargs keys you pass are sent) by slug. REQUIRED: slug. kwargs fields: name, description, ip_ranges, ip_ranges_url, enabled. region and slug are create-only and cannot be changed. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_cloud_provider", description="UPDATE a cloud provider (partial: only the kwargs keys you pass are sent) by slug. REQUIRED: slug. kwargs fields: name, description, ip_ranges, ip_ranges_url, enabled. region and slug are create-only and cannot be changed. strict kwargs validation: see npg_update_settings.")
 async def npg_update_cloud_provider(slug: str, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("slug", slug)
@@ -2970,7 +2970,7 @@ async def npg_verify_challenge(
 
 # ── Security (banned IPs, etc.) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans), page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_banned_ips(
     filter: Literal["global", "host"] | None = None,
     proxy_host_id: str | None = None,
@@ -3094,7 +3094,7 @@ async def npg_create_exploit_rule(category: str, name: str, pattern: str, patter
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change in kwargs: name (max 100 chars), pattern (validated), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced), description, severity (info|warning|critical — legacy low/medium/high now return HTTP 400, upstream v2.51.0), enabled. Unknown fields rejected unless strict=false. REQUIRED: rule_id.")
+@mcp.tool(name="npg_update_exploit_rule", description="Update an exploit rule. Pass only fields to change in kwargs: name (max 100 chars), pattern (validated), pattern_type (query_string/request_uri/user_agent/request_method — strictly enforced), description, severity (info|warning|critical — legacy low/medium/high now return HTTP 400, upstream v2.51.0), enabled. strict kwargs validation: see npg_update_settings. REQUIRED: rule_id.")
 async def npg_update_exploit_rule(rule_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("rule_id", rule_id)
@@ -3327,7 +3327,7 @@ async def npg_get_log_settings(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change in kwargs: retention_days, max_logs_per_type, auto_cleanup_enabled. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_log_settings", description="Update log settings. Pass only fields to change in kwargs: retention_days, max_logs_per_type, auto_cleanup_enabled. strict kwargs validation: see npg_update_settings.")
 async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_log_settings", kwargs, strict)
     c = _get_client()
@@ -3444,7 +3444,7 @@ async def npg_list_system_logs(
 
 # ── Backups ───────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_backups", description="LIST backups. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_backups", description="LIST backups. Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_backups(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -3496,7 +3496,7 @@ async def npg_restore_backup(backup_id: str | int) -> dict:
 
 # ── API Tokens ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_api_tokens", description="LIST API tokens scoped to the caller's account (name + prefix only — secrets are never returned). Slicing (MCP-side limit/offset; upstream ignores paging) and zero-arg: same as npg_list_users. Create with npg_create_api_token, inspect usage with npg_get_audit_log_api_tokens. expand=true lifts the result cap.")
 async def npg_list_api_tokens(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -3530,7 +3530,7 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_in: st
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change in kwargs: name, permissions, allowed_ips, rate_limit, is_active. Unknown fields rejected unless strict=false. REQUIRED: token_id.")
+@mcp.tool(name="npg_update_api_token", description="Update an API token. Pass only fields to change in kwargs: name, permissions, allowed_ips, rate_limit, is_active. strict kwargs validation: see npg_update_settings. REQUIRED: token_id.")
 async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("token_id", token_id)
@@ -3563,7 +3563,7 @@ async def npg_delete_api_token(token_id: str | int) -> dict:
 
 # ── Notification Channels ──────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (paging applied MCP-side — upstream ignores paging query params; events/timezone are always complete). Zero-arg returns everything. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_notification_channels", description="LIST notification channels plus the server's event catalogue (valid `events` values) and digest clock — read the events list here before npg_create_notification_channel. Optional: limit/offset — MCP-side slice of the channels list only (same slicing as npg_list_users; events/timezone always complete). Zero-arg returns everything. expand=true lifts the result cap.")
 async def npg_list_notification_channels(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -3750,7 +3750,7 @@ async def npg_delete_user(user_id: str | int) -> dict:
 
 # ── Roles ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_roles", description="LIST roles for RBAC (built-ins first, then by name). Slicing (MCP-side limit/offset; upstream ignores paging) and zero-arg: same as npg_list_users. Use a role's id as role_id in npg_create_user / npg_set_user_role; view its permission strings with npg_get_user. expand=true lifts the result cap.")
 async def npg_list_roles(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -3798,7 +3798,7 @@ async def npg_delete_role(role_id: str | int) -> dict:
 
 # ── SSO Providers ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. Optional: limit/offset — MCP-side slice of the full list (upstream ignores paging query params). Zero-arg returns the full list. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_sso_providers", description="LIST configured SSO (OIDC) providers. Slicing (MCP-side limit/offset; upstream ignores paging) and zero-arg: same as npg_list_users. client_secret always reads back as ********; use the derived callback_url shown here when registering the provider at your IdP. Test an issuer without saving via npg_test_sso_provider. expand=true lifts the result cap.")
 async def npg_list_sso_providers(limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -4107,7 +4107,7 @@ async def npg_get_global_uri_block(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_uri_block", description="UPDATE global URI block configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. Re-allow a needs_review domain with npg_confirm_global_uri_block_dns.")
+@mcp.tool(name="npg_update_global_uri_block", description="UPDATE global URI block configuration (partial update — same omitted-field semantics as npg_update_global_bot_filter). Body: enabled, rules (list of {pattern, is_regex, action}), exception_ips, exception_hostnames (domain/DDNS names whose addresses count as exception_ips; omit=keep, []=clear — a domain name sent in exception_ips now 400s hostname_in_ip_field), allow_private_ips. Re-allow a needs_review domain with npg_confirm_global_uri_block_dns.")
 async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, exception_hostnames: list[str] | None = None) -> dict:
     c = _get_client()
     try:
@@ -4126,7 +4126,7 @@ async def npg_update_global_uri_block(enabled: bool | None = None, rules: list[d
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_confirm_global_uri_block_dns", description="Re-allow a needs_review domain entry in the global URI block exceptions. REQUIRED: hostname, expected_addresses (observed IPs), expected_canonical_name (observed CNAME target; no CNAME = own target). Re-looks up (<=3s), publishes only if still matching. 400 not_in_list/not_in_review; 403 lacks write permission on another list using the domain; 409 lookup_unavailable/observation_changed/nginx_reload_rejected.")
+@mcp.tool(name="npg_confirm_global_uri_block_dns", description="Re-allow a needs_review domain entry in the global URI block exceptions. REQUIRED: hostname, expected_addresses, expected_canonical_name — same shapes, re-lookup (<=3s) and 400/403/409 semantics as npg_confirm_trusted_dns.")
 async def npg_confirm_global_uri_block_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
     try:
         _validate_required("hostname", hostname)
@@ -4312,7 +4312,7 @@ async def npg_get_cloudflare_tunnel(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_cloudflare_tunnel", description="Update Cloudflare Tunnel configuration. Pass only fields to change in kwargs: enabled, token, mode (token/managed), api_token, catchall_enabled. Unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_update_cloudflare_tunnel", description="Update Cloudflare Tunnel configuration. Pass only fields to change in kwargs: enabled, token, mode (token/managed), api_token, catchall_enabled. strict kwargs validation: see npg_update_settings.")
 async def npg_update_cloudflare_tunnel(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_cloudflare_tunnel", kwargs, strict)
     c = _get_client()
@@ -4413,7 +4413,7 @@ async def npg_get_global_cloud_providers(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_cloud_providers", description="UPDATE global cloud providers configuration (partial update — only provided fields are changed; omitted fields are left as-is). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool).")
+@mcp.tool(name="npg_update_global_cloud_providers", description="UPDATE global cloud providers configuration (partial update — same omitted-field semantics as npg_update_global_bot_filter). Body: blocked_providers (list of slugs), challenge_mode (bool), allow_search_bots (bool).")
 async def npg_update_global_cloud_providers(blocked_providers: list[str] | None = None, challenge_mode: bool | None = None, allow_search_bots: bool | None = None) -> dict:
     c = _get_client()
     try:
@@ -4464,7 +4464,7 @@ async def npg_update_global_geo(enabled: bool | None = None, mode: Literal["whit
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_confirm_global_geo_dns", description="Re-allow a needs_review domain entry in the global priority allow list (global GeoIP allowed_hostnames). REQUIRED: hostname, expected_addresses (observed IPs), expected_canonical_name (observed CNAME target; no CNAME = own target). Re-looks up (<=3s), publishes only if still matching. 400 not_in_list/not_in_review; 403 lacks write permission on another list using the domain; 409 lookup_unavailable/observation_changed/nginx_reload_rejected.")
+@mcp.tool(name="npg_confirm_global_geo_dns", description="Re-allow a needs_review domain entry in the global priority allow list (global GeoIP allowed_hostnames). REQUIRED: hostname, expected_addresses, expected_canonical_name — same shapes, re-lookup (<=3s) and 400/403/409 semantics as npg_confirm_trusted_dns.")
 async def npg_confirm_global_geo_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
     try:
         _validate_required("hostname", hostname)
@@ -4512,7 +4512,7 @@ async def npg_update_global_rate_limit(enabled: bool | None = None, requests_per
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_confirm_global_rate_limit_dns", description="Re-allow a needs_review domain entry in the global rate limit exceptions. REQUIRED: hostname, expected_addresses (observed IPs), expected_canonical_name (observed CNAME target; no CNAME = own target). Re-looks up (<=3s), publishes only if still matching. 400 not_in_list/not_in_review; 403 lacks write permission on another list using the domain; 409 lookup_unavailable/observation_changed/nginx_reload_rejected.")
+@mcp.tool(name="npg_confirm_global_rate_limit_dns", description="Re-allow a needs_review domain entry in the global rate limit exceptions. REQUIRED: hostname, expected_addresses, expected_canonical_name — same shapes, re-lookup (<=3s) and 400/403/409 semantics as npg_confirm_trusted_dns.")
 async def npg_confirm_global_rate_limit_dns(hostname: str, expected_addresses: list[str], expected_canonical_name: str) -> dict:
     try:
         _validate_required("hostname", hostname)
@@ -4535,7 +4535,7 @@ async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify. Unknown fields rejected unless strict=false. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host.")
+@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify. strict kwargs validation: see npg_update_settings. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host.")
 async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_kwargs("npg_update_global_fail2ban", kwargs, strict)
@@ -4781,7 +4781,7 @@ async def npg_delete_auth_provider(provider_id: str | int) -> dict:
 
 # ── DDNS Records ───────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_ddns_records", description="LIST DDNS records. Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_ddns_records", description="LIST DDNS records. Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_ddns_records(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -4879,7 +4879,7 @@ async def npg_import_ddns_from_hosts(proxy_host_ids: list[str], dns_provider_id:
 
 # ── Filter Subscriptions ───────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_filter_subscriptions", description="LIST filter subscriptions (remote IP/UA blocklists). Optional: page, limit (per_page, API clamps to 1-100, default 20). Paginated responses include metadata. Zero-arg returns the full list. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_filter_subscriptions", description="LIST filter subscriptions (remote IP/UA blocklists). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_filter_subscriptions(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5299,7 +5299,7 @@ async def npg_get_log_autocomplete_hosts(q: str | None = None, limit: int | None
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_autocomplete_ips", description="Get distinct client IPs seen in nginx access logs (for autocomplete). Same q/limit filtering and zero-arg behaviour as npg_get_log_autocomplete_hosts. expand=true lifts the result cap.")
 async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5313,7 +5313,7 @@ async def npg_get_log_autocomplete_ips(q: str | None = None, limit: int | None =
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_autocomplete_user_agents", description="Get distinct User-Agents seen in nginx access logs (for autocomplete). Same q/limit filtering and zero-arg behaviour as npg_get_log_autocomplete_hosts. expand=true lifts the result cap.")
 async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5327,7 +5327,7 @@ async def npg_get_log_autocomplete_user_agents(q: str | None = None, limit: int 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete). Optional: q (substring filter), limit (max entries, int). Omitted params = unfiltered full list, same as before. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_autocomplete_uris", description="Get distinct request URIs seen in nginx access logs (for autocomplete). Same q/limit filtering and zero-arg behaviour as npg_get_log_autocomplete_hosts. expand=true lifts the result cap.")
 async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5341,7 +5341,7 @@ async def npg_get_log_autocomplete_uris(q: str | None = None, limit: int | None 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) - applied MCP-side as a window because the upstream endpoint accepts NO query params (no q/limit). Omitted = full list, as before; with limit the success/data envelope is unchanged and a paging dict (total/returned/offset/unit) is added so you can see how many values exist beyond the window. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_autocomplete_countries", description="Get distinct countries seen in nginx access logs with per-country hit counts (autocomplete). Optional: limit (max entries) — MCP-side window, same paging dict (total/returned/offset/unit) and unchanged envelope as npg_get_log_autocomplete_methods (that endpoint also accepts NO query params). expand=true lifts the result cap.")
 async def npg_get_log_autocomplete_countries(limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
