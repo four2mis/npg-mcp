@@ -33,6 +33,7 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 import npg_mcp.client as client_mod  # noqa: E402
 import npg_mcp.resultcap as resultcap  # noqa: E402
+import npg_mcp.scopefilter as scopefilter  # noqa: E402
 import npg_mcp.toolsets as toolsets  # noqa: E402
 from npg_mcp.upstream_models import _validate_kwargs  # noqa: E402
 
@@ -5830,7 +5831,7 @@ async def npg_get_server_info(expand: bool = False) -> dict:
         },
     }
 
-@mcp.tool(name="npg_get_stack_features", description="REPORT-ONLY probe of optional NPG feature families the stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, not an error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_stack_features", description="REPORT-ONLY probe of optional NPG feature families: Cloudflare tunnel, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family probes separately — a 403/absent endpoint returns readable=false + http_status as DATA, not an error. hidden_by_scope lists tools NPG_TOOL_SCOPE_FILTER hid at boot (null when off). Use npg_get_*/npg_list_* for detail. expand=true lifts the result cap.")
 async def npg_get_stack_features(expand: bool = False) -> dict:
     """Probe ten optional feature families with one GET each — never raises.
 
@@ -5849,9 +5850,14 @@ async def npg_get_stack_features(expand: bool = False) -> dict:
 
     Returns ``{"success": True, "data": {"features": {...}, "counts": {...},
     "families_probed", "families_readable", "unreadable_families",
-    "report_only": True}}``. ``features`` entries carry the upstream flags
-    (``enabled``/``state``/``mode``/…) and ``counts`` entries carry ``count``;
-    both carry ``readable``.
+    "hidden_by_scope", "report_only": True}}``. ``features`` entries carry the
+    upstream flags (``enabled``/``state``/``mode``/…) and ``counts`` entries
+    carry ``count``; both carry ``readable``. ``hidden_by_scope`` reports the
+    boot snapshot taken by ``NPG_TOOL_SCOPE_FILTER`` (token prefix, granted
+    scopes, the tool names it removed, and why it failed open if it did), or
+    ``None`` when that filter is off. This tool is never itself hidden by the
+    filter: it is the only way a scope-restricted server can report what the
+    filter did.
     """
     c = _get_client()
 
@@ -5949,6 +5955,7 @@ async def npg_get_stack_features(expand: bool = False) -> dict:
             "families_probed": len(entries),
             "families_readable": len(entries) - len(unreadable),
             "unreadable_families": unreadable,
+            "hidden_by_scope": scopefilter.hidden_by_scope(),
             "report_only": True,
         },
     }
@@ -6204,6 +6211,16 @@ def main() -> None:
     # levels and unset env fall back to "full" (all tools). The returned
     # count is what the HTTP /health route reports as the exposed tool count.
     exposed_tools = toolsets.configure_toolset(mcp)
+    # Opt-in scope-aware narrowing (NPG_TOOL_SCOPE_FILTER, default off). Runs
+    # AFTER the tier filter so the result is `tier membership ∩ granted scopes`,
+    # and before the transport starts so a hidden tool is never listed or
+    # callable. Takes a one-off boot snapshot of the configured API token's
+    # permissions (GET /api/v1/api-tokens); a restart is needed to pick up a
+    # scope change. Fails OPEN on every introspection problem — the tier
+    # manifest above stays intact — so a scoped token can never lose tools it
+    # could actually use.
+    if scopefilter.apply(mcp).applied:
+        exposed_tools = len(mcp._tool_manager.list_tools())
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "http":
         transport = "streamable-http"

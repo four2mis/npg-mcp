@@ -261,6 +261,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `MCP_TRANSPORT` | `stdio` | 전송 모드: 직접 파이프는 `stdio` (직접 실행 기본값), 네트워크 배포는 `http`. Docker 이미지는 `ENV`로 `http`를 설정합니다. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
 | `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 137개), `standard`(파괴적 작업 제외 262개), `full`(전체 309개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
+| `NPG_TOOL_SCOPE_FILTER` | `0` | 선택적 범위 인식 도구 필터링. 활성화하면 서버가 설정된 `NPG_API_TOKEN`의 유효 권한을 **부팅 시 한 번** 확인하여(`GET /api/v1/api-tokens`( `apitoken:read` 필요) + prefix 행 매칭, 실패 시 `GET /api/v1/auth/me` 대체) 해당 스코프가 커버하는 도구만 노출합니다: `NPG_TOOL_LEVEL` ∩ 부여된 스코프. 스코프는 정확한 문자열로 매칭하며(`*` 및 `area:*` 와일드카드 허용) 레거시 스코프를 다른 영역으로 확장하지 않습니다. 스코프 변경은 재시작해야 반영됩니다. 항상 **fail-open**: 두 엔드포인트 모두 실패(403/타임아웃), 토큰 prefix 불일치 또는 중복 일치, 토큰 미설정 시 전체 매니페스트를 유지하며, 권한 주석이 없는 도구는 절대 숨기지 않습니다. 기본값은 꺼짐이며 이때 매니페스트와 도구 수는 변경되지 않습니다. 아래 "범위 필터링" 참고. |
 | `NPG_DRY_RUN` | `0` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 | `NPG_HTTP_TIMEOUT` | `30` | 발신 NPG API 요청 타임아웃(초). 대용량 액세스 로그 다운로드, 백업 내보내기/복원, 인증서 업로드, 전체 프록시 호스트 동기화 등 오래 걸리는 엔드포인트에서 `ReadTimeout` 실패를 피하려면 값을 높이세요. `[1, 600]` 범위로 제한되며, 잘못된 값은 경고와 함께 `30`으로 대체됩니다. |
 | `NPG_MAX_RESULT_CHARS` | `65536` | 읽기/목록/조회 도구 결과의 직렬화 크기 상한(압축 JSON 문자 수). 초과한 페이로드는 데이터 경계에서만 잘라내고 `truncated` 메타 객체를 덧붙입니다. 호출 시 `expand=true`를 주면 해당 호출만 상한이 해제됩니다. `[1024, 8000000]` 범위로 제한되며, 잘못된 값은 경고와 함께 `65536`으로 대체됩니다. 아래 "결과 봉투와 잘라내기" 참고. |
@@ -289,6 +290,25 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `full` | 309 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
 
 그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 309개 도구 참조를 문서화합니다.
+
+### 범위 필터링(Scope Filtering)
+
+`NPG_TOOL_SCOPE_FILTER`(기본값 `0`, 꺼짐)는 노출 범위를 한 단계 더 좁힙니다. 활성화하면 서버는 설정된 `NPG_API_TOKEN`이 실제로 호출할 수 있는 도구만 노출합니다. MCP 엔드포인트에 범위가 제한된 토큰을 연결할 때 유용합니다 — `read_only` 스코프를 가진 모니터링 토큰에는 어차피 `403`만 받을 쓰기 도구가 필요하지 않습니다.
+
+권한은 **부팅 시 한 번** 다음 두 엔드포인트를 순서대로 확인합니다.
+
+1. `GET /api/v1/api-tokens` — 각 토큰 행에는 표시용 `token_prefix`(`ng_` + 앞 8자)와 `permissions` 배열(`*` 또는 NPG의 레거시 리소스 스코프 15개)이 있습니다. 설정된 토큰이 `token_prefix`로 시작하는 행을 찾습니다.
+2. 대체 경로 `GET /api/v1/auth/me` — 권한이 필요 없는 self 라우트입니다. 토큰 호출자에게는 소유자 역할 권한과 토큰 자체 스코프의 교집합인 `effective_permissions`를 반환하며, 이는 NPG가 요청마다 실제로 적용하는 집합입니다. (이 대체 경로가 실무에서 필요합니다: UI에서 만든 토큰은 `*` 또는 레거시 스코프만 가질 수 있고 NPG는 토큰 스코프를 정확한 문자열로 비교하므로, 범위가 제한된 토큰은 항상 `/api/v1/api-tokens`에서 `403`을 받습니다.)
+
+권한 매칭은 NPG의 `APIToken.HasPermission`을 그대로 따릅니다. 도구가 호출하는 모든 라우트의 필요 권한이 `*`, 동일한 문자열, 또는 `area:*` 패밀리 와일드카드로 충족될 때만 노출됩니다. 레거시 스코프가 다른 영역으로 **확장되지 않으며** `write`가 `read`를 함의하지도 않습니다 — 그 확장은 *역할*에 적용되는 규칙입니다(NPG 2.65.4에서 검증: `read_only` 토큰은 proxy/certificate/waf/logs/settings/backup 읽기만 통과하고 redirect/access/authprovider/dnsprovider/ddns/audit/dashboard/user/role에서는 `403`). 노출 집합은 `NPG_TOOL_LEVEL` ∩ `{필요한 모든 권한이 부여된 도구}`입니다.
+
+스냅샷은 부팅 시에만 수행되므로 **NPG UI에서 토큰 스코프를 변경해도 MCP를 재시작해야** 노출 범위가 바뀝니다. 부팅 로그에 확인한 내용이 남고, `npg_get_stack_features`가 동일한 정보를 데이터로 반환합니다(`hidden_by_scope`).
+
+`hidden_by_scope`는 필터가 꺼져 있으면 `null`입니다. `npg_get_stack_features` 자체는 이 필터로 숨겨지지 않으므로, 제한된 서버도 무엇을 숨겼는지 항상 보고할 수 있습니다.
+
+**항상 fail-open입니다.** 동작했을 도구를 숨기는 것이 `403`을 반환하는 도구를 노출하는 것보다 훨씬 나쁩니다 — `npg_create_*` 도구를 숨기면 기능을 존재하게 만드는 유일한 경로가 사라집니다. 따라서 모든 불확실성은 전체 티어 매니페스트를 그대로 유지합니다: 두 조회 엔드포인트 모두 실패(`403`/타임아웃/전송 오류), 토큰 prefix와 일치하는 행 없음, 일치 행이 2개 이상(모호성), `NPG_API_TOKEN` 미설정, 권한 배열이 비었거나 해석 불가. 사유는 `WARNING`으로 기록되고 `hidden_by_scope.reason`으로 반환됩니다. 권한 주석이 없는 도구도 절대 숨기지 않으므로, 새로 연결된 업스트림 엔드포인트가 조용히 사라지지 않습니다.
+
+도구 → 권한 매핑은 `npg_mcp/permission_map.py`에 있으며, NPG 자체의 라우트 권한 레지스트리(`api/internal/middleware/permissions.go`)에서 `scripts/derive_tool_permissions.py`로 생성합니다. 등록된 도구가 맵에 없으면 `tests/test_scopefilter.py`가 실패하므로 맵이 도구 목록보다 뒤처질 수 없습니다. 필터가 꺼져 있으면 매니페스트, 도구 수, 위의 티어 수치는 이 기능이 없을 때와 완전히 동일합니다.
 
 ### 도구 애노테이션(Tool Annotations)
 
@@ -327,6 +347,8 @@ npg_mcp/
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   toolsets.py   # 도구 수준(NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   resultcap.py  # 공용 결과 상한(NPG_MAX_RESULT_CHARS) + `expand` 예외 경로
+  scopefilter.py    # 선택적 범위 인식 필터링(NPG_TOOL_SCOPE_FILTER)
+  permission_map.py # 범위 필터용 도구 → NPG 권한 맵(생성 파일)
   __init__.py
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml

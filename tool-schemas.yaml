@@ -4188,7 +4188,7 @@ npg_get_server_info:
       default: false
 
 npg_get_stack_features:
-  description: "REPORT-ONLY probe of optional NPG feature families the stack serves: Cloudflare tunnel state, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family is probed separately — a 403/permission-scope or absent endpoint returns readable=false + http_status as DATA, not an error. Mutates nothing and gates no tools; use npg_get_*/npg_list_* for detail. expand=true lifts the result cap."
+  description: "REPORT-ONLY probe of optional NPG feature families: Cloudflare tunnel, global fail2ban/WAF/challenge/GeoIP flags, counts of SSO/DNS/cloud providers + DDNS records + notification channels. Each family probes separately — a 403/absent endpoint returns readable=false + http_status as DATA, not an error. hidden_by_scope lists tools NPG_TOOL_SCOPE_FILTER hid at boot (null when off). Use npg_get_*/npg_list_* for detail. expand=true lifts the result cap."
   parameters:
     - name: expand
       type: boolean

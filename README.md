@@ -261,6 +261,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` for direct pipes (bare-process default), `http` for network deployment. Docker images set `http` via `ENV`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
 | `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (137 read-only tools), `standard` (262 tools, no destructive ops), `full` (all 309 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`, except three probes that write or POST (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`), which stay at `standard`/`full` only. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_TOOL_SCOPE_FILTER` | `0` | Opt-in scope-aware tool filtering. When enabled, the server discovers the configured `NPG_API_TOKEN`'s effective permissions **once at boot** — `GET /api/v1/api-tokens` (needs `apitoken:read`) with a prefixed-row match, falling back to `GET /api/v1/auth/me` — and exposes only the tools those scopes cover: `NPG_TOOL_LEVEL` ∩ granted scopes. Scopes match by exact string (`*` and `area:*` wildcards allowed), so legacy scopes are not widened. Restart to pick up a scope change. Fails **open**: both endpoints failing (403/timeout), no or ambiguous token-prefix match, or an unset token leaves the full manifest in place, and unannotated tools are never hidden. Off by default — the manifest and tool count are then unchanged. See Scope Filtering below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 | `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
 | `NPG_MAX_RESULT_CHARS` | `65536` | Ceiling on the serialized size (compact JSON characters) of any read/list/get tool result. Over-budget payloads are truncated at data boundaries only and carry a `truncated` metadata object; `expand=true` on the call lifts the cap. Clamped to `[1024, 8000000]`; invalid values fall back to `65536` with a warning. See Result Envelope & Truncation below. |
@@ -289,6 +290,38 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 | `full` | 309 | All tools. Default; behavior without the variable is unchanged. |
 
 Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 309-tool reference regardless of the selected level.
+
+### Scope Filtering
+
+`NPG_TOOL_SCOPE_FILTER` (default `0`, off) narrows the surface one step further: with it enabled the server exposes only the tools the configured `NPG_API_TOKEN` can actually call. Useful when the MCP endpoint is handed a scoped token — a monitoring token holding `read_only` scopes does not need the write tools it would only ever get `403`s from.
+
+It resolves the grant **once at boot**, from two endpoints in order:
+
+1. `GET /api/v1/api-tokens` — the token rows, each with its displayable `token_prefix` (`ng_` + the first 8 characters) and its `permissions` array (`*` or entries from NPG's 15 legacy resource scopes). Match the row whose `token_prefix` the configured token starts with.
+2. Fallback `GET /api/v1/auth/me` — a self-service route needing no permission. It reports `effective_permissions` for a token caller: the owner role's permissions intersected with the token's own scopes, i.e. exactly what NPG enforces per request. (This fallback matters in practice: a UI-created token can only carry `*` or the legacy scopes, and NPG checks token scopes by exact string, so a scoped token always gets `403` on `/api/v1/api-tokens`.)
+
+Matching mirrors NPG's `APIToken.HasPermission` exactly: a tool is exposed when **every** permission its routes need is covered by `*`, by the identical string, or by an `area:*` family wildcard. Legacy scopes are **not** widened into other areas and `write` does not imply `read` — that expansion applies to *roles*, not tokens (verified against NPG 2.65.4: a `read_only` token reaches exactly proxy/certificate/waf/logs/settings/backup reads and `403`s on redirect/access/authprovider/dnsprovider/ddns/audit/dashboard/user/role). The exposed set is `NPG_TOOL_LEVEL` ∩ `{tools whose every required permission is granted}`.
+
+Because the snapshot happens at boot, **changing the token's scopes in the NPG UI needs an MCP restart** to change the surface. The boot log records what it saw, and `npg_get_stack_features` returns the same information as data:
+
+```json
+"hidden_by_scope": {
+  "enabled": true, "applied": true, "reason": "", "snapshot": "boot",
+  "source": "/api/v1/auth/me",
+  "token_prefix": "ng_c9233b0e",
+  "stored_permissions": ["proxy:read", "waf:read", "settings:read"],
+  "granted_scope_count": 3,
+  "hidden_count": 231, "hidden_tools": ["npg_ban_ip", "..."],
+  "exposed_count": 78, "manifest_before": 309,
+  "unmapped_tool_count": 0
+}
+```
+
+`hidden_by_scope` is `null` when the filter is off; `npg_get_stack_features` itself is never hidden by it, so a restricted server can always report what it hid.
+
+**It fails open, always.** Hiding a tool that would have worked is worse than showing one that answers `403` — a hidden `npg_create_*` removes the only path that makes a feature exist. Every uncertainty therefore keeps the full tier manifest: both introspection endpoints failing (`403`, timeout, transport error), no row matching the token prefix, more than one matching row (ambiguity), an unset `NPG_API_TOKEN`, or an empty/unparseable permissions array. The reason is logged at `WARNING` and returned in `hidden_by_scope.reason`. Tools that carry no permission annotation are also never hidden, so a freshly bridged upstream endpoint cannot disappear silently.
+
+The tool → permission map lives in `npg_mcp/permission_map.py`, generated by `scripts/derive_tool_permissions.py` from NPG's own route-authorisation registry (`api/internal/middleware/permissions.go`); `tests/test_scopefilter.py` fails when a registered tool is missing from it, so the map cannot fall behind the tool surface. With the filter off, the manifest, the tool count and the tier counts above are exactly what they are without it.
 
 ### Tool Annotations
 
@@ -327,6 +360,8 @@ npg_mcp/
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Toolset levels (NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   resultcap.py  # Shared result cap (NPG_MAX_RESULT_CHARS) + `expand` escape hatch
+  scopefilter.py    # Opt-in scope-aware narrowing (NPG_TOOL_SCOPE_FILTER)
+  permission_map.py # Generated tool → NPG permission map for the scope filter
   __init__.py
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
