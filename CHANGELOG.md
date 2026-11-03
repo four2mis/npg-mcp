@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.7.1] - 2026-11-04
+
+### What changed
+- The committed `swagger.yaml` was still the NPG **2.65.4** spec while the code and tool descriptions already targeted **2.66.0**, so any swagger-driven gap analysis against this repo under-reported the release's upstream changes (the four `/traffic/*` endpoints and the new settings/credential fields were invisible in the committed spec). It is now synced from upstream tag `v2.66.0`: +232/-5 lines covering the `GET /traffic/{summary,timeseries,realtime,export}` paths with their `Traffic*` schemas, `GlobalSettings.worker_shutdown_timeout`, `Route53Credentials.use_default_credentials` plus the masked response field, the SSO `group_claim` `maxLength: 64`, and the challenge/dashboard documentation clarifications. Documentation artefact only — no runtime code path reads it.
+- Three DNS-provider tool descriptions now document the **route53 `use_default_credentials`** credential shape (`{use_default_credentials: true}` = AWS SDK default credential chain, no static keys; sending keys alongside it is a 400), which upstream added in v2.66.0 and which the tools accepted but never advertised: `npg_create_dns_provider`, `npg_update_dns_provider`, `npg_test_dns_provider`. `npg_create_dns_provider`'s description was additionally rewritten in the standard imperative / `REQUIRED:` style used by the rest of the surface, with the per-provider credential shapes (cloudflare `{api_token}`, ionos `{api_key_prefix, api_key}`, route53 key pair or default chain) spelled out. Descriptions stay under the 460-char `DESC_LEN` cap (438 / 288 / 447 served chars).
+- Tool **signatures** are untouched by the description work, so no parameter, type, default or tier moved: the surface remains 313 tools (read 141 / standard 266 / full 313, destructive 47) and the CI description-sync gate sees no signature change.
+- Verified at this commit against the disposable test stack with a **HEAD-pinned local image** (`local/npg-mcp:8437722`, container `main.py`/`toolsets.py` sha256 identical to the checkout — the stale published `npg-test-mcp` image was deliberately not used as evidence): 42/42 live MCP checks pass, including route53 create with `use_default_credentials` → 201 + persisted `true`, the contradictory-keys 400 (`route53 takes no access key with use_default_credentials`), update/get/delete round-trip, credential masking, and 10 unrelated tools showing no regressions.
+- Release gates on this commit: `ruff check .` clean, `mypy npg_mcp/` clean, `pytest` 621 passed, `regenerate_all_docs.py --check` exit 0 (tool-schemas/README/README.ko in sync at 313 tools, all prose rules and `DESC_LEN` pass), and `.env.example` tier counts match `tier_allowed()`.
+
+### What's new
+- (none) — no new tools, endpoints or parameters; the exposed surface is unchanged at 313 tools. The `swagger.yaml` bundled in the repo now describes the same upstream NPG v2.66.0 API the tools are written against.
+
+### Breaking changes
+- (none) — documentation- and description-only release: no tool renamed, added or removed, no parameter retyped, no default changed, no tier-membership change.
+
 ## [1.7.0] - 2026-11-03
 
 ### What changed
