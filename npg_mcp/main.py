@@ -2605,7 +2605,7 @@ async def npg_get_dns_provider(provider_id: str | int, expand: bool = False) -> 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. Required: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict, e.g. {'api_token': '...'}; ionos: {'api_key_prefix': '...public prefix', 'api_key': '...secret'}). Optional: is_default, kwargs extras (unknown fields rejected unless strict=false). NOTE: IONOS can issue certificates but has NO DDNS updater (DDNS-restricted values: cloudflare/duckdns/dynu).")
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. REQUIRED: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict). cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} OR {use_default_credentials: true} (AWS SDK default chain, no keys). Optional: is_default, kwargs (unknown rejected unless strict=false). IONOS has NO DDNS updater; DDNS: cloudflare/duckdns/dynu.")
 async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
@@ -2622,7 +2622,7 @@ async def npg_create_dns_provider(name: str, provider_type: str, credentials: di
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. strict kwargs validation: see npg_update_settings. REQUIRED: provider_id.")
+@mcp.tool(name="npg_update_dns_provider", description="Update a DNS provider. Pass only fields to change in kwargs: name, credentials, is_default. route53 credentials may be {use_default_credentials: true} instead of an access key pair (AWS SDK default chain, no keys). REQUIRED: provider_id. strict kwargs validation: see npg_update_settings.")
 async def npg_update_dns_provider(provider_id: str | int, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_id("provider_id", provider_id)
@@ -2643,7 +2643,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|ionos|manual), credentials (provider-specific object, e.g. cloudflare: {\"api_token\": \"...\"}; ionos: {\"api_key_prefix\": \"...public prefix\", \"api_key\": \"...secret\"}). NOTE: the body is the create payload, NOT a provider id — to test an existing saved provider, fetch it with npg_get_dns_provider and pass its name/provider_type/credentials here.")
+@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|ionos|manual), credentials (object: cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} or {use_default_credentials: true}). NOTE: body is the create payload, NOT a provider id - to test a saved provider, fetch it with npg_get_dns_provider and pass name/provider_type/credentials here.")
 async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict, is_default: bool | None = None) -> dict:
     try:
         c = _get_client()
