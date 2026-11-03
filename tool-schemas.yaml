@@ -996,7 +996,7 @@ npg_get_settings:
       default: false
 
 npg_update_settings:
-  description: "Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false. See npg_get_settings for current values."
+  description: "Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. worker_shutdown_timeout = seconds an old worker waits for its connections before exiting (0 = wait forever, max 86400). Unknown fields rejected unless strict=false. See npg_get_settings for current values."
   parameters:
     - name: kwargs
       type: object
@@ -1564,7 +1564,7 @@ npg_delete_proxy_host_challenge:
       required: true
 
 npg_verify_challenge:
-  description: "VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 503 = challenge disabled/unconfigured."
+  description: "VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 404 = proxy_host_id not found; 503 = challenge disabled/unconfigured."
   parameters:
     - name: token
       type: string
@@ -2398,7 +2398,7 @@ npg_list_sso_providers:
       default: false
 
 npg_create_sso_provider:
-  description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers."
+  description: "CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups, max 64 chars), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers."
   parameters:
     - name: slug
       type: string
@@ -2439,7 +2439,7 @@ npg_create_sso_provider:
       required: false
 
 npg_update_sso_provider:
-  description: "UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id."
+  description: "UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim (max 64 chars), required_group, default_role_id."
   parameters:
     - name: provider_id
       type: integer | string
@@ -2811,7 +2811,7 @@ npg_get_dashboard_containers:
       default: false
 
 npg_get_dashboard_stats:
-  description: "GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap."
+  description: "GET hourly request statistics for the dashboard. Without proxy_host_id only global rollup rows come back; with an ID only that host's rows. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap."
   parameters:
     - name: start
       type: string
@@ -2835,6 +2835,62 @@ npg_get_dashboard_health_history:
       required: false
     - name: limit
       type: integer
+      required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_traffic_summary:
+  description: "GET per-host traffic totals for a window (response bytes + requests, each host's percentage of the total). Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days). Traffic with no proxy host, not yet backfilled, or with deleted logs is reported as unclassified. CSV instead: npg_get_traffic_export. expand=true lifts the result cap."
+  parameters:
+    - name: start
+      type: string
+      required: false
+    - name: end
+      type: string
+      required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_traffic_timeseries:
+  description: "GET the bucketed traffic series (requests + response bytes per point) for a window; resolution is 5min, hour or day depending on the window length. Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days), proxy_host_id (host UUID, the literal unclassified, or omit for all hosts). expand=true lifts the result cap."
+  parameters:
+    - name: start
+      type: string
+      required: false
+    - name: end
+      type: string
+      required: false
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_traffic_realtime:
+  description: "GET live traffic for the last 3 minutes in 10s buckets (bytes + requests per bucket) with 30s average rates. No time window — the API fixes it. Optional: proxy_host_id (host UUID, the literal unclassified, or omit for all hosts). Figures stay 0 until traffic is recorded. Windowed history: npg_get_traffic_timeseries. expand=true lifts the result cap."
+  parameters:
+    - name: proxy_host_id
+      type: string
+      required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_traffic_export:
+  description: "EXPORT per-host traffic for a window as CSV text (columns domain,proxy_host_id,response_bytes,requests,percentage) for spreadsheets. Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days). Returns the raw CSV string in data, not JSON. Same figures as JSON: npg_get_traffic_summary. expand=true lifts the result cap."
+  parameters:
+    - name: start
+      type: string
+      required: false
+    - name: end
+      type: string
       required: false
     - name: expand
       type: boolean

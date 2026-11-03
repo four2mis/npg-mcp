@@ -51,6 +51,23 @@ def test_system_settings_v2_51_fields_accepted():
     _validate_kwargs("npg_update_system_settings", kwargs, strict=True)
 
 
+def test_global_settings_v2_66_worker_shutdown_timeout_accepted():
+    """Upstream v2.66.0 added worker_shutdown_timeout to UpdateGlobalSettingsRequest.
+
+    0 is a meaningful value (wait for every connection, the legacy behaviour),
+    so the whitelist must accept it too — and combined with a normal field it
+    must still pass strict validation.
+    """
+    _validate_kwargs(
+        "npg_update_settings", {"worker_shutdown_timeout": 240}, strict=True
+    )
+    _validate_kwargs(
+        "npg_update_settings",
+        {"worker_shutdown_timeout": 0, "keepalive_timeout": 65},
+        strict=True,
+    )
+
+
 def test_valid_dict_passes_through_unchanged():
     kwargs = {"retention_days": 30, "max_logs_per_type": 5000}
     _validate_kwargs("npg_update_log_settings", kwargs)

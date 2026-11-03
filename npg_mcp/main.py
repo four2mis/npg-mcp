@@ -2403,7 +2403,7 @@ async def npg_get_settings(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_settings", description="Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. Unknown fields rejected unless strict=false. See npg_get_settings for current values.")
+@mcp.tool(name="npg_update_settings", description="Update global NPG settings (nginx worker/gzip/SSL/proxy/buffer/DDoS etc.). Pass only fields to change in kwargs. worker_shutdown_timeout = seconds an old worker waits for its connections before exiting (0 = wait forever, max 86400). Unknown fields rejected unless strict=false. See npg_get_settings for current values.")
 async def npg_update_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_settings", kwargs, strict)
     c = _get_client()
@@ -2937,7 +2937,7 @@ async def npg_delete_proxy_host_challenge(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_verify_challenge", description="VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 503 = challenge disabled/unconfigured.")
+@mcp.tool(name="npg_verify_challenge", description="VERIFY a CAPTCHA response, return a bypass token. Public (no auth). REQUIRED: token (CAPTCHA provider response, e.g. Turnstile/reCAPTCHA). Optional: proxy_host_id (UUID of the host that showed the challenge — selects its CAPTCHA keys; omit = global), challenge_reason (bot_filter|geo_restriction, logged). Rejected CAPTCHA = success:false + data.error. 400 = no token; 404 = proxy_host_id not found; 503 = challenge disabled/unconfigured.")
 async def npg_verify_challenge(
     token: str,
     proxy_host_id: str | int | None = None,
@@ -3809,7 +3809,7 @@ async def npg_list_sso_providers(limit: int | None = None, offset: int | None = 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers.")
+@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups, max 64 chars), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers.")
 async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     try:
         _validate_id("slug", slug)
@@ -3837,7 +3837,7 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim, required_group, default_role_id.")
+@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim (max 64 chars), required_group, default_role_id.")
 async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, trust_provider_email: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     try:
         _validate_id("provider_id", provider_id)
@@ -4264,7 +4264,7 @@ async def npg_get_dashboard_containers(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard_stats", description="GET hourly request statistics for the dashboard. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_dashboard_stats", description="GET hourly request statistics for the dashboard. Without proxy_host_id only global rollup rows come back; with an ID only that host's rows. Optional: start, end (RFC3339 strings passed verbatim — without them the API defaults the window), proxy_host_id (narrow stats to one host). expand=true lifts the result cap.")
 async def npg_get_dashboard_stats(
     start: str | None = None,
     end: str | None = None,
@@ -4297,6 +4297,83 @@ async def npg_get_dashboard_health_history(hours: int | None = None, limit: int 
             _validate_query_int("limit", limit)
             params["limit"] = limit
         data = await _api(c.get, "/api/v1/dashboard/health/history", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+
+# ── Traffic ────────────────────────────────────────────────────────────
+
+@mcp.tool(name="npg_get_traffic_summary", description="GET per-host traffic totals for a window (response bytes + requests, each host's percentage of the total). Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days). Traffic with no proxy host, not yet backfilled, or with deleted logs is reported as unclassified. CSV instead: npg_get_traffic_export. expand=true lifts the result cap.")
+async def npg_get_traffic_summary(
+    start: str | None = None,
+    end: str | None = None,
+    expand: bool = False,
+) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if start is not None and str(start).strip():
+            params["start"] = str(start)
+        if end is not None and str(end).strip():
+            params["end"] = str(end)
+        data = await _api(c.get, "/api/v1/traffic/summary", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_traffic_timeseries", description="GET the bucketed traffic series (requests + response bytes per point) for a window; resolution is 5min, hour or day depending on the window length. Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days), proxy_host_id (host UUID, the literal unclassified, or omit for all hosts). expand=true lifts the result cap.")
+async def npg_get_traffic_timeseries(
+    start: str | None = None,
+    end: str | None = None,
+    proxy_host_id: str | None = None,
+    expand: bool = False,
+) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if start is not None and str(start).strip():
+            params["start"] = str(start)
+        if end is not None and str(end).strip():
+            params["end"] = str(end)
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        data = await _api(c.get, "/api/v1/traffic/timeseries", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_traffic_realtime", description="GET live traffic for the last 3 minutes in 10s buckets (bytes + requests per bucket) with 30s average rates. No time window — the API fixes it. Optional: proxy_host_id (host UUID, the literal unclassified, or omit for all hosts). Figures stay 0 until traffic is recorded. Windowed history: npg_get_traffic_timeseries. expand=true lifts the result cap.")
+async def npg_get_traffic_realtime(
+    proxy_host_id: str | None = None,
+    expand: bool = False,
+) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            params["proxy_host_id"] = str(proxy_host_id)
+        data = await _api(c.get, "/api/v1/traffic/realtime", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_traffic_export", description="EXPORT per-host traffic for a window as CSV text (columns domain,proxy_host_id,response_bytes,requests,percentage) for spreadsheets. Optional: start, end (RFC3339; default last 24h; window at most 90 days and inside the last 90 days). Returns the raw CSV string in data, not JSON. Same figures as JSON: npg_get_traffic_summary. expand=true lifts the result cap.")
+async def npg_get_traffic_export(
+    start: str | None = None,
+    end: str | None = None,
+    expand: bool = False,
+) -> dict:
+    c = _get_client()
+    try:
+        params: dict = {}
+        if start is not None and str(start).strip():
+            params["start"] = str(start)
+        if end is not None and str(end).strip():
+            params["end"] = str(end)
+        # Traffic export is text/csv; client.get() would call resp.json() and
+        # raise on a non-JSON body, so this route uses get_text().
+        data = await _api(c.get_text, "/api/v1/traffic/export", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

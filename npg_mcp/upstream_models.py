@@ -48,6 +48,10 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         "limit_req_enabled", "limit_req_zone_size", "limit_req_rate",
         "limit_req_burst", "reset_timedout_connection",
         "limit_rate", "limit_rate_after",
+        # v2.66.0: workers left over from a reload close their connections
+        # after this many seconds (0 = wait for every connection, the legacy
+        # behaviour; max 86400; omitted = 240). null = unchanged (no reset).
+        "worker_shutdown_timeout",
     }),
     # model/system_settings.go: UpdateSystemSettingsRequest
     "npg_update_system_settings": frozenset({

@@ -146,8 +146,9 @@ class TestHealthIsNotAnMCPTool:
         # npg_reload_nginx, npg_test_nginx, npg_enable_waf_rule_by_host)
         # were removed; canonical replacements cover the same routes.
         # 308 → 309: npg_get_stack_features (report-only stack probe) added.
+        # 309 → 313: the 4 read-only /traffic/* tools added (NPG v2.66.0).
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 309
+        assert len(names) == 313
 
 
 class TestAccessLogRequestId:
