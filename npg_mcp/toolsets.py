@@ -69,8 +69,9 @@ Every registered tool also gets standard MCP ``ToolAnnotations``
 (``readOnlyHint`` / ``destructiveHint`` / ``idempotentHint`` /
 ``openWorldHint`` + a derived ``title``) attached at startup by
 :func:`annotate_tools`. Classification is derived, not hand-assigned: the HTTP
-verbs each tool body calls are AST-harvested from ``main.py`` and combined with
-the destructive-name set above. Annotations are additive client-facing
+verbs each tool body calls (including calls delegated to private module-level
+helpers, which are followed transitively) are AST-harvested from ``main.py`` and
+combined with the destructive-name set above. Annotations are additive client-facing
 metadata — they never change execution, signatures, or descriptions — but they
 let MCP clients filter read-only tools, warn before destructive calls, and
 batch idempotent ones.
@@ -364,13 +365,21 @@ def _tool_verbs() -> dict[str, frozenset[str]]:
         )
         return {}
 
-    verbs_by_tool: dict[str, frozenset[str]] = {}
-    for node in tree.body:
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        name = _tool_name_from_decorators(node)
-        if name is None:
-            continue
+    # Private module-level helpers may own the HTTP calls a tool delegates to
+    # (e.g. ``_build_export_bundle``, shared by ``npg_export_proxy_host`` and
+    # ``npg_bulk_export_proxy_hosts``). Follow those calls too, or a refactor
+    # that moves a route into a helper would silently drop the tool's verbs —
+    # flipping a read-only tool to readOnlyHint=false and removing it from the
+    # result-cap target set. Only ``_``-prefixed helpers are followed (never
+    # other tools, so no tool-to-tool recursion) and cycles are guarded.
+    helpers: dict[str, ast.AST] = {
+        n.name: n
+        for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and n.name.startswith("_")
+    }
+
+    def _verbs_in(node: ast.AST, seen: frozenset[str] = frozenset()) -> set[str]:
         verbs: set[str] = set()
         for call in ast.walk(node):
             if not isinstance(call, ast.Call):
@@ -387,7 +396,23 @@ def _tool_verbs() -> dict[str, frozenset[str]]:
                 and func.value.id == "c"
             ):
                 verbs.add(func.attr)
-        verbs_by_tool[name] = frozenset(verbs)
+            elif (
+                isinstance(func, ast.Name)
+                and func.id in helpers
+                and func.id not in seen
+            ):
+                # Helper call: harvest its verbs, guarding against a cycle.
+                verbs |= _verbs_in(helpers[func.id], seen | {func.id})
+        return verbs
+
+    verbs_by_tool: dict[str, frozenset[str]] = {}
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        name = _tool_name_from_decorators(node)
+        if name is None:
+            continue
+        verbs_by_tool[name] = frozenset(_verbs_in(node))
     return verbs_by_tool
 
 

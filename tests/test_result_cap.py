@@ -284,10 +284,10 @@ def _call(name: str, arguments: dict):
 class TestInstrumentation:
     def test_tool_count_and_read_tier_unchanged(self):
         names = toolsets._discover_tool_names()
-        assert len(names) == 313
+        assert len(names) == 314
         assert len(toolsets.tier_allowed(names, "read")) == 141
-        assert len(toolsets.tier_allowed(names, "standard")) == 266
-        assert len(toolsets.tier_allowed(names, "full")) == 313
+        assert len(toolsets.tier_allowed(names, "standard")) == 267
+        assert len(toolsets.tier_allowed(names, "full")) == 314
 
     def test_cap_applies_end_to_end_and_expand_lifts_it(self, monkeypatch, small_cap):
         monkeypatch.setattr(main_mod, "_get_client", lambda: _HugeListClient())
@@ -375,7 +375,7 @@ class TestInstrumentation:
             for tool in main_mod.mcp._tool_manager.list_tools()
             if getattr(tool.fn, resultcap._WRAPPED_ATTR, False)
         }
-        assert len(wrapped_once) == 145
+        assert len(wrapped_once) == 146
         assert resultcap.instrument_tools(main_mod.mcp) == 0
         wrapped_twice = {
             tool.name

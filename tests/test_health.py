@@ -147,8 +147,9 @@ class TestHealthIsNotAnMCPTool:
         # were removed; canonical replacements cover the same routes.
         # 308 → 309: npg_get_stack_features (report-only stack probe) added.
         # 309 → 313: the 4 read-only /traffic/* tools added (NPG v2.66.0).
+        # 313 → 314: npg_bulk_export_proxy_hosts (bounded multi-host export).
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 313
+        assert len(names) == 314
 
 
 class TestAccessLogRequestId:

@@ -524,6 +524,12 @@ _INTERNAL_BODY_KEYS = frozenset({"self", "c", "body"})
 # being partially executed.
 _BULK_HOST_LIMIT = 50
 
+# Hard cap on host_ids per bulk EXPORT call. An export bundle carries all 11
+# config sections of one host, so batches are deliberately smaller than the
+# 50-host read cap: 20 bundles is already a multi-megabyte payload and the
+# result cap kicks in well before a whole-inventory sweep could fit.
+_BULK_EXPORT_HOST_LIMIT = 20
+
 # Hard cap on cert_ids per bulk renewal call. Renewals hit Let's Encrypt/ACME
 # rate limits, so batches stay far below the 50-host bulk cap to avoid
 # exhausting quotas for the whole deployment.
@@ -1509,6 +1515,66 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
         return _error_result(e)
 
 
+@mcp.tool(name="npg_bulk_export_proxy_hosts", description="EXPORT MANY proxy hosts' full configs in one call (fleet disaster recovery / migration). REQUIRED: host_ids (list, max 20). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Each bundle feeds npg_import_proxy_host unchanged; a failed host lands in hosts_failed without aborting the batch. Read-only. expand=true lifts the result cap.")
+async def npg_bulk_export_proxy_hosts(host_ids: list[str | int], sections: list[str] | None = None, expand: bool = False) -> dict:
+    try:
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_EXPORT_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_EXPORT_HOST_LIMIT} hosts per bulk export "
+                f"(got {len(host_ids)})"
+            )
+        if sections is not None:
+            _select_section_paths(_proxy_host_section_paths("validation"), sections)
+        c = _get_client()
+
+        # Dedupe on the URL-encoded id in first-seen order (the same key each
+        # section URL interpolates) and keep the raw spelling — the bundle
+        # helper encodes it once, so passing an encoded id here would
+        # double-encode the path — identical contract to
+        # npg_bulk_get_proxy_host_full.
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for host_id in host_ids:
+            key = _id_path(host_id)
+            if key not in seen:
+                seen.add(key)
+                ordered.append(_id_str(host_id))
+
+        async def _one(display: str) -> tuple[str, dict]:
+            entry: dict = {"success": True, "bundle": {}, "sections_failed": []}
+            try:
+                res = await _build_export_bundle(c, display, sections)
+                entry["bundle"] = res["bundle"]
+                entry["sections_failed"] = res["sections_failed"]
+                # A bundle without its core "host" section is not importable,
+                # so that host counts as failed (mirrors
+                # npg_bulk_get_proxy_host_full). Sub-section failures (geo or
+                # challenge simply not configured, ...) stay in
+                # sections_failed while the host still exports.
+                if "host" not in (res["bundle"].get("sections") or {}):
+                    msg = res["section_errors"].get("host", "host section failed")
+                    entry["success"] = False
+                    entry["error"] = msg
+                    entry["hint"] = _error_hint(RuntimeError(msg))
+            except Exception as he:
+                entry["success"] = False
+                entry["error"] = str(he)
+                entry["hint"] = _error_hint(he)
+            return display, entry
+
+        # Same two-level bounded fan-out as npg_bulk_get_proxy_host_full:
+        # <=16 host workers, each holding <=8 section GETs, so a 20-host
+        # export never exceeds 128 in-flight NPG API calls.
+        results = await _gather_bounded(_BULK_HOST_CONCURRENCY,
+                                        (_one(disp) for disp in ordered))
+        data = {display: entry for display, entry in results}
+        hosts_failed = sorted(display for display, entry in data.items() if not entry.get("success"))
+        return {"success": True, "data": data, "hosts_failed": hosts_failed}
+    except Exception as e:
+        return _error_result(e)
+
+
 _HOST_CREATE_BODY_FIELDS = (
     # host-section API field -> same-named field in the POST /proxy-hosts body.
     # Field names are the API's (ssl_force_https, not the MCP ssl_forced alias).
@@ -1615,63 +1681,86 @@ def _should_apply_section(name: str, payload: dict) -> bool:
     return bool(payload.get("enabled"))
 
 
+async def _build_export_bundle(c, host_id, sections: list[str] | None = None) -> dict:
+    """Fetch one host's 11 section GETs and assemble a portable export bundle.
+
+    Shared implementation behind ``npg_export_proxy_host`` (one host) and
+    ``npg_bulk_export_proxy_hosts`` (bounded fan-out), so both produce the
+    identical bundle shape, ``sections_failed`` list, and warning order.
+    Section GETs run under ``_BULK_SECTION_CONCURRENCY`` so the bulk tool's
+    two-level ceiling holds (16 host workers x 8 sections = 128 in flight).
+
+    Returns ``{"bundle", "sections_failed", "section_errors"}``. Per-section
+    failures never raise — they are recorded in ``sections_failed`` plus a
+    bundle ``warning`` — while an unknown ``sections`` name raises
+    ``ValueError`` before any HTTP call.
+    """
+    hid = _id_str(host_id)  # raw: goes into bundle["source_host_id"] metadata
+    section_paths = _proxy_host_section_paths(_id_path(host_id))  # URLs encode
+    if sections is not None:
+        section_paths = _select_section_paths(section_paths, sections)
+
+    async def _fetch(section: str, path: str):
+        try:
+            return section, await _api(c.get, path)
+        except Exception as se:
+            return section, {"__export_error__": str(se)}
+
+    results = await _gather_bounded(
+        _BULK_SECTION_CONCURRENCY,
+        (_fetch(section, path) for section, path in section_paths.items()),
+    )
+    sections_out: dict = {}
+    failed: list[str] = []
+    section_errors: dict[str, str] = {}
+    warnings: list[str] = []
+    external_refs: dict = {}
+    for section, payload in results:
+        if not isinstance(payload, dict) or "__export_error__" in payload:
+            failed.append(section)
+            err = payload.get("__export_error__", "unknown error") if isinstance(payload, dict) else "unexpected payload"
+            section_errors[section] = err
+            warnings.append(f"section {section} not exported: {err}")
+            continue
+        cleaned: dict = {}
+        for key, value in payload.items():
+            if key in _EXPORT_STRIP_KEYS:
+                continue
+            if key in _EXTERNAL_REF_KEYS:
+                if value:
+                    external_refs[key] = _id_str(value)
+                    warnings.append(
+                        f"instance-scoped ref {key} moved to external_refs — import flags it, "
+                        "never copies it blind; re-resolve on the target instance"
+                    )
+                continue
+            cleaned[key] = value
+        if section == "host" and cleaned.get("custom_locations"):
+            warnings.append(
+                "custom_locations is present but not applied by npg_import_proxy_host "
+                "(no create-time parameter); re-add it manually after import"
+            )
+        sections_out[section] = cleaned
+    bundle: dict = {
+        "schema_version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "source_host_id": hid,
+        "sections": sections_out,
+    }
+    if external_refs:
+        bundle["external_refs"] = external_refs
+    if warnings:
+        bundle["warnings"] = warnings
+    return {"bundle": bundle, "sections_failed": failed, "section_errors": section_errors}
+
+
 @mcp.tool(name="npg_export_proxy_host", description="EXPORT a proxy host's complete config as a portable bundle for npg_import_proxy_host (clone across hosts / disaster recovery). Composes the same 11 section GETs as npg_get_proxy_host_full, strips instance-scoped metadata (ids, timestamps), and moves cross-instance UUID refs (certificate_id etc.) to external_refs. REQUIRED: host_id. Read-only — never touches the source host. expand=true lifts the result cap.")
 async def npg_export_proxy_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        hid = _id_str(host_id)  # raw: goes into bundle["source_host_id"] metadata
-        section_paths = _proxy_host_section_paths(_id_path(host_id))  # URLs encode
-
-        async def _fetch(section: str, path: str):
-            try:
-                return section, await _api(c.get, path)
-            except Exception as se:
-                return section, {"__export_error__": str(se)}
-
-        results = await asyncio.gather(
-            *(_fetch(section, path) for section, path in section_paths.items())
-        )
-        sections: dict = {}
-        failed: list[str] = []
-        warnings: list[str] = []
-        external_refs: dict = {}
-        for section, payload in results:
-            if not isinstance(payload, dict) or "__export_error__" in payload:
-                failed.append(section)
-                err = payload.get("__export_error__", "unknown error") if isinstance(payload, dict) else "unexpected payload"
-                warnings.append(f"section {section} not exported: {err}")
-                continue
-            cleaned: dict = {}
-            for key, value in payload.items():
-                if key in _EXPORT_STRIP_KEYS:
-                    continue
-                if key in _EXTERNAL_REF_KEYS:
-                    if value:
-                        external_refs[key] = _id_str(value)
-                        warnings.append(
-                            f"instance-scoped ref {key} moved to external_refs — import flags it, "
-                            "never copies it blind; re-resolve on the target instance"
-                        )
-                    continue
-                cleaned[key] = value
-            if section == "host" and cleaned.get("custom_locations"):
-                warnings.append(
-                    "custom_locations is present but not applied by npg_import_proxy_host "
-                    "(no create-time parameter); re-add it manually after import"
-                )
-            sections[section] = cleaned
-        bundle: dict = {
-            "schema_version": 1,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
-            "source_host_id": hid,
-            "sections": sections,
-        }
-        if external_refs:
-            bundle["external_refs"] = external_refs
-        if warnings:
-            bundle["warnings"] = warnings
-        return {"success": True, "data": bundle, "sections_failed": failed}
+        res = await _build_export_bundle(c, host_id)
+        return {"success": True, "data": res["bundle"], "sections_failed": res["sections_failed"]}
     except Exception as e:
         return _error_result(e)
 
