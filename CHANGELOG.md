@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.2] - 2026-11-04
+
+### What changed
+- `npg_list_audit_logs` **silently ignored its `page` parameter**: the tool forwarded `page=` straight to `GET /api/v1/audit-logs`, but that route reads only `limit` and `offset`, so every "page" came back as the first page's rows and paging through the audit log from MCP was impossible. The tool now converts `page` client-side to `offset = (page - 1) * limit` (page size falls back to 50 when `limit` is omitted or not positive) and sends only `limit`/`offset` upstream. Invalid input fails closed before any request: a `page` of 0 is rejected with `page must be >= 1 (page numbers start at 1)` (negative values are caught earlier by the shared `_validate_query_int` guard), and passing `page` together with `offset` is rejected with `pass either page or offset, not both` instead of silently ignoring one of them.
+- `npg_end_user_sessions` returned `{"success": true, "data": null}` on success, because the API answers `204 No Content` with an empty body — callers could not distinguish a successful force-logout from a tool that lost the response. It now returns a `message` (`Ended all sessions for user <id>`) through the shared `_mutate_result` helper, matching the other delete-family tools; the helper also keeps `NPG_DRY_RUN=1` working by surfacing the dry-run payload as `data`.
+- Both tools' `description=` values were updated in the same commit as the behaviour change: `npg_list_audit_logs` now states that the API reads only `limit` (default 50, max 100) and `offset`, that `page` is converted and is mutually exclusive with `offset`, and lists the remaining filters; `npg_end_user_sessions` states `REQUIRED: user_id`, that the API answers 204 with no payload so the tool returns a message, and the follow-up verification tool.
+- Regression tests added/updated: `tests/test_end_user_sessions.py` (new — 204 body yields the message shape with no `data: null`, IDs containing a slash are path-encoded, a missing `user_id` is a clean error) and `tests/test_list_pagination.py` (extended — `page` → `offset` arithmetic including the default 50 page size and first page = offset 0, `page=0` clean error, `page` + `offset` conflict clean error, all asserting no HTTP call is made on rejection).
+- Verified at this commit against the disposable test stack with a **HEAD-pinned local image** (`local/npg-mcp:01af82b`, `main.py`/`client.py`/`toolsets.py`/`resultcap.py` byte-identical to the checkout — the stale published `npg-test-mcp` image on port 8082 was deliberately not used as evidence): 60/60 checks pass, including exact page-window slicing (page N == `snapshot[(N-1)*limit : N*limit]` for limit 2/3/5), `page` == `offset` equivalence, disjoint consecutive windows, an empty past-the-end page, and the message-shaped `npg_end_user_sessions` result for two throwaway users. The stale 8082 image reproduced **both** defects on the same data (`page=1` == `page=2`, `data: null`), confirming the fixes were real and not a test-data artefact.
+- Release gates on this commit: `ruff check .` clean, `mypy npg_mcp/` clean, `pytest` 629 passed, `regenerate_all_docs.py --check` exit 0 (313 tools, all prose rules and `DESC_LEN` pass), `.env.example` tier counts match `tier_allowed()` (read 141 / standard 266 / full 313).
+
+### What's new
+- (none) — no new tools, endpoints or parameters; the surface stays at 313 tools and both fixed tools keep their existing signatures. The only behavioural additions are the two `page` validation errors and the message-shaped result.
+
+### Breaking changes
+- (none) — no tool renamed, added or removed, no parameter retyped or defaulted differently, no tier-membership change. `npg_list_audit_logs(page=...)` now actually pages (it previously returned page 1 regardless), and a caller that passed `page` and `offset` together now gets a clean error instead of having its input partially ignored.
+
 ## [1.7.1] - 2026-11-04
 
 ### What changed
