@@ -503,6 +503,10 @@ def _mutate_result(data, message: str | None = None) -> dict:
     Dry-run mode (NPG_DRY_RUN=1): the client returns a structured payload
     instead of executing; surface it as ``data`` so callers can inspect the
     exact request that WOULD have been sent.
+
+    Every delete-family tool passes a ``message``; ``tests/test_delete_response_shape.py``
+    enforces it. ``NPGClient.delete()`` returns ``None`` for a 204, so a raw
+    ``{"success": True, "data": data}`` return would surface ``data: null``.
     """
     if isinstance(data, dict) and data.get(client_mod.DRY_RUN_KEY):
         return {"success": True, "data": data}
