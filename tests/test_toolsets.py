@@ -226,10 +226,10 @@ class TestDerivedDestructiveTools:
         assert (
             len(tier_allowed(all_tools, "standard"))
             == len(all_tools) - len(DESTRUCTIVE_TOOLS)
-            == 267
+            == 268
         )
-        # Live surface guardrail (current HEAD): 314 tools, 47 destructive.
-        assert len(all_tools) == 314
+        # Live surface guardrail (current HEAD): 315 tools, 47 destructive.
+        assert len(all_tools) == 315
         assert len(DESTRUCTIVE_TOOLS) == 47
 
     def test_destructive_count_47_exact(self):
@@ -240,9 +240,9 @@ class TestDerivedDestructiveTools:
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(tier_allowed(all_tools, "standard")) == 267
+        assert len(tier_allowed(all_tools, "standard")) == 268
         assert len(tier_allowed(all_tools, "read")) == 141
-        assert len(tier_allowed(all_tools, "full")) == 314
+        assert len(tier_allowed(all_tools, "full")) == 315
 
     def test_read_tier_has_no_mutating_verbs(self):
         """The read tier's contract: every exposed tool only issues GETs.
@@ -326,7 +326,7 @@ class TestToolAnnotations:
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(all_tools) == 314
+        assert len(all_tools) == 315
         missing = sorted(n for n in all_tools if annotations_for(n) is None)
         assert missing == []
 
@@ -432,7 +432,7 @@ class TestToolAnnotations:
 
     def test_annotations_reach_served_tools_list(self):
         served = self._served()
-        assert len(served) == 314
+        assert len(served) == 315
         assert [n for n, t in served.items() if t.annotations is None] == []
         for name, tool in served.items():
             expected = _hints(annotations_for(name))
@@ -454,8 +454,8 @@ class TestToolAnnotations:
     def test_annotate_tools_is_idempotent(self):
         import npg_mcp.main as main_mod
 
-        assert annotate_tools(main_mod.mcp) == 314
-        assert annotate_tools(main_mod.mcp) == 314
+        assert annotate_tools(main_mod.mcp) == 315
+        assert annotate_tools(main_mod.mcp) == 315
 
     def test_annotate_tools_never_raises_on_broken_tool_manager(self):
         class Broken:

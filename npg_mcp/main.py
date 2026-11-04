@@ -543,8 +543,72 @@ _BULK_CERT_LIMIT = 20
 # into the remainder is what npg_view_log_file(offset/lines) is for.
 _LOG_DOWNLOAD_MAX_BYTES = 262144  # 256 KB
 
+# MCP parameter name -> API body field for npg_update_proxy_host's PARTIAL
+# update. Hoisted out of the tool body because npg_bulk_update_proxy_hosts
+# applies one such field set to many hosts: two copies would drift, so both
+# tools build their body from this single constant (pinned by
+# tests/test_bulk_update.py::test_field_map_matches_update_signature).
+# Keys are MCP parameter names (what the descriptions and agent knowledge
+# use); values are the NPG API's field names where they differ
+# (ssl_forced -> ssl_force_https, ssl_cert_id -> certificate_id).
+_PROXY_HOST_UPDATE_FIELD_MAP: dict[str, str] = {
+    "domain_names": "domain_names",
+    "forward_host": "forward_host",
+    "forward_port": "forward_port",
+    "forward_scheme": "forward_scheme",
+    "waf_enabled": "waf_enabled",
+    "waf_mode": "waf_mode",
+    "waf_use_global": "waf_use_global",
+    "waf_paranoia_level": "waf_paranoia_level",
+    "waf_anomaly_threshold": "waf_anomaly_threshold",
+    "ssl_forced": "ssl_force_https",
+    "ssl_enabled": "ssl_enabled",
+    "ssl_cert_id": "certificate_id",
+    "cache_enabled": "cache_enabled",
+    "cache_static_only": "cache_static_only",
+    "cache_ttl": "cache_ttl",
+    "advanced_config": "advanced_config",
+    "enabled": "enabled",
+    "ssl_http2": "ssl_http2",
+    "ssl_http3": "ssl_http3",
+    "block_exploits": "block_exploits",
+    "block_exploits_exceptions": "block_exploits_exceptions",
+    "allow_websocket_upgrade": "allow_websocket_upgrade",
+    "proxy_connect_timeout": "proxy_connect_timeout",
+    "proxy_send_timeout": "proxy_send_timeout",
+    "proxy_read_timeout": "proxy_read_timeout",
+    "proxy_buffering": "proxy_buffering",
+    "proxy_request_buffering": "proxy_request_buffering",
+    "client_max_body_size": "client_max_body_size",
+    "proxy_max_temp_file_size": "proxy_max_temp_file_size",
+    "access_list_id": "access_list_id",
+    "auth_provider_id": "auth_provider_id",
+    "auth_bypass_paths": "auth_bypass_paths",
+    "ddns_enabled": "ddns_enabled",
+    "ddns_provider_id": "ddns_provider_id",
+    "ddns_proxied": "ddns_proxied",
+    "forward_container_name": "forward_container_name",
+    "forward_container_network": "forward_container_network",
+    "proxy_type": "proxy_type",
+    "stream_listen_host": "stream_listen_host",
+    "stream_listen_port": "stream_listen_port",
+    "stream_protocol": "stream_protocol",
+    "stream_ssl_preread": "stream_ssl_preread",
+    "stream_accept_proxy_protocol": "stream_accept_proxy_protocol",
+    "stream_send_proxy_protocol": "stream_send_proxy_protocol",
+    "stream_proxy_connect_timeout": "stream_proxy_connect_timeout",
+    "stream_proxy_timeout": "stream_proxy_timeout",
+    "tags": "tags",
+}
 
-def _build_body(vars_dict: dict, mapping: dict, id_fields: set | None = None) -> dict:
+# Fields coerced through _id_str (int -> raw string). Body values are NEVER
+# percent-encoded — URLs use _id_path, bodies use _id_str.
+_PROXY_HOST_UPDATE_ID_FIELDS: frozenset[str] = frozenset(
+    {"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"}
+)
+
+
+def _build_body(vars_dict: dict, mapping: dict, id_fields: set | frozenset | None = None) -> dict:
     """Build an API request body dict from local variables, keeping only non-None values.
 
     Eliminates the repeated ``if x is not None: body["api_field"] = x`` pattern
@@ -1123,56 +1187,8 @@ async def npg_update_proxy_host(
         c = _get_client()
         body = _build_body(
             locals(),
-            {
-                "domain_names": "domain_names",
-                "forward_host": "forward_host",
-                "forward_port": "forward_port",
-                "forward_scheme": "forward_scheme",
-                "waf_enabled": "waf_enabled",
-                "waf_mode": "waf_mode",
-                "waf_use_global": "waf_use_global",
-                "waf_paranoia_level": "waf_paranoia_level",
-                "waf_anomaly_threshold": "waf_anomaly_threshold",
-                "ssl_forced": "ssl_force_https",
-                "ssl_enabled": "ssl_enabled",
-                "ssl_cert_id": "certificate_id",
-                "cache_enabled": "cache_enabled",
-                "cache_static_only": "cache_static_only",
-                "cache_ttl": "cache_ttl",
-                "advanced_config": "advanced_config",
-                "enabled": "enabled",
-                "ssl_http2": "ssl_http2",
-                "ssl_http3": "ssl_http3",
-                "block_exploits": "block_exploits",
-                "block_exploits_exceptions": "block_exploits_exceptions",
-                "allow_websocket_upgrade": "allow_websocket_upgrade",
-                "proxy_connect_timeout": "proxy_connect_timeout",
-                "proxy_send_timeout": "proxy_send_timeout",
-                "proxy_read_timeout": "proxy_read_timeout",
-                "proxy_buffering": "proxy_buffering",
-                "proxy_request_buffering": "proxy_request_buffering",
-                "client_max_body_size": "client_max_body_size",
-                "proxy_max_temp_file_size": "proxy_max_temp_file_size",
-                "access_list_id": "access_list_id",
-                "auth_provider_id": "auth_provider_id",
-                "auth_bypass_paths": "auth_bypass_paths",
-                "ddns_enabled": "ddns_enabled",
-                "ddns_provider_id": "ddns_provider_id",
-                "ddns_proxied": "ddns_proxied",
-                "forward_container_name": "forward_container_name",
-                "forward_container_network": "forward_container_network",
-                "proxy_type": "proxy_type",
-                "stream_listen_host": "stream_listen_host",
-                "stream_listen_port": "stream_listen_port",
-                "stream_protocol": "stream_protocol",
-                "stream_ssl_preread": "stream_ssl_preread",
-                "stream_accept_proxy_protocol": "stream_accept_proxy_protocol",
-                "stream_send_proxy_protocol": "stream_send_proxy_protocol",
-                "stream_proxy_connect_timeout": "stream_proxy_connect_timeout",
-                "stream_proxy_timeout": "stream_proxy_timeout",
-                "tags": "tags",
-            },
-            id_fields={"ssl_cert_id", "access_list_id", "auth_provider_id", "ddns_provider_id"},
+            _PROXY_HOST_UPDATE_FIELD_MAP,
+            id_fields=_PROXY_HOST_UPDATE_ID_FIELDS,
         )
 
         params = {"skip_nginx": "true"} if skip_nginx else None
@@ -1432,6 +1448,85 @@ async def npg_bulk_set_proxy_hosts_enabled(host_ids: list[str | int], enabled: b
         # flight; order preserved so the response list matches host_ids.
         results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
                                         (_set_one(h) for h in ordered))
+        hosts_failed = sorted(entry["host_id"] for entry in results if not entry["success"])
+        return {"success": True, "data": results, "hosts_failed": hosts_failed}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_bulk_update_proxy_hosts", description="BULK UPDATE: apply ONE field set to many proxy hosts (mass write). REQUIRED: host_ids (max 50), fields = dict of npg_update_proxy_host param names, e.g. {client_max_body_size: '25m'}. PARTIAL: omitted host fields stay untouched. Unknown keys/empty fields rejected before any write. Per-host result + hosts_failed (one failure never aborts), duplicates deduped. skip_nginx=true (default): run npg_sync_proxy_hosts once after. NPG_DRY_RUN=1 previews each PUT.")
+async def npg_bulk_update_proxy_hosts(host_ids: list[str | int], fields: dict, skip_nginx: bool = True) -> dict:
+    try:
+        _validate_required("host_ids", host_ids)
+        if len(host_ids) > _BULK_HOST_LIMIT:
+            raise ValueError(
+                f"host_ids exceeds the limit of {_BULK_HOST_LIMIT} hosts per bulk call "
+                f"(got {len(host_ids)})"
+            )
+        _validate_required("fields", fields)
+        # Explicit allowlist: `fields` is NOT a raw body passthrough. A typo'd or
+        # upstream-only key must fail the whole call — silently dropping it
+        # would "succeed" with a half-applied fleet change. ddns_remove_provider
+        # is absent on purpose: it is a PUT *query* param on the single-host
+        # tool, not a body field, and its effect is irreversible.
+        unknown = sorted(str(key) for key in set(fields) - set(_PROXY_HOST_UPDATE_FIELD_MAP))
+        if unknown:
+            raise ValueError(
+                f"fields contains unsupported key(s) {unknown} — pass npg_update_proxy_host "
+                f"parameter names; allowed: {sorted(_PROXY_HOST_UPDATE_FIELD_MAP)}"
+            )
+        # One body for the batch: the map translates MCP param names to the
+        # API's (ssl_forced -> ssl_force_https, ssl_cert_id -> certificate_id)
+        # and _id_str-coerces instance ids. Partial-update semantics come from
+        # the upstream endpoint (pointer fields + COALESCE): every key present
+        # here is written, everything else is left as stored.
+        body = _build_body(fields, _PROXY_HOST_UPDATE_FIELD_MAP, _PROXY_HOST_UPDATE_ID_FIELDS)
+        if not body:
+            raise ValueError(
+                "fields produced an empty update body (every value was None) — pass at least "
+                "one non-null field; '' or [] clears a stored value, null is ignored"
+            )
+        c = _get_client()
+
+        # Dedupe preserving first-seen order, keyed on the URL-encoded form
+        # (_id_path) like the other bulk mutators — quote-variant spellings of
+        # one id must not PUT the same host twice. The raw spelling is kept for
+        # the response's host_id display field.
+        seen: set[str] = set()
+        ordered: list[str | int] = []
+        for host_id in host_ids:
+            key = _id_path(host_id)
+            if key not in seen:
+                seen.add(key)
+                ordered.append(host_id)
+
+        # Skip-nginx is a QUERY param on PUT /proxy-hosts/{id}, so a batch never
+        # triggers per-host nginx regen/reload by default; the caller runs
+        # npg_sync_proxy_hosts once at the end.
+        params = {"skip_nginx": "true"} if skip_nginx else None
+
+        async def _update_one(host_id) -> dict:
+            entry: dict = {"host_id": _id_str(host_id)}
+            try:
+                # Validate the RAW id (not the display string) so a None /
+                # blank entry is rejected instead of PUT to a garbage path.
+                _validate_id("host_id", host_id)
+                data = await _api(c.put,
+                    f"/api/v1/proxy-hosts/{_id_path(host_id)}",
+                    body,
+                    params=params,
+                )
+                entry["success"] = True
+                entry["result"] = data
+            except Exception as e:
+                entry["success"] = False
+                entry["error"] = str(e)
+                entry["hint"] = _error_hint(e)
+            return entry
+
+        # Semaphore-capped gather — at most _BULK_WRITE_CONCURRENCY PUTs in
+        # flight; order preserved so the response list matches host_ids.
+        results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
+                                        (_update_one(h) for h in ordered))
         hosts_failed = sorted(entry["host_id"] for entry in results if not entry["success"])
         return {"success": True, "data": results, "hosts_failed": hosts_failed}
     except Exception as e:

@@ -529,6 +529,20 @@ npg_bulk_set_proxy_hosts_enabled:
       required: false
       default: true
 
+npg_bulk_update_proxy_hosts:
+  description: "BULK UPDATE: apply ONE field set to many proxy hosts (mass write). REQUIRED: host_ids (max 50), fields = dict of npg_update_proxy_host param names, e.g. {client_max_body_size: '25m'}. PARTIAL: omitted host fields stay untouched. Unknown keys/empty fields rejected before any write. Per-host result + hosts_failed (one failure never aborts), duplicates deduped. skip_nginx=true (default): run npg_sync_proxy_hosts once after. NPG_DRY_RUN=1 previews each PUT."
+  parameters:
+    - name: host_ids
+      type: array<st> | int]
+      required: true
+    - name: fields
+      type: object
+      required: true
+    - name: skip_nginx
+      type: boolean
+      required: false
+      default: true
+
 npg_bulk_get_proxy_host_full:
   description: "GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch. expand=true lifts the result cap."
   parameters:

@@ -370,6 +370,7 @@ TOOL_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "npg_bulk_import_proxy_hosts": ("proxy:write",),
     "npg_bulk_renew_certificates": ("certificate:write",),
     "npg_bulk_set_proxy_hosts_enabled": ("proxy:write",),
+    "npg_bulk_update_proxy_hosts": ("proxy:write",),
     "npg_bulk_unban_ips": ("waf:write",),
     "npg_check_backup_restore": ("settings:read",),
     "npg_check_dashboard_queries": ("settings:read",),
