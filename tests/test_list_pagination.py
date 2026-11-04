@@ -3,7 +3,7 @@
 Covers, without any network access (recording fake client):
 * npg_list_proxy_hosts  — page/limit/search params on GET /api/v1/proxy-hosts
 * npg_get_logs          — host/status/method/limit/offset params on GET /api/v1/logs
-* npg_list_audit_logs   — page/limit/action/resource_type on GET /api/v1/audit-logs
+* npg_list_audit_logs   — page->offset, limit/action/resource_type on /api/v1/audit-logs
 * npg_list_system_logs  — source/level/limit on GET /api/v1/system-logs
 * conditional param building: only provided values appear in the query string
 * zero-arg regression: calls stay identical to the pre-change behavior (no params)
@@ -374,7 +374,7 @@ class TestListAuditLogs:
     def test_filters_sent(self, recording):
         _run(
             main_mod.npg_list_audit_logs(
-                page=1, limit=25, action="create", resource_type="proxy_host"
+                offset=0, limit=25, action="create", resource_type="proxy_host"
             )
         )
         assert recording.calls == [
@@ -382,13 +382,42 @@ class TestListAuditLogs:
                 "GET",
                 "/api/v1/audit-logs",
                 {
-                    "page": 1,
+                    "offset": 0,
                     "limit": 25,
                     "action": "create",
                     "resource_type": "proxy_host",
                 },
             )
         ]
+
+    def test_page_translated_to_offset(self, recording):
+        """The API ignores `page` (limit/offset only) — the tool converts it."""
+        _run(main_mod.npg_list_audit_logs(page=3, limit=25))
+        assert recording.calls == [
+            ("GET", "/api/v1/audit-logs", {"limit": 25, "offset": 50})
+        ]
+
+    def test_page_uses_default_page_size(self, recording):
+        _run(main_mod.npg_list_audit_logs(page=2))
+        assert recording.calls == [("GET", "/api/v1/audit-logs", {"offset": 50})]
+
+    def test_first_page_is_offset_zero(self, recording):
+        _run(main_mod.npg_list_audit_logs(page=1, limit=2))
+        assert recording.calls == [
+            ("GET", "/api/v1/audit-logs", {"limit": 2, "offset": 0})
+        ]
+
+    def test_page_zero_clean_error(self, recording):
+        result = _run(main_mod.npg_list_audit_logs(page=0))
+        assert result["success"] is False
+        assert "page must be >= 1" in result["error"]
+        assert recording.calls == []
+
+    def test_page_and_offset_conflict_clean_error(self, recording):
+        result = _run(main_mod.npg_list_audit_logs(page=2, offset=10))
+        assert result["success"] is False
+        assert "pass either page or offset" in result["error"]
+        assert recording.calls == []
 
 
 class TestListSystemLogs:

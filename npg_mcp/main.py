@@ -3374,7 +3374,7 @@ async def npg_get_log_stats(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. Optional filters: page, limit (default 50), offset, action, resource_type, search (text), user_id, start_time, end_time (RFC3339 strings passed verbatim). REQUIRED: none — zero-arg call returns the full audit log set. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_audit_logs", description="LIST audit log entries. The API reads only limit (default 50, max 100) and offset; alternatively pass page (1-based) and this tool converts it to offset=(page-1)*limit — pass only one of the two. Other filters: action, resource_type, search, user_id (UUID), start_time, end_time (RFC3339, passed verbatim). REQUIRED: none. expand=true lifts the result cap.")
 async def npg_list_audit_logs(
     page: int | None = None,
     limit: int | None = None,
@@ -3389,7 +3389,15 @@ async def npg_list_audit_logs(
 ) -> dict:
     c = _get_client()
     try:
-        params = _list_params(limit=limit, page=page, offset=offset)
+        if page is not None:
+            _validate_query_int("page", page)
+            if page < 1:
+                raise ValueError("page must be >= 1 (page numbers start at 1)")
+            if offset is not None:
+                raise ValueError("pass either page or offset, not both")
+            page_size = limit if limit is not None and limit > 0 else 50
+            offset = (page - 1) * page_size
+        params = _list_params(limit=limit, offset=offset)
         if action is not None and str(action).strip():
             params["action"] = str(action)
         if resource_type is not None and str(resource_type).strip():
@@ -3728,13 +3736,13 @@ async def npg_set_user_password(user_id: str | int, new_password: str) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_end_user_sessions", description="End all sessions for a user (force logout). Required: user_id.")
+@mcp.tool(name="npg_end_user_sessions", description="End all sessions for a user (force logout). REQUIRED: user_id. Returns a message — the API answers 204 with no payload. Next: verify with npg_list_users.")
 async def npg_end_user_sessions(user_id: str | int) -> dict:
     try:
         _validate_id("user_id", user_id)
         c = _get_client()
         data = await _api(c.post, f"/api/v1/users/{_id_path(user_id)}/end-sessions")
-        return {"success": True, "data": data}
+        return _mutate_result(data, f"Ended all sessions for user {_id_str(user_id)}")
     except Exception as e:
         return _error_result(e)
 
