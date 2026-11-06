@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.66.0
+  version: 2.67.0
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -895,6 +895,14 @@ paths:
                 $ref: '#/components/schemas/Upstream'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          description: |
+            Another proxy host's upstream already uses this name. nginx refuses
+            two upstream blocks with one name, for every host at once.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     delete:
       tags: [Security]
@@ -8618,8 +8626,11 @@ paths:
       summary: Clone a proxy host
       description: |
         Creates a new host from an existing one under new domain names. Fields
-        omitted from the body are copied from the source host. Requires the
-        `proxy:write` scope when called with an API token.
+        omitted from the body are copied from the source host. A copied
+        upstream gets its own name, derived from the clone's id. If nginx
+        refuses the clone's config with its copied settings, the clone is
+        removed again and the request fails. Requires the `proxy:write` scope
+        when called with an API token.
       security:
         - BearerAuth: []
       parameters:
@@ -9420,8 +9431,9 @@ paths:
           (`cidr` when more than half the entries contain `/`, else `ip`).
         - The subscription is created with `enabled: false` — nothing is applied to nginx
           until you `PUT` it with `enabled: true`.
-        - Caps: at most 25000 entries are kept per list, and creation is refused once the
-          total across all subscriptions reaches 100000 (400, "total entry limit reached").
+        - Caps: all subscriptions together keep at most 100000 entries. A new list keeps what
+          that total leaves (`source_entry_count` says how many it had), and creation is
+          refused once the total is reached (400, "total entry limit reached").
         - The returned object is the in-memory struct built before the fetch-status row is
           written, so `last_fetched_at`/`last_success_at` are null here even though the fetch
           succeeded. Re-read with `GET /filter-subscriptions/{id}` for the persisted values.
@@ -9615,7 +9627,7 @@ paths:
       tags: [Filter Subscriptions]
       summary: Get a filter subscription with its entries and exclusions
       description: |
-        Returns the subscription plus **all** of its stored entries (up to 25000), its host
+        Returns the subscription plus **all** of its stored entries (up to 100000), its host
         exclusions and its entry exclusions. Note that `entries` is the raw fetched list — it
         is not filtered by `entry_exclusions`; the exclusions are applied when the shared
         nginx config is generated.
@@ -9746,7 +9758,8 @@ paths:
           as a success (200).
         - Global cap: entries are truncated so the 100000 total is not exceeded; if no room is
           left the existing entries are kept unchanged.
-        - Per-list cap: at most 25000 entries.
+        - Per-list cap: at most 100000 entries, the whole total.
+        - `source_entry_count` records how many entries the list had, so a cut list shows.
 
         On success entries are replaced in a transaction and a shared-config regeneration +
         debounced nginx reload is triggered asynchronously.
@@ -12486,6 +12499,10 @@ components:
           enum: [letsencrypt, selfsigned, custom]
         auto_renew:
           type: boolean
+        key_type:
+          type: string
+          enum: [rsa2048, ec256, ec384]
+          description: The key type Let's Encrypt issues and renews this certificate with. rsa2048 for every other certificate and for those issued before 2.67.0.
         expires_at:
           type: string
           format: date-time
@@ -16520,6 +16537,11 @@ components:
           enum: [letsencrypt, selfsigned, custom]
         auto_renew:
           type: boolean
+        key_type:
+          type: string
+          enum: [rsa2048, ec256, ec384]
+          default: rsa2048
+          description: The key type a Let's Encrypt certificate is issued with, kept by every renewal; other providers keep rsa2048. ec256 and ec384 are ECDSA P-256 and P-384. Case-insensitive; an unknown value is 400 whatever the provider.
         validity_days:
           type: integer
           description: Self-signed only; defaults to 365
@@ -18470,7 +18492,7 @@ components:
       properties:
         name:
           type: string
-          description: nginx upstream block name. Defaults to `upstream_` + the first 8 characters of the proxy host id when empty, and must match ^[a-zA-Z0-9_]+$ or the request is rejected with 400.
+          description: nginx upstream block name. Defaults to `upstream_` + the first 8 characters of the proxy host id when empty (the whole id, without dashes, when another host's upstream already has that name), and must match ^[a-zA-Z0-9_]+$ or the request is rejected with 400. A name another proxy host's upstream uses is 409.
         scheme:
           type: string
           enum: [http, https]
@@ -19060,7 +19082,10 @@ components:
           description: Error text of the last failed fetch. Omitted (cleared) after a success.
         entry_count:
           type: integer
-          description: Entries stored for this subscription. Capped at 25000 per list.
+          description: Entries stored for this subscription. All subscriptions together keep at most 100000, so a list can be cut short.
+        source_entry_count:
+          type: integer
+          description: Entries the list itself had at the last fetch. Above `entry_count` when the entry limit left the rest out; 0 before the first fetch since 2.66.1.
         exclude_private_ips:
           type: boolean
           description: |

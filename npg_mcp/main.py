@@ -2198,11 +2198,12 @@ async def npg_get_certificate(cert_id: str | int, expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_certificate", description="Request a new Let's Encrypt certificate (upstream takes the ACME account email from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (e.g. 'letsencrypt'), dns_provider_id.")
+@mcp.tool(name="npg_create_certificate", description="Request a new certificate (ACME account email comes from system settings — set it via npg_update_system_settings(acme_email=...)). REQUIRED: domain_names=[\"sub.example.com\"]. Optional: provider (letsencrypt|selfsigned|custom, default letsencrypt), dns_provider_id, key_type (rsa2048|ec256|ec384). Only letsencrypt honours ec256/ec384 as ECDSA P-256/P-384 and keeps them on renew; other providers stay rsa2048. Omit it for the upstream default.")
 async def npg_create_certificate(
     domain_names: list[str],
     provider: str = "letsencrypt",
     dns_provider_id: str | None = None,
+    key_type: str | None = None,
 ) -> dict:
     try:
         _validate_required("domain_names", domain_names)
@@ -2212,6 +2213,8 @@ async def npg_create_certificate(
             "provider": provider,
             "dns_provider_id": dns_provider_id,
         }
+        if key_type is not None:
+            body["key_type"] = key_type
         data = await _api(c.post, "/api/v1/certificates", body)
         return {"success": True, "data": data}
     except Exception as e:
