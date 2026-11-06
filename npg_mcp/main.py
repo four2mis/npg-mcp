@@ -1859,7 +1859,7 @@ async def npg_export_proxy_host(host_id: str | int, expand: bool = False) -> dic
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_import_proxy_host", description="IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=true creates the host + sub-configs; default apply=false = dry-run plan. Inherit-state sections skipped; source host untouched.")
+@mcp.tool(name="npg_import_proxy_host", description="IMPORT an npg_export_proxy_host bundle as a NEW proxy host (config clone / disaster recovery). REQUIRED: bundle (export result, its 'data' object, or bare sections), domain_names (new domains). apply=true creates the host + sub-configs; default apply=false = dry-run plan. skip_nginx=true (default) does NOT regenerate nginx — run npg_sync_proxy_hosts after. Inherit-state sections skipped; source host untouched.")
 async def npg_import_proxy_host(bundle: dict, domain_names: list[str], apply: bool = False, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("bundle", bundle)
@@ -2085,7 +2085,7 @@ def _parse_import_csv(csv_data: str) -> tuple[list[str], list[dict]]:
     return fieldnames, rows
 
 
-@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data - header must include domain_names, forward_host, forward_port. Optional columns mirror npg_create_proxy_host (forward_scheme, ssl_*, cache_*, block_exploits, waf_*, client_max_body_size, advanced_config, access_list_id, auth_provider_id, proxy_type, enabled); other columns ignored (no block_normal upstream). Multi-domain cells: quoted comma-separated. Max 50 rows; bad rows fail individually.")
+@mcp.tool(name="npg_bulk_import_proxy_hosts", description="BULK CREATE proxy hosts from CSV in ONE call. REQUIRED: csv_data - header: domain_names, forward_host, forward_port. Optional columns mirror npg_create_proxy_host (forward_scheme, ssl_*, cache_*, block_exploits, waf_*, client_max_body_size, advanced_config, access_list_id, auth_provider_id, proxy_type, enabled); other columns ignored. Multi-domain cells: quoted CSV. skip_nginx=true (default) skips nginx regen. Max 50 rows; bad rows fail individually.")
 async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("csv_data", csv_data)
@@ -2796,7 +2796,7 @@ async def npg_get_dns_provider(provider_id: str | int, expand: bool = False) -> 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. REQUIRED: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual), credentials (dict). cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} OR {use_default_credentials: true} (AWS SDK default chain, no keys). Optional: is_default, kwargs (unknown rejected unless strict=false). IONOS has NO DDNS updater; DDNS: cloudflare/duckdns/dynu.")
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. REQUIRED: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual). credentials: cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} - or omit credentials for route53 (AWS default chain, use_default_credentials). Optional: is_default, kwargs (unknown rejected unless strict=false). IONOS has NO DDNS updater; DDNS: cloudflare/duckdns/dynu.")
 async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
@@ -3376,7 +3376,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params. No args = last 24h. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params; sort_by, sort_order (asc|desc). No args = last 24h. expand=true lifts the result cap.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -3866,7 +3866,7 @@ async def npg_get_notification_deliveries(channel_id: str | int, expand: bool = 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_detect_telegram_chats", description="DETECT available Telegram chats for notification delivery. REQUIRED: bot_token (Telegram bot API token). Optional: channel_id (existing channel ID to look up stored token). Sends bot_token in the request body; Telegram must be reachable from the NPG server.")
+@mcp.tool(name="npg_detect_telegram_chats", description="DETECT available Telegram chats for notification delivery. Pass one of: bot_token (Telegram bot API token, sent in the request body) or channel_id (existing channel ID — reuses its stored token). Telegram must be reachable from the NPG server.")
 async def npg_detect_telegram_chats(bot_token: str | None = None, channel_id: str | None = None) -> dict:
     c = _get_client()
     try:
@@ -4008,7 +4008,7 @@ async def npg_list_sso_providers(limit: int | None = None, offset: int | None = 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id (+client_secret for most IdPs). Optional: scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups, max 64 chars), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers.")
+@mcp.tool(name="npg_create_sso_provider", description="CREATE an SSO (OIDC) provider. REQUIRED: slug, name, issuer_url, client_id. Optional: client_secret (most IdPs need it), scopes (needs openid), trust_provider_email (only if you control the provider), allowed_email_domains, allowed_emails, group_claim (default groups, max 64 chars), required_group, default_role_id (existing role UUID). Gate = (email OR domain) AND required_group; no allowlist = nobody signs in. Verify via npg_list_sso_providers.")
 async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_id: str, client_secret: str | None = None, scopes: str | None = None, trust_provider_email: bool = False, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     try:
         _validate_id("slug", slug)
@@ -4036,7 +4036,7 @@ async def npg_create_sso_provider(slug: str, name: str, issuer_url: str, client_
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, trust_provider_email, allowed_email_domains, allowed_emails, group_claim (max 64 chars), required_group, default_role_id.")
+@mcp.tool(name="npg_update_sso_provider", description="UPDATE an SSO provider (read-modify-write; full-replace API merged before PUT). REQUIRED: provider_id. Optional: name, slug, issuer_url, client_id, client_secret (masked), scopes, callback_base_url, enabled, allow_jit, trust_provider_email, allowed_email_domains, allowed_emails, group_claim (max 64 chars), required_group, default_role_id.")
 async def npg_update_sso_provider(provider_id: str | int, name: str | None = None, slug: str | None = None, issuer_url: str | None = None, client_id: str | None = None, client_secret: str | None = None, scopes: str | None = None, callback_base_url: str | None = None, enabled: bool | None = None, allow_jit: bool | None = None, trust_provider_email: bool | None = None, allowed_email_domains: list[str] | None = None, allowed_emails: list[str] | None = None, group_claim: str | None = None, required_group: str | None = None, default_role_id: str | None = None) -> dict:
     try:
         _validate_id("provider_id", provider_id)
@@ -4429,7 +4429,7 @@ async def npg_check_update(expand: bool = False) -> dict:
 
 # ── ACME Test ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_test_acme", description="VALIDATE the stored ACME configuration (POST system-settings/acme/test — this is the v0.3.19 reroute; older docs calling /acme/test are stale). Local consistency check only — contacts no ACME server. Returns status disabled/pending/ok.")
+@mcp.tool(name="npg_test_acme", description="VALIDATE the stored ACME configuration (POST system-settings/acme/test — this is the v0.3.19 reroute; older docs calling /acme/test are stale). Optional: dns_provider_id (test a specific DNS provider; omit = stored config). Local consistency check only — contacts no ACME server. Returns status disabled/pending/ok.")
 async def npg_test_acme(dns_provider_id: str | int | None = None) -> dict:
     c = _get_client()
     try:
@@ -4870,7 +4870,7 @@ async def npg_download_backup(backup_id: str | int, expand: bool = False) -> dic
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore a backup (multipart). REQUIRED: file_content (.tar.gz backup) and encoding ('base64' default or 'raw'). Use npg_create_backup + npg_download_backup to get a backup file first. DESTRUCTIVE: replaces current NPG configuration.")
+@mcp.tool(name="npg_upload_restore_backup", description="UPLOAD and restore a backup (multipart). REQUIRED: file_content (.tar.gz backup). encoding: 'base64' (default) or 'raw'. Use npg_create_backup + npg_download_backup to get a backup file first. DESTRUCTIVE: replaces current NPG configuration.")
 async def npg_upload_restore_backup(file_content: str, encoding: str = "base64") -> dict:
     try:
         _validate_required("file_content", file_content)
@@ -4990,7 +4990,7 @@ async def npg_list_auth_providers(page: int | None = None, limit: int | None = N
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_auth_provider", description="CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom), provider_url (http(s) URL). Optional: config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme (Docker-backed: provider_url resolved from container).")
+@mcp.tool(name="npg_create_auth_provider", description="CREATE a ForwardAuth provider. REQUIRED: name, provider_type (authelia/authentik/custom). Optional: provider_url (http(s) URL; omit for Docker-backed — resolved from container_name/network/port/scheme, else required), config (dict), enabled, timeout_ms, container_name, container_network, container_port, container_scheme.")
 async def npg_create_auth_provider(name: str, provider_type: str, provider_url: str | None = None, config: dict | None = None, enabled: bool | None = None, timeout_ms: int | None = None, container_name: str | None = None, container_network: str | None = None, container_port: int | None = None, container_scheme: str | None = None) -> dict:
     try:
         _validate_required("name", name)
@@ -5505,7 +5505,7 @@ async def npg_get_dns_provider_default(expand: bool = False) -> dict:
 
 # ── Logs Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). REQUIRED: log_type — access|error|modsec (default access). Optional fields are type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
+@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). log_type — access|error|modsec (default access); all other fields optional and type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
 async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
     try:
         _validate_required("log_type", log_type)
