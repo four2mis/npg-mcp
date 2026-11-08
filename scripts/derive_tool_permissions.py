@@ -94,6 +94,14 @@ MANUAL_OVERRIDES: dict[str, tuple[tuple[str, ...], str]] = {
         ("proxy:read", "waf:read"),
         "composes the same 11 sections as npg_get_proxy_host_full (read-only)",
     ),
+    "npg_bulk_export_proxy_hosts": (
+        ("proxy:read", "waf:read"),
+        "per-host fan-out over the same 11 sections as npg_export_proxy_host "
+        "via _build_export_bundle(), so its section paths are built at runtime "
+        "and the AST cannot see them; without this entry the generator emits an "
+        "empty tuple and the scope filter exposes a proxy-config dump to any "
+        "token",
+    ),
     "npg_import_proxy_host": (
         ("proxy:write",),
         "POST /api/v1/proxy-hosts + per-host sub-config writes + "

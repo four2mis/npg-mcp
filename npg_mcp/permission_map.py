@@ -369,7 +369,7 @@ TOOL_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "npg_bulk_add_uri_block_rule": ("waf:write",),
     "npg_bulk_apply_certificate": ("proxy:write",),
     "npg_bulk_delete_proxy_hosts": ("proxy:delete",),
-    "npg_bulk_export_proxy_hosts": (),
+    "npg_bulk_export_proxy_hosts": ("proxy:read", "waf:read"),
     "npg_bulk_get_proxy_host_full": ("proxy:read", "waf:read"),
     "npg_bulk_import_proxy_hosts": ("proxy:write",),
     "npg_bulk_renew_certificates": ("certificate:write",),

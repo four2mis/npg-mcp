@@ -541,3 +541,38 @@ def test_permission_map_values_are_known_permissions():
         if any(p not in known for p in required)
     }
     assert unknown == {}
+
+
+def test_manual_overrides_are_reflected_in_the_map():
+    """Every reviewed MANUAL_OVERRIDES entry must survive regeneration.
+
+    The generator emits an empty tuple for a tool whose routes it cannot
+    resolve from main.py's AST, and an empty tuple means "permission-free" — so
+    the scope filter would never hide that tool. That is how
+    ``npg_bulk_export_proxy_hosts`` (section paths built at runtime by
+    ``_build_export_bundle``) lost its ``proxy:read``/``waf:read`` requirement
+    and became a proxy-config dump for any token: the map is generated, so a
+    hand-added entry is erased on the next ``--write``. Any drift between the
+    generator's review table and the committed map fails here.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    script = (
+        Path(__file__).resolve().parents[1] / "scripts" / "derive_tool_permissions.py"
+    )
+    spec = importlib.util.spec_from_file_location("derive_tool_permissions", script)
+    assert spec is not None and spec.loader is not None
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+
+    mismatched = {
+        name: (TOOL_PERMISSIONS.get(name), expected)
+        for name, (expected, _reason) in generator.MANUAL_OVERRIDES.items()
+        if TOOL_PERMISSIONS.get(name) != expected
+    }
+    assert mismatched == {}, (
+        "permission_map.py disagrees with MANUAL_OVERRIDES "
+        f"(tool, (map_value, override_value)): {mismatched}"
+    )
+    assert TOOL_PERMISSIONS["npg_bulk_export_proxy_hosts"] == ("proxy:read", "waf:read")
