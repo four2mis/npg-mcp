@@ -207,12 +207,12 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 ## 도구 참조(Tools Reference)
 
-이 서버는 **315개의 MCP 도구**를 29개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
+이 서버는 **319개의 MCP 도구**를 29개 카테고리에 걸쳐 노출합니다. 전체 도구 이름, 설명, 입력 매개변수 스키마는 [`tool-schemas.yaml`](tool-schemas.yaml)에 있습니다.
 
 | 카테고리 | 도구 |
 |----------|-------|
 | **프록시 호스트(Proxy Hosts)** | 48개 |
-| **로그(Logs)** | 38개 |
+| **로그(Logs)** | 35개 |
 | **보안 및 WAF(Security & WAF)** | 31개 |
 | **DNS 제공자(DNS Providers)** | 15개 |
 | **인증(Authentication)** | 9개 |
@@ -220,12 +220,12 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | **필터 구독(Filter Subscriptions)** | 15개 |
 | **클라우드 제공자(Cloud Providers)** | 13개 |
 | **URI 차단(URI Block)** | 7개 |
-| **설정(Settings)** | 12개 |
+| **설정(Settings)** | 13개 |
 | **백업(Backups)** | 8개 |
 | **API 토큰(API Tokens)** | 8개 |
 | **사용자(Users)** | 9개 |
 | **SSO 제공자(SSO Providers)** | 8개 |
-| **기타(Other)** | 2개 |
+| **기타(Other)** | 8개 |
 | **대시보드(Dashboard)** | 3개 |
 | **트래픽(Traffic)** | 4개 |
 | **IP 관리(IP Management)** | 4개 |
@@ -261,7 +261,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 | `MCP_REBINDING_PROTECTION` | `true` | DNS 리바인딩 보호 활성화(프록시가 깨지는 경우에만 비활성화) |
 | `MCP_TRANSPORT` | `stdio` | 전송 모드: 직접 파이프는 `stdio` (직접 실행 기본값), 네트워크 배포는 `http`. Docker 이미지는 `ENV`로 `http`를 설정합니다. |
 | `NPG_LOG_LEVEL` | `INFO` | 컨테이너 로그 상세 수준(`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO`는 수신 MCP 요청 및 발신 NPG API 호출당 한 줄씩 기록합니다. 아래 "컨테이너 로그" 참고. |
-| `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 141개), `standard`(파괴적 작업 제외 268개), `full`(전체 315개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
+| `NPG_TOOL_LEVEL` | `full` | 계층형 도구 노출: `read`(읽기 전용 144개), `standard`(파괴적 작업 제외 272개), `full`(전체 319개). 읽기 도구는 `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*` 이름을 가지며, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되어 `standard`/`full`에서만 사용할 수 있습니다. 숨겨진 도구는 목록에 표시되지도, 호출도 불가능합니다. 아래 "도구 수준" 참고. |
 | `NPG_TOOL_SCOPE_FILTER` | `0` | 선택적 범위 인식 도구 필터링. 활성화하면 서버가 설정된 `NPG_API_TOKEN`의 유효 권한을 **부팅 시 한 번** 확인하여(`GET /api/v1/api-tokens`( `apitoken:read` 필요) + prefix 행 매칭, 실패 시 `GET /api/v1/auth/me` 대체) 해당 스코프가 커버하는 도구만 노출합니다: `NPG_TOOL_LEVEL` ∩ 부여된 스코프. 스코프는 정확한 문자열로 매칭하며(`*` 및 `area:*` 와일드카드 허용) 레거시 스코프를 다른 영역으로 확장하지 않습니다. 스코프 변경은 재시작해야 반영됩니다. 항상 **fail-open**: 두 엔드포인트 모두 실패(403/타임아웃), 토큰 prefix 불일치 또는 중복 일치, 토큰 미설정 시 전체 매니페스트를 유지하며, 권한 주석이 없는 도구는 절대 숨기지 않습니다. 기본값은 꺼짐이며 이때 매니페스트와 도구 수는 변경되지 않습니다. 아래 "범위 필터링" 참고. |
 | `NPG_DRY_RUN` | `0` | 드라이런 모드: 참으로 설정(`1`/`true`/`on`)하면 모든 변경 도구가 실제로 실행하는 대신 보낼 요청을 정확히 반환합니다(`{"dry_run": true, "method", "path", "body", ...}`). 아무것도 적용되지 않으므로 실제 인스턴스에 대한 첫 배포를 안전하게 리허설할 수 있습니다. |
 | `NPG_HTTP_TIMEOUT` | `30` | 발신 NPG API 요청 타임아웃(초). 대용량 액세스 로그 다운로드, 백업 내보내기/복원, 인증서 업로드, 전체 프록시 호스트 동기화 등 오래 걸리는 엔드포인트에서 `ReadTimeout` 실패를 피하려면 값을 높이세요. `[1, 600]` 범위로 제한되며, 잘못된 값은 경고와 함께 `30`으로 대체됩니다. |
@@ -286,11 +286,11 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 | 수준 | 도구 수 | 범위 |
 |-------|-------|-------|
-| `read` | 141 | 읽기 전용 도구만 (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`) — 단, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되며 `standard`/`full`에만 남습니다. NPG 상태를 변경하지 않는 모니터링 에이전트에 적합합니다. |
-| `standard` | 268 | 파괴적 작업(모든 삭제/제거, IP 차단, 백업 복원/업로드, 비밀번호/역할/이메일 변경, 토큰 폐기, 정리, 초기화, 세션 종료, 로그 회전)을 제외한 모든 도구. 일상적인 관리 작업에 적합합니다. |
-| `full` | 315 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
+| `read` | 144 | 읽기 전용 도구만 (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`) — 단, 쓰기 또는 POST 본문을 사용하는 검사 도구 3개(`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`)는 제외되며 `standard`/`full`에만 남습니다. NPG 상태를 변경하지 않는 모니터링 에이전트에 적합합니다. |
+| `standard` | 272 | 파괴적 작업(모든 삭제/제거, IP 차단, 백업 복원/업로드, 비밀번호/역할/이메일 변경, 토큰 폐기, 정리, 초기화, 세션 종료, 로그 회전)을 제외한 모든 도구. 일상적인 관리 작업에 적합합니다. |
+| `full` | 319 | 모든 도구. 기본값이며, 변수를 설정하지 않으면 기존 동작과 동일합니다. |
 
-그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 315개 도구 참조를 문서화합니다.
+그 외의 값(또는 미설정)은 `full`로 폴백합니다. `tool-schemas.yaml`은 선택한 수준과 관계없이 항상 전체 319개 도구 참조를 문서화합니다.
 
 ### 범위 필터링(Scope Filtering)
 
@@ -344,7 +344,7 @@ stdio에서는 `MCP_API_TOKEN`이 적용되지 않습니다 — 접근 제어는
 
 ```
 npg_mcp/
-  main.py       # 315개의 모든 MCP 도구
+  main.py       # 319개의 모든 MCP 도구
   client.py     # API 토큰 인증을 갖춘 HTTP 클라이언트 래퍼
   toolsets.py   # 도구 수준(NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   resultcap.py  # 공용 결과 상한(NPG_MAX_RESULT_CHARS) + `expand` 예외 경로
@@ -354,7 +354,7 @@ npg_mcp/
 Dockerfile      # Multi-stage Docker 빌드
 docker-compose.yml
 pyproject.toml  # 의존성: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
-tool-schemas.yaml  # 315개 도구의 전체 입력 매개변수 스키마
+tool-schemas.yaml  # 319개 도구의 전체 입력 매개변수 스키마
 ```
 
 ## 개발 및 테스트

@@ -149,8 +149,10 @@ class TestHealthIsNotAnMCPTool:
         # 309 → 313: the 4 read-only /traffic/* tools added (NPG v2.66.0).
         # 313 → 314: npg_bulk_export_proxy_hosts (bounded multi-host export).
         # 314 → 315: npg_bulk_update_proxy_hosts (one field set, many hosts).
+        # 315 → 319: NPG v2.69.0 sync — npg_get_instance, npg_list_log_rules,
+        # npg_get_log_rules, npg_update_log_rules (per-host access-log rules).
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 315
+        assert len(names) == 319
 
 
 class TestAccessLogRequestId:

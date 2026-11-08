@@ -906,7 +906,7 @@ async def npg_list_proxy_host_groups(limit: int | None = None, offset: int | Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_proxy_host", description="Get a single proxy host by its ID. REQUIRED: host_id. waf_effective {enabled, mode} = the WAF as it actually runs once waf_use_global is resolved; the stored per-host waf_* columns are the requested values, not what nginx runs. expand=true lifts the result cap.")
 async def npg_get_proxy_host(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2546,7 +2546,7 @@ async def npg_get_proxy_host_uri_block(host_id: str | int, expand: bool = False)
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block config (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips, exception_hostnames (domain/DDNS names counted as exception_ips; omit=keep, []=clear; a domain in exception_ips 400s hostname_in_ip_field), skip_reload (skip nginx regen; batch then npg_sync_proxy_hosts).")
+@mcp.tool(name="npg_update_proxy_host_uri_block", description="UPDATE URI block config (partial update). REQUIRED: host_id. Optional: enabled, rules (each {id, pattern, match_type exact|prefix|regex, description, enabled, exception_ips}), exception_ips (block-wide), allow_private_ips, exception_hostnames (domains counted as exception_ips; omit=keep, []=clear; a domain in exception_ips 400s), skip_reload. A rule's own exception_ips (<=100) let IPs through that rule only — distinct from block-wide exception_ips.")
 async def npg_update_proxy_host_uri_block(host_id: str | int, enabled: bool | None = None, rules: list[dict] | None = None, exception_ips: list[str] | None = None, allow_private_ips: bool | None = None, skip_reload: bool | None = None, exception_hostnames: list[str] | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -2604,7 +2604,7 @@ async def npg_update_settings(kwargs: dict | None = None, strict: bool = True) -
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_system_settings", description="Get system settings (server name, timezone, locale). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_system_settings", description="GET system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + hostnames, dns_entry_settings, UI, instance_name). NOTE: no server name / timezone / locale exist in this object; for the version, nginx_version and instance_name use npg_get_instance. Update with npg_update_system_settings. expand=true lifts the result cap.")
 async def npg_get_system_settings(expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -2613,7 +2613,16 @@ async def npg_get_system_settings(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_system_settings", description="UPDATE system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domain/DDNS names trusted like global_trusted_ips; omit=keep, []=clear; a domain in global_trusted_ips 400s hostname_in_ip_field), UI, dns_entry_settings for DDNS entries). Partial: omitted or null keys keep stored values. Pass only changed fields in kwargs; unknown fields rejected unless strict=false.")
+@mcp.tool(name="npg_get_instance", description="GET what this NPG reports about itself: version, nginx_version (absent when it cannot be read), instance_name (\"\" when unset; set it with npg_update_system_settings kwargs {instance_name}, <=32 chars). Needs a token but NO permission, so it still answers when other tools 403. NPG 2.69.0+. expand=true lifts the result cap.")
+async def npg_get_instance(expand: bool = False) -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/instance")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_update_system_settings", description="UPDATE system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domains trusted like global_trusted_ips; omit=keep, []=clear; a domain in global_trusted_ips 400s), UI, dns_entry_settings, instance_name (<=32 chars, \"\"=none)). Partial: omitted keys keep stored values. Pass only changed fields in kwargs; unknown fields rejected unless strict=false.")
 async def npg_update_system_settings(kwargs: dict | None = None, strict: bool = True) -> dict:
     _validate_kwargs("npg_update_system_settings", kwargs, strict)
     c = _get_client()
@@ -3526,6 +3535,43 @@ async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = Tru
     try:
         data = await _api(c.put, "/api/v1/logs/settings", kwargs or {})
         return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+# ── Access-log collection rules per host (NPG 2.69.0+, #347) ───────────
+
+@mcp.tool(name="npg_list_log_rules", description="LIST every non-stream proxy host with its access-log collection rules: proxy_host_id, domain_names, enabled, skip_all, skip_statuses, skip_methods, skip_paths, updated_at (absent when the host has no rules). NPG 2.69.0+. Lines NPG blocked are always stored and fail2ban counts every line. One host: npg_get_log_rules; change: npg_update_log_rules. expand=true lifts the result cap.")
+async def npg_list_log_rules(expand: bool = False) -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/log-rules")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_log_rules", description="GET one proxy host's access-log collection rules by host_id (UUID): skip_all, skip_statuses, skip_methods, skip_paths, plus domain_names, enabled and updated_at (absent when no rules). 404 = no such host. NPG 2.69.0+. Change with npg_update_log_rules; every host with npg_list_log_rules. expand=true lifts the result cap.")
+async def npg_get_log_rules(host_id: str | int, expand: bool = False) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        data = await _api(c.get, f"/api/v1/log-rules/{_id_path(host_id)}")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_update_log_rules", description="REPLACE a host's access-log collection rules — full replace: an omitted list skips nothing. REQUIRED: host_id. Optional: skip_all (store no line of the host), skip_statuses (codes like 207 or classes like 3xx), skip_methods (upper case, e.g. PROPFIND), skip_paths (prefixes like /remote.php/dav/, <=256 bytes each). Each list <=50 entries; rules that skip nothing remove the host's rules. NPG 2.69.0+; token needs '*'. Applies at once (no sync needed).")
+async def npg_update_log_rules(host_id: str | int, skip_all: bool | None = None, skip_statuses: list[str] | None = None, skip_methods: list[str] | None = None, skip_paths: list[str] | None = None) -> dict:
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        body = {
+            "skip_all": bool(skip_all),
+            "skip_statuses": skip_statuses or [],
+            "skip_methods": skip_methods or [],
+            "skip_paths": skip_paths or [],
+        }
+        data = await _api(c.put, f"/api/v1/log-rules/{_id_path(host_id)}", body)
+        return _mutate_result(data)
     except Exception as e:
         return _error_result(e)
 

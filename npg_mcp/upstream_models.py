@@ -93,6 +93,10 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         "system_logs_exclude_patterns", "system_logs_stdout_excluded",
         # v2.51.0
         "trusted_proxy_cidrs", "trusted_proxy_preset", "real_ip_header",
+        # v2.69.0: name the header shows to tell NPG instances apart; trimmed,
+        # at most 32 characters, no control characters, "" shows none.
+        # Read it back with npg_get_instance / npg_get_system_settings.
+        "instance_name",
     }),
     # model/log.go: UpdateLogSettingsRequest
     "npg_update_log_settings": frozenset({

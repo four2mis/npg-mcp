@@ -48,7 +48,7 @@ npg_list_proxy_host_groups:
       default: false
 
 npg_get_proxy_host:
-  description: "Get a single proxy host by its ID. REQUIRED: host_id. expand=true lifts the result cap."
+  description: "Get a single proxy host by its ID. REQUIRED: host_id. waf_effective {enabled, mode} = the WAF as it actually runs once waf_use_global is resolved; the stored per-host waf_* columns are the requested values, not what nginx runs. expand=true lifts the result cap."
   parameters:
     - name: host_id
       type: integer | string
@@ -978,7 +978,7 @@ npg_get_proxy_host_uri_block:
       default: false
 
 npg_update_proxy_host_uri_block:
-  description: "UPDATE URI block config (partial update - omitted fields left as-is). REQUIRED: host_id. Optional: enabled, rules (list of {pattern, is_regex, action}), exception_ips, allow_private_ips, exception_hostnames (domain/DDNS names counted as exception_ips; omit=keep, []=clear; a domain in exception_ips 400s hostname_in_ip_field), skip_reload (skip nginx regen; batch then npg_sync_proxy_hosts)."
+  description: "UPDATE URI block config (partial update). REQUIRED: host_id. Optional: enabled, rules (each {id, pattern, match_type exact|prefix|regex, description, enabled, exception_ips}), exception_ips (block-wide), allow_private_ips, exception_hostnames (domains counted as exception_ips; omit=keep, []=clear; a domain in exception_ips 400s), skip_reload. A rule's own exception_ips (<=100) let IPs through that rule only — distinct from block-wide exception_ips."
   parameters:
     - name: host_id
       type: integer | string
@@ -1038,7 +1038,15 @@ npg_update_settings:
       default: true
 
 npg_get_system_settings:
-  description: "Get system settings (server name, timezone, locale). expand=true lifts the result cap."
+  description: "GET system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + hostnames, dns_entry_settings, UI, instance_name). NOTE: no server name / timezone / locale exist in this object; for the version, nginx_version and instance_name use npg_get_instance. Update with npg_update_system_settings. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_instance:
+  description: "GET what this NPG reports about itself: version, nginx_version (absent when it cannot be read), instance_name (\"\" when unset; set it with npg_update_system_settings kwargs {instance_name}, <=32 chars). Needs a token but NO permission, so it still answers when other tools 403. NPG 2.69.0+. expand=true lifts the result cap."
   parameters:
     - name: expand
       type: boolean
@@ -1046,7 +1054,7 @@ npg_get_system_settings:
       default: false
 
 npg_update_system_settings:
-  description: "UPDATE system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domain/DDNS names trusted like global_trusted_ips; omit=keep, []=clear; a domain in global_trusted_ips 400s hostname_in_ip_field), UI, dns_entry_settings for DDNS entries). Partial: omitted or null keys keep stored values. Pass only changed fields in kwargs; unknown fields rejected unless strict=false."
+  description: "UPDATE system settings (GeoIP, ACME, notifications, retention, bot-filter defaults, WAF auto-ban, trusted IPs + global_trusted_hostnames (domains trusted like global_trusted_ips; omit=keep, []=clear; a domain in global_trusted_ips 400s), UI, dns_entry_settings, instance_name (<=32 chars, \"\"=none)). Partial: omitted keys keep stored values. Pass only changed fields in kwargs; unknown fields rejected unless strict=false."
   parameters:
     - name: kwargs
       type: object
@@ -1966,6 +1974,44 @@ npg_update_log_settings:
       type: boolean
       required: false
       default: true
+
+npg_list_log_rules:
+  description: "LIST every non-stream proxy host with its access-log collection rules: proxy_host_id, domain_names, enabled, skip_all, skip_statuses, skip_methods, skip_paths, updated_at (absent when the host has no rules). NPG 2.69.0+. Lines NPG blocked are always stored and fail2ban counts every line. One host: npg_get_log_rules; change: npg_update_log_rules. expand=true lifts the result cap."
+  parameters:
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_get_log_rules:
+  description: "GET one proxy host's access-log collection rules by host_id (UUID): skip_all, skip_statuses, skip_methods, skip_paths, plus domain_names, enabled and updated_at (absent when no rules). 404 = no such host. NPG 2.69.0+. Change with npg_update_log_rules; every host with npg_list_log_rules. expand=true lifts the result cap."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
+npg_update_log_rules:
+  description: "REPLACE a host's access-log collection rules — full replace: an omitted list skips nothing. REQUIRED: host_id. Optional: skip_all (store no line of the host), skip_statuses (codes like 207 or classes like 3xx), skip_methods (upper case, e.g. PROPFIND), skip_paths (prefixes like /remote.php/dav/, <=256 bytes each). Each list <=50 entries; rules that skip nothing remove the host's rules. NPG 2.69.0+; token needs '*'. Applies at once (no sync needed)."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: skip_all
+      type: boolean
+      required: false
+    - name: skip_statuses
+      type: array<string>
+      required: false
+    - name: skip_methods
+      type: array<string>
+      required: false
+    - name: skip_paths
+      type: array<string>
+      required: false
 
 npg_get_log_stats:
   description: "GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats). expand=true lifts the result cap."
