@@ -143,6 +143,10 @@ class TestRowImport:
         assert result["summary"]["failed"] == 1
         assert result["data"][1]["success"] is False
         assert "expected true/false" in result["data"][1]["error"]
+        # CSV parse failures are local ValueError -> the input playbook hint;
+        # rows that imported carry no hint key.
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_INPUT
+        assert "hint" not in result["data"][0]
 
     def test_missing_domain_fails_only_that_row(self, recording):
         csv_data = _csv(
@@ -155,6 +159,7 @@ class TestRowImport:
         assert result["summary"]["created"] == 1
         assert result["summary"]["failed"] == 1
         assert "domain_names is required" in result["data"][1]["error"]
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_INPUT
 
     def test_bad_port_fails_only_that_row(self, recording):
         csv_data = _csv(

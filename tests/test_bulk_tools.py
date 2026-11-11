@@ -114,6 +114,11 @@ class TestBulkApplyCertificate:
         assert result["data"][0]["success"] is True
         assert result["data"][1]["success"] is False
         assert "404" in result["data"][1]["error"]
+        # Per-entry failures carry the same static playbook hint a single-tool
+        # failure returns; successful siblings stay hint-free.
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_404
+        assert "hint" not in result["data"][0]
+        assert "hint" not in result["data"][2]
         assert result["data"][2]["success"] is True
 
     def test_int_host_ids_coerced_to_string_paths(self, recording):
@@ -189,6 +194,8 @@ class TestBulkDeleteProxyHosts:
         assert result["data"][0]["success"] is True
         assert result["data"][1]["success"] is False
         assert "404" in result["data"][1]["error"]
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_404
+        assert "hint" not in result["data"][0]
         assert result["data"][2]["success"] is True
 
     def test_empty_host_ids_rejected(self):
@@ -256,6 +263,8 @@ class TestBulkRenewCertificates:
         assert result["data"][0]["success"] is True
         assert result["data"][1]["success"] is False
         assert "404" in result["data"][1]["error"]
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_404
+        assert "hint" not in result["data"][0]
         assert result["data"][2]["success"] is True
 
     def test_int_cert_ids_coerced_to_string_paths(self, recording):
@@ -361,6 +370,8 @@ class TestBulkSetProxyHostsEnabled:
         assert result["data"][0]["success"] is True
         assert result["data"][1]["success"] is False
         assert "404" in result["data"][1]["error"]
+        assert result["data"][1]["hint"] == main_mod._ERROR_HINT_404
+        assert "hint" not in result["data"][0]
         assert result["data"][2]["success"] is True
         assert result["hosts_failed"] == ["fail-host"]
 

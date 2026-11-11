@@ -495,6 +495,21 @@ def _error_result(e: Exception) -> dict:
     return {"success": False, "error": str(e), "hint": _error_hint(e)}
 
 
+def _entry_error(entry: dict, exc: Exception) -> dict:
+    """Record a per-item bulk failure with the standard static hint.
+
+    Bulk tools isolate failures per item, so a partial batch must carry the
+    same ``error`` + ``hint`` pair a single-tool failure exposes through
+    :func:`_error_result` — otherwise the status->playbook mapping (401/403
+    token scope, 404 missing id, 409 conflict, 429 rate limit, 5xx upstream)
+    is lost exactly when per-entry guidance matters most. Purely additive:
+    callers keying on ``success``/``error``/``result`` are unaffected.
+    """
+    entry["error"] = str(exc)
+    entry["hint"] = _error_hint(exc)
+    return entry
+
+
 def _mutate_result(data, message: str | None = None) -> dict:
     """Normalize a mutating tool's result shape.
 
@@ -1322,7 +1337,7 @@ async def npg_clone_proxy_host(host_id: str | int, domain_names: list[str]) -> d
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_apply_certificate", description="Apply one certificate to multiple proxy hosts. REQUIRED: cert_id, host_ids (UUID list, max 50). Per-host results: success:true/result or success:false/error - one failure does not abort the batch. ssl_cert_id maps to API certificate_id. Over the 50-host cap raises ValueError; empty rejected.")
+@mcp.tool(name="npg_bulk_apply_certificate", description="Apply one certificate to multiple proxy hosts. REQUIRED: cert_id, host_ids (UUID list, max 50). Per-host results: success:true/result or success:false/error+hint - one failure does not abort the batch. ssl_cert_id maps to API certificate_id. Over the 50-host cap raises ValueError; empty rejected.")
 async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | int]) -> dict:
     try:
         _validate_id("cert_id", cert_id)
@@ -1351,7 +1366,7 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
                 entry["result"] = data
             except Exception as e:
                 entry["success"] = False
-                entry["error"] = str(e)
+                _entry_error(entry, e)
             return entry
 
         results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
@@ -1360,7 +1375,7 @@ async def npg_bulk_apply_certificate(cert_id: str | int, host_ids: list[str | in
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_delete_proxy_hosts", description="DESTRUCTIVE: DELETE multiple proxy hosts in one call; sub-configs (WAF, geo, fail2ban) cascade-delete. REQUIRED: host_ids (UUID list, max 50). Per-host deleted/error results, 50-host cap (ValueError) and empty rejection: same bulk semantics as npg_bulk_apply_certificate.")
+@mcp.tool(name="npg_bulk_delete_proxy_hosts", description="DESTRUCTIVE: DELETE multiple proxy hosts in one call; sub-configs (WAF, geo, fail2ban) cascade-delete. REQUIRED: host_ids (UUID list, max 50). Per-host deleted/error+hint results, 50-host cap (ValueError) and empty rejection: same bulk semantics as npg_bulk_apply_certificate.")
 async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
     try:
         _validate_required("host_ids", host_ids)
@@ -1386,7 +1401,7 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
                     entry["result"] = {"deleted": True, "dry_run": data}
             except Exception as e:
                 entry["success"] = False
-                entry["error"] = str(e)
+                _entry_error(entry, e)
             return entry
 
         results = await _gather_bounded(_BULK_WRITE_CONCURRENCY,
@@ -1395,7 +1410,7 @@ async def npg_bulk_delete_proxy_hosts(host_ids: list[str | int]) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_set_proxy_hosts_enabled", description="BULK ENABLE/DISABLE proxy hosts in one call. REQUIRED: host_ids (list, max 50), enabled (bool). Per-host result; one failure doesn't abort. Duplicates deduped; empty rejected. skip_nginx=true (default) persists without nginx regen — call npg_sync_proxy_hosts once after; skip_nginx=false regens+reloads per host. Disabling hosts takes them offline at once (reversible).")
+@mcp.tool(name="npg_bulk_set_proxy_hosts_enabled", description="BULK ENABLE/DISABLE proxy hosts in one call. REQUIRED: host_ids (list, max 50), enabled (bool). Per-host result + hint on failure; one failure doesn't abort. Duplicates deduped; empty rejected. skip_nginx=true (default) persists without nginx regen — call npg_sync_proxy_hosts once after; skip_nginx=false regens+reloads per host. Disabling hosts takes them offline at once (reversible).")
 async def npg_bulk_set_proxy_hosts_enabled(host_ids: list[str | int], enabled: bool, skip_nginx: bool = True) -> dict:
     try:
         _validate_required("host_ids", host_ids)
@@ -1441,7 +1456,7 @@ async def npg_bulk_set_proxy_hosts_enabled(host_ids: list[str | int], enabled: b
                 entry["result"] = data
             except Exception as e:
                 entry["success"] = False
-                entry["error"] = str(e)
+                _entry_error(entry, e)
             return entry
 
         # Semaphore-capped gather — at most _BULK_WRITE_CONCURRENCY PUTs in
@@ -1519,8 +1534,7 @@ async def npg_bulk_update_proxy_hosts(host_ids: list[str | int], fields: dict, s
                 entry["result"] = data
             except Exception as e:
                 entry["success"] = False
-                entry["error"] = str(e)
-                entry["hint"] = _error_hint(e)
+                _entry_error(entry, e)
             return entry
 
         # Semaphore-capped gather — at most _BULK_WRITE_CONCURRENCY PUTs in
@@ -1532,7 +1546,7 @@ async def npg_bulk_update_proxy_hosts(host_ids: list[str | int], fields: dict, s
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed; one bad host never aborts the batch. expand=true lifts the result cap.")
+@mcp.tool(name="npg_bulk_get_proxy_host_full", description="GET complete config of MANY proxy hosts in one call (fleet-wide audit). REQUIRED: host_ids (list, max 50). OPTIONAL: sections subset of host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block; omit = all. Failed hosts land in hosts_failed with error+hint; one bad host never aborts the batch. expand=true lifts the result cap.")
 async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list[str] | None = None, expand: bool = False) -> dict:
     try:
         _validate_required("host_ids", host_ids)
@@ -1590,9 +1604,14 @@ async def npg_bulk_get_proxy_host_full(host_ids: list[str | int], sections: list
                 if isinstance(host_payload, dict) and not host_payload.get("success"):
                     entry["success"] = False
                     entry["error"] = host_payload.get("error", "host section failed")
+                    # Reuse the section-level hint (already status-classified)
+                    # so the host-level failure carries guidance too.
+                    entry["hint"] = host_payload.get("hint") or _error_hint(
+                        RuntimeError(entry["error"])
+                    )
             except Exception as he:
                 entry["success"] = False
-                entry["error"] = str(he)
+                _entry_error(entry, he)
             return display, entry
 
         # Two-level bounded fan-out: at most _BULK_HOST_CONCURRENCY host
@@ -2134,13 +2153,24 @@ async def npg_bulk_import_proxy_hosts(csv_data: str, skip_nginx: bool = True) ->
                     entry["result"] = result.get("data")
                 else:
                     entry["success"] = False
-                    entry["error"] = str(
-                        (result or {}).get("error", "unknown error") if isinstance(result, dict)
-                        else "unknown error"
+                    _entry_error(
+                        entry,
+                        RuntimeError(
+                            str(
+                                (result or {}).get("error", "unknown error")
+                                if isinstance(result, dict)
+                                else "unknown error"
+                            )
+                        ),
                     )
+                    # npg_create_proxy_host already classified this failure —
+                    # keep its status-aware hint rather than the generic
+                    # RuntimeError fallback.
+                    if isinstance(result, dict) and result.get("hint"):
+                        entry["hint"] = result["hint"]
             except Exception as rexc:
                 entry["success"] = False
-                entry["error"] = str(rexc)
+                _entry_error(entry, rexc)
             results.append(entry)
         summary: dict = {
             "rows": len(results),
@@ -2240,7 +2270,7 @@ async def npg_renew_certificate(cert_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_bulk_renew_certificates", description="RENEW multiple certificates in one call. REQUIRED: cert_ids (UUID list, max 20). Per-cert success:true/error results, one-failure isolation and empty rejection: same as npg_bulk_apply_certificate; the 20-cert cap raises ValueError before any renewal. Watch ACME/Let's Encrypt rate limits.")
+@mcp.tool(name="npg_bulk_renew_certificates", description="RENEW multiple certificates in one call. REQUIRED: cert_ids (UUID list, max 20). Per-cert success:true/error+hint results, one-failure isolation and empty rejection: same as npg_bulk_apply_certificate; the 20-cert cap raises ValueError before any renewal. Watch ACME/Let's Encrypt rate limits.")
 async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
     try:
         _validate_required("cert_ids", cert_ids)
@@ -2264,7 +2294,7 @@ async def npg_bulk_renew_certificates(cert_ids: list[str | int]) -> dict:
                 entry["result"] = data
             except Exception as e:
                 entry["success"] = False
-                entry["error"] = str(e)
+                _entry_error(entry, e)
             return entry
 
         results = await _gather_bounded(_BULK_RENEW_CONCURRENCY,

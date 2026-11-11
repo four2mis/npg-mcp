@@ -260,6 +260,9 @@ class TestBulkGetProxyHostFullConcurrency:
         assert result["success"] is True
         assert result["hosts_failed"] == ["fail-b"]
         assert result["data"]["fail-b"]["success"] is False
+        # The host-level entry carries the section's status-aware playbook hint.
+        assert result["data"]["fail-b"]["hint"] == main_mod._ERROR_HINT_404
+        assert "hint" not in result["data"]["ok-a"]
         # Healthy hosts still return their full config
         assert result["data"]["ok-a"]["success"] is True
         assert result["data"]["ok-c"]["success"] is True
