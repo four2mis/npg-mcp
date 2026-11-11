@@ -4,8 +4,9 @@ Covers:
 * NPGError sanitization (HTTP 400 with JSON body includes detail; HTTP 500
   without body returns a generic message; transport errors return a generic
   message and never leak internals).
-* Retry logic (GET retries on 502/503/504 and ConnectError; does NOT retry on
-  400/401/404; POST/PUT/DELETE never retry).
+* Retry logic (GET/PUT/DELETE retry on 502/503/504, 429 and ConnectError; never
+  retry 400/401/404; POST and file uploads never retry). A DELETE replayed
+  after its first attempt already landed answers 404 — that is success.
 * Singleton lifecycle (get_singleton returns the same instance; close_singleton
   resets the module-level singleton to None).
 
@@ -130,7 +131,7 @@ class TestNPGErrorSanitization:
 
 
 class TestRetryLogic:
-    """GET retries on transient failures; mutations never retry."""
+    """GET/PUT/DELETE retry transient failures; POST never retries."""
 
     def test_get_retries_on_502_then_succeeds(self, client):
         route = respx.get(f"{BASE}/api/v1/hosts")
@@ -203,23 +204,144 @@ class TestRetryLogic:
             assert route.call_count == 1
         assert ei.value.message == "NPG API returned HTTP 503"
 
-    def test_put_never_retries(self, client):
+    def test_post_file_never_retries(self, client):
+        # Uploads are not idempotent — a replay could store the payload twice.
+        route = respx.post(f"{BASE}/api/v1/backups/upload-restore")
+        route.mock(return_value=httpx.Response(503, json={"message": "nope"}))
+        with respx.mock:
+            with pytest.raises(NPGError) as ei:
+                client.post_file(
+                    "/api/v1/backups/upload-restore",
+                    "backup",
+                    b"tar-bytes",
+                    "restore.tar.gz",
+                )
+            assert route.call_count == 1
+        assert ei.value.message == "NPG API returned HTTP 503"
+
+    def test_put_retries_on_429_then_succeeds(self, client):
+        route = respx.put(f"{BASE}/api/v1/hosts/1")
+        route.mock(
+            side_effect=[
+                httpx.Response(
+                    429, headers={"Retry-After": "0"}, json={"message": "slow down"}
+                ),
+                httpx.Response(200, json={"data": "updated"}),
+            ]
+        )
+        with respx.mock:
+            data = client.put("/api/v1/hosts/1", {"a": 1})
+            assert route.call_count == 2
+        assert data == {"data": "updated"}
+
+    @pytest.mark.parametrize("status", [503, 504])
+    def test_put_retries_on_transient_status(self, client, status):
+        route = respx.put(f"{BASE}/api/v1/hosts/1")
+        route.mock(
+            side_effect=[
+                httpx.Response(status, json={"message": "nope"}),
+                httpx.Response(200, json={"data": status}),
+            ]
+        )
+        with respx.mock:
+            data = client.put("/api/v1/hosts/1", {"a": 1})
+            assert route.call_count == 2
+        assert data == {"data": status}
+
+    def test_put_retries_on_connect_error(self, client):
+        route = respx.put(f"{BASE}/api/v1/hosts/1")
+        route.mock(
+            side_effect=[
+                httpx.ConnectError("connection refused"),
+                httpx.Response(200, json={"data": "recovered"}),
+            ]
+        )
+        with respx.mock:
+            data = client.put("/api/v1/hosts/1", {"a": 1})
+            assert route.call_count == 2
+        assert data == {"data": "recovered"}
+
+    def test_put_exhausts_retries_then_sanitized_error(self, client):
         route = respx.put(f"{BASE}/api/v1/hosts/1")
         route.mock(return_value=httpx.Response(503, json={"message": "nope"}))
         with respx.mock:
             with pytest.raises(NPGError) as ei:
                 client.put("/api/v1/hosts/1", {"a": 1})
-            assert route.call_count == 1
+            # initial attempt + 2 retries (monkeypatched _MAX_RETRIES=2)
+            assert route.call_count == 3
         assert ei.value.message == "NPG API returned HTTP 503"
 
-    def test_delete_never_retries(self, client):
+    def test_put_does_not_retry_client_errors(self, client):
+        route = respx.put(f"{BASE}/api/v1/hosts/1")
+        route.mock(return_value=httpx.Response(400, json={"message": "nope"}))
+        with respx.mock:
+            with pytest.raises(NPGError) as ei:
+                client.put("/api/v1/hosts/1", {"a": 1})
+            assert route.call_count == 1, "PUT must not retry HTTP 400"
+        assert ei.value.message == "NPG API returned HTTP 400"
+
+    def test_delete_retries_on_503_then_succeeds(self, client):
         route = respx.delete(f"{BASE}/api/v1/hosts/1")
-        route.mock(return_value=httpx.Response(503, json={"message": "nope"}))
+        route.mock(
+            side_effect=[
+                httpx.Response(503, json={"message": "nope"}),
+                httpx.Response(204),
+            ]
+        )
+        with respx.mock:
+            data = client.delete("/api/v1/hosts/1")
+            assert route.call_count == 2
+        assert data is None
+
+    def test_delete_retries_on_429_then_succeeds(self, client):
+        route = respx.delete(f"{BASE}/api/v1/hosts/1")
+        route.mock(
+            side_effect=[
+                httpx.Response(
+                    429, headers={"Retry-After": "0"}, json={"message": "rl"}
+                ),
+                httpx.Response(200, json={"deleted": True}),
+            ]
+        )
+        with respx.mock:
+            data = client.delete("/api/v1/hosts/1")
+            assert route.call_count == 2
+        assert data == {"deleted": True}
+
+    def test_delete_retry_404_is_success(self, client):
+        # First attempt landed but its response was lost; the replay answers
+        # 404 — that means "already deleted", not a failure.
+        route = respx.delete(f"{BASE}/api/v1/hosts/1")
+        route.mock(
+            side_effect=[
+                httpx.Response(503, json={"message": "nope"}),
+                httpx.Response(404, json={"message": "not found"}),
+            ]
+        )
+        with respx.mock:
+            data = client.delete("/api/v1/hosts/1")
+            assert route.call_count == 2
+        assert data is None
+
+    def test_delete_first_attempt_404_still_raises(self, client):
+        # A 404 on the FIRST attempt is a genuine not-found and must raise.
+        route = respx.delete(f"{BASE}/api/v1/hosts/1")
+        route.mock(return_value=httpx.Response(404, json={"message": "not found"}))
         with respx.mock:
             with pytest.raises(NPGError) as ei:
                 client.delete("/api/v1/hosts/1")
             assert route.call_count == 1
-        assert ei.value.message == "NPG API returned HTTP 503"
+        assert ei.value.message == "NPG API returned HTTP 404"
+
+    def test_delete_exhausts_retries_then_sanitized_error(self, client):
+        route = respx.delete(f"{BASE}/api/v1/hosts/1")
+        route.mock(return_value=httpx.Response(502, json={"message": "bad gateway"}))
+        with respx.mock:
+            with pytest.raises(NPGError) as ei:
+                client.delete("/api/v1/hosts/1")
+            # initial attempt + 2 retries (monkeypatched _MAX_RETRIES=2)
+            assert route.call_count == 3
+        assert ei.value.message == "NPG API returned HTTP 502"
 
 
 class TestRateLimit429Retry:

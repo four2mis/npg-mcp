@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from contextvars import ContextVar
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -32,10 +33,15 @@ _singleton_client: "NPGClient | None" = None
 
 # HTTP status codes eligible for retry (transient server-side failures).
 _RETRYABLE_STATUS = frozenset({502, 503, 504})
-# Rate-limit responses are also retried (GET-only loop — no mutation replay),
-# honoring the server's Retry-After hint when present.
+# Rate-limit responses are also retried, honoring the server's Retry-After
+# hint when present. Retries apply only to idempotent methods (GET, PUT,
+# DELETE) — see _request_with_retry().
 _RATE_LIMIT_STATUS = 429
-# Maximum retry attempts for idempotent GET requests.
+# Maximum retry attempts for idempotent requests (GET, PUT, DELETE).
+# POST and POST-file are deliberately excluded: creates and uploads are not
+# idempotent, so replaying them could create duplicate resources or double
+# an upload. A retried PUT/DELETE is safe — replaying it converges on the
+# same server state.
 _MAX_RETRIES = 2
 # Base delay in seconds for exponential backoff between retries.
 _RETRY_BASE_DELAY = 0.5
@@ -323,6 +329,91 @@ class NPGClient:
                 pass  # missing / non-numeric Retry-After — use backoff
         return _RETRY_BASE_DELAY * (2 ** attempt)
 
+    def _request_with_retry(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict | None = None,
+        body: dict | None = None,
+        files: dict | None = None,
+        data: dict | None = None,
+        retry: bool,
+        parse: str = "json",
+        redirect_ok: bool = False,
+    ) -> Any:
+        """Send one HTTP request, replaying idempotent methods on transient errors.
+
+        ``retry=True`` replays the request up to ``_MAX_RETRIES`` extra times on
+        502/503/504, 429 (honoring Retry-After, clamped to ``_RETRY_AFTER_CAP``)
+        and transport errors. ``retry=False`` makes exactly one attempt —
+        POST creates and file uploads are not idempotent and must not replay.
+
+        ``parse`` selects the return transform: ``"json"`` (204/empty body ->
+        ``None``), ``"text"`` (raw response text) or ``"bytes"``
+        (``(content, content_type)``).
+
+        A DELETE that already landed before its response was lost answers 404
+        when replayed; that replay-time 404 means "already deleted", so it
+        returns ``None`` rather than reporting a completed delete as failed.
+        """
+        url = urljoin(self.base_url + "/", path.lstrip("/"))
+        attempts = _MAX_RETRIES + 1 if retry else 1
+        for attempt in range(attempts):
+            start = time.perf_counter()
+            try:
+                resp = self._client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=body,
+                    files=files,
+                    data=data,
+                    headers=self._headers(),
+                )
+                if redirect_ok and resp.status_code in (301, 302, 303, 307, 308):
+                    self._log_ok(method, path, resp.status_code, start)
+                    location = resp.headers.get("location")
+                    return {"redirect_url": location} if location else None
+                resp.raise_for_status()
+                self._log_ok(method, path, resp.status_code, start)
+                if parse == "text":
+                    return resp.text
+                if parse == "bytes":
+                    return (resp.content, resp.headers.get("content-type", ""))
+                if resp.status_code == 204 or not resp.content:
+                    return None
+                return resp.json()
+            except NPGError:
+                raise
+            except Exception as e:
+                if (
+                    method == "DELETE"
+                    and attempt > 0
+                    and isinstance(e, httpx.HTTPStatusError)
+                    and e.response.status_code == 404
+                ):
+                    logger.info(
+                        "NPG DELETE %s -> already deleted on retry (404)%s",
+                        path, _req_suffix(),
+                    )
+                    return None
+                if attempt + 1 < attempts and self._should_retry(e):
+                    delay = self._retry_delay(attempt, e)
+                    reason = (
+                        "rate-limited" if _is_rate_limited(e) else "transient error"
+                    )
+                    logger.warning(
+                        "NPG %s %s -> %s (%s), retry %d/%d in %.1fs",
+                        method, path, reason, type(e).__name__,
+                        attempt + 1, _MAX_RETRIES, delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise self._log_err(method, path, e, start) from e
+        # Unreachable — loop exits via return or raise
+        raise NPGError("NPG API request failed after retries")
+
     def get(
         self,
         path: str,
@@ -337,69 +428,21 @@ class NPGClient:
         302 to the identity provider). Redirects are never followed so the
         API token is never forwarded to an external IdP.
         """
-        url = urljoin(self.base_url + "/", path.lstrip("/"))
-        for attempt in range(_MAX_RETRIES + 1):
-            start = time.perf_counter()
-            try:
-                resp = self._client.get(url, params=params, headers=self._headers())
-                if resp.status_code in (301, 302, 303, 307, 308) and redirect_ok:
-                    self._log_ok("GET", path, resp.status_code, start)
-                    location = resp.headers.get("location")
-                    return (
-                        {"redirect_url": location} if location else None
-                    )
-                resp.raise_for_status()
-                self._log_ok("GET", path, resp.status_code, start)
-                if resp.status_code == 204 or not resp.content:
-                    return None
-                return resp.json()
-            except NPGError:
-                raise
-            except Exception as e:
-                if attempt < _MAX_RETRIES and self._should_retry(e):
-                    delay = self._retry_delay(attempt, e)
-                    reason = (
-                        "rate-limited" if _is_rate_limited(e) else "transient error"
-                    )
-                    logger.warning(
-                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
-                        path, reason, type(e).__name__,
-                        attempt + 1, _MAX_RETRIES, delay,
-                    )
-                    time.sleep(delay)
-                    continue
-                raise self._log_err("GET", path, e, start) from e
-        # Unreachable — loop exits via return or raise
-        raise NPGError("NPG API request failed after retries")
+        return self._request_with_retry(
+            "GET",
+            path,
+            params=params,
+            retry=True,
+            parse="json",
+            redirect_ok=redirect_ok,
+        )
 
     def get_text(self, path: str, params: dict | None = None) -> str:
         """GET returning raw response text (for non-JSON endpoints like log
         downloads)."""
-        url = urljoin(self.base_url + "/", path.lstrip("/"))
-        for attempt in range(_MAX_RETRIES + 1):
-            start = time.perf_counter()
-            try:
-                resp = self._client.get(url, params=params, headers=self._headers())
-                resp.raise_for_status()
-                self._log_ok("GET", path, resp.status_code, start)
-                return resp.text
-            except NPGError:
-                raise
-            except Exception as e:
-                if attempt < _MAX_RETRIES and self._should_retry(e):
-                    delay = self._retry_delay(attempt, e)
-                    reason = (
-                        "rate-limited" if _is_rate_limited(e) else "transient error"
-                    )
-                    logger.warning(
-                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
-                        path, reason, type(e).__name__,
-                        attempt + 1, _MAX_RETRIES, delay,
-                    )
-                    time.sleep(delay)
-                    continue
-                raise self._log_err("GET", path, e, start) from e
-        raise NPGError("NPG API request failed after retries")
+        return self._request_with_retry(
+            "GET", path, params=params, retry=True, parse="text"
+        )
 
     def get_bytes(self, path: str, params: dict | None = None) -> tuple[bytes, str]:
         """GET returning raw response bytes and the content-type header.
@@ -409,93 +452,46 @@ class NPGClient:
         Returns ``(content, content_type)`` so callers can decide between
         text passthrough and base64 encoding.
         """
-        url = urljoin(self.base_url + "/", path.lstrip("/"))
-        for attempt in range(_MAX_RETRIES + 1):
-            start = time.perf_counter()
-            try:
-                resp = self._client.get(url, params=params, headers=self._headers())
-                resp.raise_for_status()
-                self._log_ok("GET", path, resp.status_code, start)
-                return (
-                    resp.content,
-                    resp.headers.get("content-type", ""),
-                )
-            except NPGError:
-                raise
-            except Exception as e:
-                if attempt < _MAX_RETRIES and self._should_retry(e):
-                    delay = self._retry_delay(attempt, e)
-                    reason = (
-                        "rate-limited" if _is_rate_limited(e) else "transient error"
-                    )
-                    logger.warning(
-                        "NPG GET %s -> %s (%s), retry %d/%d in %.1fs",
-                        path, reason, type(e).__name__,
-                        attempt + 1, _MAX_RETRIES, delay,
-                    )
-                    time.sleep(delay)
-                    continue
-                raise self._log_err("GET", path, e, start) from e
-        raise NPGError("NPG API request failed after retries")
+        return self._request_with_retry(
+            "GET", path, params=params, retry=True, parse="bytes"
+        )
 
     def post(
         self, path: str, body: dict | None = None, params: dict | None = None
     ) -> dict | None:
+        """POST returning parsed JSON (or None on 204/empty body).
+
+        Never retried — a create replay could duplicate the resource.
+        """
         if _DRY_RUN:
             return _dry_run_payload("POST", path, body, params)
-        start = time.perf_counter()
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            resp = self._client.post(
-                url, json=body, params=params, headers=self._headers()
-            )
-            resp.raise_for_status()
-            self._log_ok("POST", path, resp.status_code, start)
-            if resp.status_code == 204 or not resp.content:
-                return None
-            return resp.json()
-        except NPGError:
-            raise
-        except Exception as e:
-            raise self._log_err("POST", path, e, start) from e
+        return self._request_with_retry(
+            "POST", path, params=params, body=body, retry=False
+        )
 
     def put(
         self, path: str, body: dict | None = None, params: dict | None = None
     ) -> dict | None:
+        """PUT returning parsed JSON (or None on 204/empty body).
+
+        Idempotent by HTTP semantics, so transient failures are retried.
+        """
         if _DRY_RUN:
             return _dry_run_payload("PUT", path, body, params)
-        start = time.perf_counter()
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            resp = self._client.put(
-                url, json=body, params=params, headers=self._headers()
-            )
-            resp.raise_for_status()
-            self._log_ok("PUT", path, resp.status_code, start)
-            if resp.status_code == 204 or not resp.content:
-                return None
-            return resp.json()
-        except NPGError:
-            raise
-        except Exception as e:
-            raise self._log_err("PUT", path, e, start) from e
+        return self._request_with_retry(
+            "PUT", path, params=params, body=body, retry=True
+        )
 
     def delete(self, path: str, params: dict | None = None) -> dict | None:
+        """DELETE returning parsed JSON (or None on 204/empty body).
+
+        Idempotent by HTTP semantics, so transient failures are retried.
+        """
         if _DRY_RUN:
             return _dry_run_payload("DELETE", path, None, params)
-        start = time.perf_counter()
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            resp = self._client.delete(url, params=params, headers=self._headers())
-            resp.raise_for_status()
-            self._log_ok("DELETE", path, resp.status_code, start)
-            if resp.status_code == 204 or not resp.content:
-                return None
-            return resp.json()
-        except NPGError:
-            raise
-        except Exception as e:
-            raise self._log_err("DELETE", path, e, start) from e
+        return self._request_with_retry(
+            "DELETE", path, params=params, retry=True
+        )
 
     def post_file(
         self,
@@ -506,7 +502,11 @@ class NPGClient:
         extra_fields: dict | None = None,
     ) -> dict | None:
         """POST a multipart file upload (for backup restore, certificate
-        upload, etc.)."""
+        upload, etc.).
+
+        Never retried — an upload replay could restore or store the same
+        payload twice.
+        """
         if _DRY_RUN:
             payload = _dry_run_payload("POST", path, None, None)
             payload["multipart"] = {
@@ -517,22 +517,10 @@ class NPGClient:
             if extra_fields:
                 payload["multipart"]["extra_fields"] = extra_fields
             return payload
-        start = time.perf_counter()
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            files = {file_field: (filename, file_content, "application/octet-stream")}
-            resp = self._client.post(
-                url, files=files, data=extra_fields, headers=self._headers()
-            )
-            resp.raise_for_status()
-            self._log_ok("POST", path, resp.status_code, start)
-            if resp.status_code == 204 or not resp.content:
-                return None
-            return resp.json()
-        except NPGError:
-            raise
-        except Exception as e:
-            raise self._log_err("POST", path, e, start) from e
+        files = {file_field: (filename, file_content, "application/octet-stream")}
+        return self._request_with_retry(
+            "POST", path, files=files, data=extra_fields, retry=False
+        )
 
     def close(self) -> None:
         self._client.close()
