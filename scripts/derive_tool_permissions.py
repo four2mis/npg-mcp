@@ -90,6 +90,13 @@ MANUAL_OVERRIDES: dict[str, tuple[tuple[str, ...], str]] = {
         ("proxy:read", "waf:read"),
         "per-host fan-out over the same 11 sections as npg_get_proxy_host_full",
     ),
+    "npg_get_proxy_host_diagnosis": (
+        ("proxy:read", "waf:read"),
+        "derived diagnosis over the same 11 section GETs as npg_get_proxy_host_full "
+        "(paths built by _proxy_host_section_paths at runtime, so the AST cannot "
+        "see them); read-only by construction — it must never issue the "
+        "POST-based npg_test_proxy_host probe",
+    ),
     "npg_export_proxy_host": (
         ("proxy:read", "waf:read"),
         "composes the same 11 sections as npg_get_proxy_host_full (read-only)",

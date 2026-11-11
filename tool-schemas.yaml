@@ -83,6 +83,20 @@ npg_get_proxy_host_full:
       required: false
       default: false
 
+npg_get_proxy_host_diagnosis:
+  description: "GET a DERIVED diagnosis of a proxy host: runs npg_get_proxy_host_full's section GETs and returns ranked findings (critical/warning/info) for SILENT misconfigs — challenge without CAPTCHA keys, geo whitelist with no countries, uri_block/rate_limit/bot_filter/fail2ban on but empty, waf_use_global=true ignoring per-host WAF, TLS without a cert. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. expand=true lifts the cap. Read-only."
+  parameters:
+    - name: host_id
+      type: integer | string
+      required: true
+    - name: sections
+      type: array<string>
+      required: false
+    - name: expand
+      type: boolean
+      required: false
+      default: false
+
 npg_create_proxy_host:
   description: "CREATE a reverse proxy. REQUIRED: domain_names, forward_host, forward_port. Omitted fields inherit global defaults; hardcoded true: enabled, ssl_forced, ssl_http2, block_exploits, waf_use_global; proxy_type='http'. Also: tags (<=10, lowercased, <=32 chars, alnum/._-), ssl (ssl_http3), cache, timeouts, buffering, access, auth, ddns, stream_*; WAF tuning when waf_use_global=false: waf_mode (detection|blocking), waf_paranoia_level, waf_anomaly_threshold."
   parameters:

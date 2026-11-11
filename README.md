@@ -207,11 +207,11 @@ mcp_servers:
 
 ## Tools Reference
 
-This server exposes **319 MCP tools** across 29 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
+This server exposes **320 MCP tools** across 29 categories. Tool names, descriptions, and full input parameter schemas are in [`tool-schemas.yaml`](tool-schemas.yaml).
 
 | Category | Tools |
 |----------|-------|
-| **Proxy Hosts** | 48 tools |
+| **Proxy Hosts** | 49 tools |
 | **Logs** | 35 tools |
 | **Security & WAF** | 31 tools |
 | **DNS Providers** | 15 tools |
@@ -261,7 +261,7 @@ Session-only endpoints (account password changes, 2FA management, account metada
 | `MCP_REBINDING_PROTECTION` | `true` | Enable DNS-rebinding protection (disable only if it breaks your proxy) |
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` for direct pipes (bare-process default), `http` for network deployment. Docker images set `http` via `ENV`. |
 | `NPG_LOG_LEVEL` | `INFO` | Container log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`). `INFO` logs one line per inbound MCP request and per outbound NPG API call — see Container Logs below. |
-| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (144 read-only tools), `standard` (272 tools, no destructive ops), `full` (all 319 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`, except three probes that write or POST (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`), which stay at `standard`/`full` only. Hidden tools are not listed and not callable. See Toolset Levels below. |
+| `NPG_TOOL_LEVEL` | `full` | Layered toolset exposure: `read` (145 read-only tools), `standard` (273 tools, no destructive ops), `full` (all 320 tools). Read tools are named `npg_get_*`/`npg_list_*`/`npg_view_*`/`npg_download_*`/`npg_check_*`/`npg_detect_*`, except three probes that write or POST (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`), which stay at `standard`/`full` only. Hidden tools are not listed and not callable. See Toolset Levels below. |
 | `NPG_TOOL_SCOPE_FILTER` | `0` | Opt-in scope-aware tool filtering. When enabled, the server discovers the configured `NPG_API_TOKEN`'s effective permissions **once at boot** — `GET /api/v1/api-tokens` (needs `apitoken:read`) with a prefixed-row match, falling back to `GET /api/v1/auth/me` — and exposes only the tools those scopes cover: `NPG_TOOL_LEVEL` ∩ granted scopes. Scopes match by exact string (`*` and `area:*` wildcards allowed), so legacy scopes are not widened. Restart to pick up a scope change. Fails **open**: both endpoints failing (403/timeout), no or ambiguous token-prefix match, or an unset token leaves the full manifest in place, and unannotated tools are never hidden. Off by default — the manifest and tool count are then unchanged. See Scope Filtering below. |
 | `NPG_DRY_RUN` | `0` | Dry-run safety mode: when set to a truthy value (`1`/`true`/`on`), every mutating tool returns the exact request it WOULD send (`{"dry_run": true, "method", "path", "body", ...}`) instead of executing — nothing is applied. Rehearse a first deployment against a live instance before switching it off. |
 | `NPG_HTTP_TIMEOUT` | `30` | Outbound NPG API request timeout in seconds. Raise it for endpoints that legitimately run long (large access-log downloads, backup export/restore, certificate upload, full proxy-host syncs) to avoid `ReadTimeout` failures. Clamped to `[1, 600]`; invalid values fall back to `30` with a warning. |
@@ -286,11 +286,11 @@ Set `NPG_LOG_LEVEL=DEBUG` for finer-grained output. **Tokens are never logged** 
 
 | Level | Tools | Scope |
 |-------|-------|-------|
-| `read` | 144 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`), minus three probing tools that write or use a POST body (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`) — those stay at `standard`/`full`. Suitable for monitoring agents that must not mutate NPG state. |
-| `standard` | 272 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
-| `full` | 319 | All tools. Default; behavior without the variable is unchanged. |
+| `read` | 145 | Strictly read-only tools only (`npg_get_*`, `npg_list_*`, `npg_view_*`, `npg_download_*`, `npg_check_*`, `npg_detect_*`), minus three probing tools that write or use a POST body (`npg_check_log_archive`, `npg_detect_telegram_chats`, `npg_check_backup_restore`) — those stay at `standard`/`full`. Suitable for monitoring agents that must not mutate NPG state. |
+| `standard` | 273 | Everything except destructive operations (all deletes/removes, IP bans, backup restore/upload, password/role/email changes, token revocation, cleanup, reset, session termination, log rotation). Suitable for everyday admin work. |
+| `full` | 320 | All tools. Default; behavior without the variable is unchanged. |
 
-Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 319-tool reference regardless of the selected level.
+Anything else (or unset) falls back to `full`. `tool-schemas.yaml` always documents the full 320-tool reference regardless of the selected level.
 
 ### Scope Filtering
 
@@ -357,7 +357,7 @@ Truncation never cuts mid-structure or mid-string: the envelope is rebuilt from 
 
 ```
 npg_mcp/
-  main.py       # All 319 MCP tools
+  main.py       # All 320 MCP tools
   client.py     # HTTP client wrapper with API token auth
   toolsets.py   # Toolset levels (NPG_TOOL_LEVEL: read/standard/full) + MCP ToolAnnotations
   resultcap.py  # Shared result cap (NPG_MAX_RESULT_CHARS) + `expand` escape hatch
@@ -367,7 +367,7 @@ npg_mcp/
 Dockerfile      # Multi-stage Docker build
 docker-compose.yml
 pyproject.toml  # Dependencies: mcp>=1.29.0,<2.0.0, httpx>=0.27.0
-tool-schemas.yaml  # Full input parameter schemas for all 319 tools
+tool-schemas.yaml  # Full input parameter schemas for all 320 tools
 ```
 
 ## Development & Testing

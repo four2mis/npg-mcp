@@ -527,6 +527,7 @@ TOOL_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "npg_get_proxy_host_by_domain": ("proxy:read",),
     "npg_get_proxy_host_challenge": ("proxy:read",),
     "npg_get_proxy_host_cloud_blocking": ("proxy:read",),
+    "npg_get_proxy_host_diagnosis": ("proxy:read", "waf:read"),
     "npg_get_proxy_host_fail2ban": ("proxy:read",),
     "npg_get_proxy_host_full": ("proxy:read", "waf:read"),
     "npg_get_proxy_host_geo": ("proxy:read",),

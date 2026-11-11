@@ -997,6 +997,303 @@ def _select_section_paths(
     return {s: section_paths[s] for s in selected}
 
 
+# Severity ranking for the derived proxy-host diagnosis, most to least urgent.
+# Findings are sorted by this rank (then by section, then by check name) and the
+# tool reports one count per severity — never any other value.
+_DIAG_SEVERITIES = ("critical", "warning", "info")
+
+# The per-host WAF column defaults the API writes on create. Those columns are
+# only honoured when ``waf_use_global`` is false; a stored value that differs
+# from these defaults is evidence the caller tried to tune the host's own WAF,
+# which is a silent no-op while the host inherits the global WAF.
+_WAF_HOST_DEFAULTS: dict[str, object] = {
+    "waf_enabled": False,
+    "waf_mode": "blocking",
+    "waf_paranoia_level": 1,
+    "waf_anomaly_threshold": 5,
+}
+
+# Bot-filter switches that actually do something. ``allow_search_engines`` is
+# deliberately absent: it is an exemption, not a blocking mode.
+_BOT_FILTER_MODES = (
+    "block_bad_bots",
+    "block_ai_bots",
+    "block_suspicious_clients",
+    "challenge_suspicious",
+)
+
+
+def _finding(severity: str, check: str, section: str, detail: str) -> dict:
+    """Build one diagnosis finding (uniform shape for every check)."""
+    return {
+        "severity": severity,
+        "check": check,
+        "section": section,
+        "detail": detail,
+    }
+
+
+def _diagnose_proxy_host_sections(
+    sections: dict, sections_failed: list[str] | None = None
+) -> list[dict]:
+    """Derive misconfiguration findings from already-fetched section payloads.
+
+    Pure function over the raw payloads returned by
+    :func:`_proxy_host_section_paths` (the ``data`` part of each section GET);
+    it performs no I/O, so every check is unit-testable without a server.
+
+    Each finding is ``{severity, check, section, detail}`` with ``severity`` in
+    :data:`_DIAG_SEVERITIES` and ``section`` naming the payload it came from.
+
+    Two rules keep the output trustworthy:
+
+    * **Never a false positive.** A check emits only when the fields it needs
+      are present in the payload; an absent key, a failed section or a
+      non-dict payload means the check is skipped (and a failed section is
+      itself reported as a ``section_unavailable`` warning so the caller knows
+      the diagnosis is partial). A missing field never escalates.
+    * **Conservative severities.** ``critical`` is reserved for states that
+      break traffic or produce an upstream error (no upstream target, TLS
+      without a certificate, a geo whitelist that admits nobody, a challenge
+      that cannot verify anyone). Advisory states are ``info``.
+    """
+    findings: list[dict] = []
+
+    def sec(name: str) -> dict | None:
+        value = sections.get(name)
+        return value if isinstance(value, dict) else None
+
+    host = sec("host")
+    if host is not None:
+        if "enabled" in host and host.get("enabled") is False:
+            findings.append(
+                _finding(
+                    "warning",
+                    "host_disabled",
+                    "host",
+                    "proxy host is disabled; nginx renders no server block for it "
+                    "(enable it with npg_update_proxy_host enabled=true)",
+                )
+            )
+        # The API omits certificate_id entirely when no certificate row exists
+        # (a default certificate is auto-assigned at create time), so only an
+        # explicitly empty value is evidence of a TLS host without a cert.
+        if (
+            host.get("ssl_enabled") is True
+            and "certificate_id" in host
+            and not host.get("certificate_id")
+        ):
+            findings.append(
+                _finding(
+                    "critical",
+                    "tls_without_certificate",
+                    "host",
+                    "ssl_enabled=true but certificate_id is empty — TLS termination "
+                    "has no certificate (npg_list_certificates, then "
+                    "npg_update_proxy_host ssl_cert_id)",
+                )
+            )
+        if (
+            "forward_host" in host
+            and "forward_port" in host
+            and str(host.get("proxy_type") or "http") == "http"
+        ):
+            host_empty = not str(host.get("forward_host") or "").strip()
+            port_missing = host.get("forward_port") in (0, None)
+            if host_empty or port_missing:
+                findings.append(
+                    _finding(
+                        "critical",
+                        "no_upstream_target",
+                        "host",
+                        "forward_host is empty or forward_port is 0/None — nginx has "
+                        "no upstream to proxy to",
+                    )
+                )
+        if host.get("waf_use_global") is True:
+            tuned = sorted(
+                key
+                for key, default in _WAF_HOST_DEFAULTS.items()
+                if key in host and host.get(key) != default
+            )
+            if tuned:
+                findings.append(
+                    _finding(
+                        "info",
+                        "waf_use_global_ignores_host_waf",
+                        "host",
+                        "waf_use_global=true, so the stored per-host WAF fields "
+                        f"({', '.join(tuned)}) are ignored — the global WAF applies. "
+                        "Send waf_use_global=false in the same npg_update_proxy_host "
+                        "call to make them effective",
+                    )
+                )
+
+    challenge = sec("challenge")
+    if challenge is not None and challenge.get("enabled") is True:
+        secret_missing = (
+            "has_secret_key" in challenge and challenge.get("has_secret_key") is False
+        )
+        site_missing = "site_key" in challenge and not str(
+            challenge.get("site_key") or ""
+        ).strip()
+        if secret_missing or site_missing:
+            findings.append(
+                _finding(
+                    "critical",
+                    "challenge_keys_incomplete",
+                    "challenge",
+                    "challenge is enabled but its CAPTCHA credentials are incomplete "
+                    f"(site_key {'empty' if site_missing else 'set'}, "
+                    f"secret_key {'missing' if secret_missing else 'set'}) — "
+                    "npg_verify_challenge then answers 503 'CAPTCHA is not configured'",
+                )
+            )
+        if "challenge_type" in challenge and not str(
+            challenge.get("challenge_type") or ""
+        ).strip():
+            findings.append(
+                _finding(
+                    "warning",
+                    "challenge_type_missing",
+                    "challenge",
+                    "challenge is enabled but challenge_type is empty — pick "
+                    "recaptcha_v2/recaptcha_v3/hcaptcha/turnstile",
+                )
+            )
+
+    geo = sec("geo")
+    if geo is not None and geo.get("enabled") is True:
+        countries = geo.get("countries")
+        mode = str(geo.get("mode") or "").strip().lower()
+        if isinstance(countries, list) and not countries:
+            if mode == "whitelist":
+                findings.append(
+                    _finding(
+                        "critical",
+                        "geo_whitelist_empty",
+                        "geo",
+                        "geo restriction is enabled in whitelist mode with no "
+                        "countries — every visitor is blocked. Add countries with "
+                        "npg_update_proxy_host_geo or disable the restriction",
+                    )
+                )
+            elif mode == "blacklist":
+                findings.append(
+                    _finding(
+                        "warning",
+                        "geo_blacklist_empty",
+                        "geo",
+                        "geo restriction is enabled in blacklist mode with no "
+                        "countries — no visitor is blocked (no-op)",
+                    )
+                )
+
+    uri_block = sec("uri_block")
+    if uri_block is not None and uri_block.get("enabled") is True:
+        rules = uri_block.get("rules")
+        if isinstance(rules, list) and not rules:
+            findings.append(
+                _finding(
+                    "warning",
+                    "uri_block_no_rules",
+                    "uri_block",
+                    "uri_block is enabled with no rules — no-op (add rules with "
+                    "npg_add_proxy_host_uri_block_rule, or disable it)",
+                )
+            )
+
+    rate_limit = sec("rate_limit")
+    if rate_limit is not None and rate_limit.get("enabled") is True:
+        if "requests_per_second" in rate_limit and not rate_limit.get(
+            "requests_per_second"
+        ):
+            findings.append(
+                _finding(
+                    "warning",
+                    "rate_limit_no_threshold",
+                    "rate_limit",
+                    "rate_limit is enabled but requests_per_second is 0/unset — "
+                    "no request is ever limited (no-op)",
+                )
+            )
+
+    bot_filter = sec("bot_filter")
+    if bot_filter is not None and bot_filter.get("enabled") is True:
+        modes = [bot_filter.get(key) for key in _BOT_FILTER_MODES if key in bot_filter]
+        if modes and not any(mode is True for mode in modes):
+            findings.append(
+                _finding(
+                    "warning",
+                    "bot_filter_no_mode",
+                    "bot_filter",
+                    "bot_filter is enabled but every blocking mode is false "
+                    f"({', '.join(_BOT_FILTER_MODES)}) — no-op",
+                )
+            )
+
+    fail2ban = sec("fail2ban")
+    if fail2ban is not None and fail2ban.get("enabled") is True:
+        if "fail_codes" in fail2ban:
+            codes = fail2ban.get("fail_codes")
+            if isinstance(codes, list):
+                empty_codes = not codes
+            else:
+                empty_codes = not str(codes or "").strip()
+            if empty_codes:
+                findings.append(
+                    _finding(
+                        "warning",
+                        "fail2ban_no_fail_codes",
+                        "fail2ban",
+                        "fail2ban is enabled but fail_codes is empty — no response "
+                        "code can ever trigger a ban (no-op)",
+                    )
+                )
+
+    waf = sec("waf")
+    if (
+        host is not None
+        and waf is not None
+        and host.get("waf_use_global") is False
+        and host.get("waf_enabled") is True
+        and waf.get("waf_enabled") is False
+    ):
+        findings.append(
+            _finding(
+                "warning",
+                "waf_not_effective",
+                "waf",
+                "the host stores waf_enabled=true but its effective WAF config reports "
+                "waf_enabled=false — regenerate and sync (npg_regenerate_config, "
+                "npg_sync_proxy_hosts), then re-check",
+            )
+        )
+
+    for section in sections_failed or []:
+        findings.append(
+            _finding(
+                "warning",
+                "section_unavailable",
+                str(section),
+                f"section '{section}' could not be fetched — its checks were skipped, "
+                "so this diagnosis is incomplete. Retry, or inspect it directly with "
+                "npg_get_proxy_host_full",
+            )
+        )
+
+    severity_rank = {name: i for i, name in enumerate(_DIAG_SEVERITIES)}
+    section_rank = {name: i for i, name in enumerate(_PROXY_HOST_SECTION_NAMES)}
+    findings.sort(
+        key=lambda f: (
+            severity_rank.get(f["severity"], len(severity_rank)),
+            section_rank.get(f["section"], len(section_rank)),
+            f["check"],
+        )
+    )
+    return findings
+
+
 @mcp.tool(name="npg_get_proxy_host_full", description="GET the COMPLETE config of one proxy host in one call — 11 per-host GETs: host, rate_limit, bot_filter, security_headers, upstream, geo, challenge, fail2ban, cloud_blocking, waf, uri_block. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. Failed sections go to sections_failed. waf section = EFFECTIVE config; stored per-host WAF values live in the host section. expand=true lifts the result cap.")
 async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None = None, expand: bool = False) -> dict:
     try:
@@ -1027,6 +1324,66 @@ async def npg_get_proxy_host_full(host_id: str | int, sections: list[str] | None
             if not payload["success"]:
                 failed.append(section)
         return {"success": True, "data": data, "sections_failed": failed}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_proxy_host_diagnosis", description="GET a DERIVED diagnosis of a proxy host: runs npg_get_proxy_host_full's section GETs and returns ranked findings (critical/warning/info) for SILENT misconfigs — challenge without CAPTCHA keys, geo whitelist with no countries, uri_block/rate_limit/bot_filter/fail2ban on but empty, waf_use_global=true ignoring per-host WAF, TLS without a cert. REQUIRED: host_id. OPTIONAL: sections=[...] subset; omit = all. expand=true lifts the cap. Read-only.")
+async def npg_get_proxy_host_diagnosis(host_id: str | int, sections: list[str] | None = None, expand: bool = False) -> dict:
+    """Report misconfigurations derived from the per-host config sections.
+
+    Read-only: every request is a GET, so the tool is valid in the ``read``
+    tool tier. The diagnosis is the product — the raw section payloads stay
+    out of the response (``npg_get_proxy_host_full`` is the raw view), which
+    keeps the result small. ``expand`` follows the shared read-tool contract
+    and only lifts the result cap (the result-cap wrapper consumes it before
+    the body runs). Findings are produced by the pure, side-effect-free
+    :func:`_diagnose_proxy_host_sections`, which skips any check whose inputs
+    are missing rather than guessing.
+    """
+    try:
+        _validate_id("host_id", host_id)
+        c = _get_client()
+        hid = _id_path(host_id)  # URL context only — used solely for section paths
+        section_paths = _proxy_host_section_paths(hid)
+        if sections is not None:
+            section_paths = _select_section_paths(section_paths, sections)
+        payloads: dict = {}
+        failed: list[str] = []
+
+        async def _fetch(section: str, path: str):
+            try:
+                return section, {"success": True, "data": await _api(c.get, path)}
+            except Exception as se:
+                return section, {"success": False, "error": str(se), "hint": _error_hint(se)}
+
+        # Same bounded fan-out as npg_get_proxy_host_full, and the same
+        # per-section failure isolation: one unavailable section degrades into
+        # a `section_unavailable` finding instead of failing the whole call.
+        results = await _gather_bounded(
+            _BULK_SECTION_CONCURRENCY,
+            [_fetch(section, path) for section, path in section_paths.items()],
+        )
+        for section, envelope in results:
+            if envelope["success"]:
+                payloads[section] = envelope["data"]
+            else:
+                failed.append(section)
+
+        findings = _diagnose_proxy_host_sections(payloads, failed)
+        host_section = payloads.get("host")
+        host: dict = host_section if isinstance(host_section, dict) else {}
+        data: dict = {
+            "host_id": _id_str(host_id),
+            "domain_names": host.get("domain_names") or [],
+            "findings": findings,
+            "counts": {
+                severity: sum(1 for f in findings if f["severity"] == severity)
+                for severity in _DIAG_SEVERITIES
+            },
+            "sections_checked": [s for s in section_paths if s not in failed],
+            "sections_failed": failed,
+        }
+        return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
