@@ -232,6 +232,30 @@ class TestGetLogs:
         _run(main_mod.npg_get_logs(cursor="  ", offset=20, limit=5))
         assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 5})]
 
+    def test_as_of_passed_verbatim(self, recording):
+        # v2.69.1: sort_by=timestamp pages by offset, pinned by page 1's as_of
+        _run(
+            main_mod.npg_get_logs(
+                sort_by="timestamp", as_of="2026-11-13T18:02:14.713719+09:00", limit=5
+            )
+        )
+        assert recording.calls == [
+            (
+                "GET",
+                "/api/v1/logs",
+                {
+                    "per_page": 5,
+                    "as_of": "2026-11-13T18:02:14.713719+09:00",
+                    "sort_by": "timestamp",
+                },
+            )
+        ]
+
+    def test_blank_as_of_not_sent(self, recording):
+        _run(main_mod.npg_get_logs(as_of="  ", offset=20, limit=5))
+        # offset 20 at per_page 5 → page 5; no as_of key for a blank value
+        assert recording.calls == [("GET", "/api/v1/logs", {"per_page": 5, "page": 5})]
+
     def test_log_type_enum_forwarded(self, recording):
         _run(main_mod.npg_get_logs(log_type="modsec"))
         assert recording.calls == [("GET", "/api/v1/logs", {"log_type": "modsec"})]

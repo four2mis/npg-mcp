@@ -1843,7 +1843,7 @@ npg_enable_waf_rule:
       required: true
 
 npg_get_logs:
-  description: "GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params; sort_by, sort_order (asc|desc). No args = last 24h. expand=true lifts the result cap."
+  description: "GET access/error/WAF logs. Paging: limit (per_page cap 200), offset; cursor (next_cursor verbatim) only for default/created_at sort. sort_by=timestamp: offset pages pinned by as_of (RFC3339, page 1's data.as_of), cursor ignored. Filters: hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search; sort_by, sort_order. No args = last 24h. expand lifts cap."
   parameters:
     - name: host
       type: string
@@ -1963,6 +1963,9 @@ npg_get_logs:
       type: string
       required: false
     - name: sort_order
+      type: string
+      required: false
+    - name: as_of
       type: string
       required: false
     - name: expand

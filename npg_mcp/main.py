@@ -3772,7 +3772,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page, cap 200), offset, cursor (next_cursor verbatim; default sort only, replaces offset). Filters cover hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo country, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search and more — see params; sort_by, sort_order (asc|desc). No args = last 24h. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page cap 200), offset; cursor (next_cursor verbatim) only for default/created_at sort. sort_by=timestamp: offset pages pinned by as_of (RFC3339, page 1's data.as_of), cursor ignored. Filters: hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search; sort_by, sort_order. No args = last 24h. expand lifts cap.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -3814,12 +3814,15 @@ async def npg_get_logs(
     exclude_countries: list[str] | None = None,
     sort_by: str | None = None,
     sort_order: Literal["asc", "desc"] | None = None,
+    as_of: str | None = None,
     expand: bool = False,
 ) -> dict:
     c = _get_client()
     try:
         # cursor = keyset paging: when present it replaces offset/page entirely
-        # (upstream honors it only for the default created_at sort).
+        # (upstream honors it only for the default created_at sort; the
+        # sort_by=timestamp order pages by offset and ignores it — pin that
+        # page stream with as_of, the value page 1 returns in data.as_of).
         params = _list_params_per_page(limit=limit, offset=None if cursor else offset)
         if cursor is not None and str(cursor).strip():
             params["cursor"] = str(cursor)
@@ -3901,6 +3904,8 @@ async def npg_get_logs(
             params["sort_by"] = str(sort_by)
         if sort_order is not None:
             params["sort_order"] = sort_order
+        if as_of is not None and str(as_of).strip():
+            params["as_of"] = str(as_of)
         data = await _api(c.get, "/api/v1/logs", params=params or None)
         return {"success": True, "data": data}
     except Exception as e:
