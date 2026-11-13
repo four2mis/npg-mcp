@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.0] - 2026-11-13
+
+### What changed
+- **`npg_get_logs` now forwards the upstream `as_of` pin, so `sort_by=timestamp` pages are stable.** Upstream NPG v2.69.1 (#373) sorts `sort_by=timestamp` by request time rather than creation time, and that sort is no longer cursor-paged upstream: `next_cursor` comes back empty and any supplied `cursor` is ignored, so pages advance by `page`/`offset`. The response carries a `data.as_of` snapshot instant (RFC3339); sending it back on later pages pins the time window so rows cannot shift underneath a caller that is paging through a live log stream. The tool forwards the value verbatim to `GET /api/v1/logs` (a blank string is omitted, matching the wrapper's blank-means-unset convention) and the upstream `400 invalid as_of: want an RFC 3339 time` surfaces unchanged, so a malformed value is rejected rather than silently ignored.
+- **Vendored `swagger.yaml` re-synced to upstream NPG v2.69.1** (byte-identical to `v2.69.1:api/internal/handler/swagger.yaml`, sha256 `abfaee1e…`), keeping the checked-in spec in step with the release this wrapper tracks. No paths were added, removed or re-scoped.
+- **Paging tests added** for the new sort semantics (`tests/test_list_pagination.py`), covering the `as_of` parameter being present/forwarded and the offset-page path for `sort_by=timestamp`.
+- Verified at commit `11d15bc` against the disposable test stack with a **HEAD-pinned local image** (`local/npg-mcp:11d15bc@sha256:0e6c20fe4105f72e85b9845dcefd4c811cf3ae2c74723b9725884ec4f3012ac6`, in-container `main.py` sha256 identical to the checkout, not the stale published `npg-test-mcp` image): `npg_get_logs(sort_by=timestamp)` returns `data.as_of` with no `next_cursor`, a pinned `as_of` taken from page 1 is echoed verbatim on page 2, an invalid `as_of` returns the upstream `400` (proving the value is forwarded), and the default `npg_get_logs()` path returns no `as_of` key at all — unchanged.
+- Release gates: `ruff check .` clean, `mypy npg_mcp/` clean, `pytest` **731 passed**, `regenerate_all_docs.py --check` exit 0 (320 tools, all prose rules and `DESC_LEN` pass, longest 460), and `.env.example` tier counts match `tier_allowed()` (read 145 / standard 273 / full 320 — unchanged, this release adds no tool).
+
+### What's new
+- `as_of` parameter on `npg_get_logs` (RFC3339, optional) — take the value from page 1's `data.as_of` and send it back on later pages to keep a `sort_by=timestamp` listing stable across `page`/`offset` requests. Omit it and the call behaves exactly as before (24h default window, cursor paging for the default/`created_at` sort).
+- `LogListResponse.as_of` is now documented as part of the log-listing response, alongside the existing `logs`/`total`/`page`/`next_cursor` fields.
+
+### Breaking changes
+- (none) — the parameter is additive and defaults to unset; `npg_get_logs()` with no arguments is byte-identical to the previous release, and the existing cursor-paged default sort is untouched. Only callers that already ask for `sort_by=timestamp` see different (now stable) paging, matching upstream v2.69.1.
+
 ## [1.11.0] - 2026-11-12
 
 ### What changed
