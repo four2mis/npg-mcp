@@ -6788,7 +6788,7 @@ async def npg_get_waf_host_history(host_id: str | int, limit: int | None = None,
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_waf_event_rules", description="GET every CRS rule that contributed to one WAF event (a blocked request usually matched several rules; the log row records only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the hypertable chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule). Read-only, waf:read scope. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_waf_event_rules", description="GET every CRS rule behind one WAF event (a blocked request usually matched several; the log keeps only the first). REQUIRED: log_id (event's log UUID), at (event's created_at from npg_get_logs, RFC 3339 — bounds the chunk lookup). Returns proxy_host_id + rules[] (rule_id, message, severity, data, category, exclusions per rule); from NPG 2.69.2 a value whose variable names a credential is '[redacted]', the name kept. Read-only, waf:read. expand lifts cap.")
 async def npg_get_waf_event_rules(log_id: str | int, at: str, expand: bool = False) -> dict:
     try:
         _validate_id("log_id", log_id)
