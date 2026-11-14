@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.1] - 2026-11-15
+
+### What changed
+- **`npg_get_waf_event_rules` now documents the upstream credential redaction introduced in NPG 2.69.2.** The description states that a matched rule value whose variable names a credential comes back as `'[redacted]'` with the variable name kept, so a caller reading the tool surface knows an empty-looking value is deliberate upstream masking rather than a missing field, and does not try to recover a token from `rules[].data`. Description rewritten (426 → 458 chars, inside the 460 `DESC_LEN` budget) with no change to the tool's parameters, return shape or request path — this was a contract-visibility fix, not a behaviour change in the wrapper.
+- **Vendored `swagger.yaml` re-synced to upstream NPG v2.69.2** (byte-identical to `v2.69.2:api/internal/handler/swagger.yaml`, sha256 `f95dbebc…`; the diff against the previous vendored copy is the version line only), keeping the checked-in spec in step with the release this wrapper tracks. No paths were added, removed or re-scoped.
+- **`tool-schemas.yaml` regenerated** from `main.py` so the generated reference carries the updated description; no other generated content changed.
+- Verified at commit `2cd3da3` against the disposable test stack with a **HEAD-pinned local image** (`local/npg-mcp:2cd3da3@sha256:664834b5dcbf0fe46c275e4fe33418602445988860ea5aad593866621ac8bb39`, in-container `main.py` sha256 `38c2f581…` and `client.py` sha256 `2f491830…` byte-identical to the checkout — the stale published `npg-test-mcp` image was deliberately not used as evidence): the served surface over HTTP `:8082` reports 320 tools / 320 unique with `npg_get_waf_event_rules` carrying the new 458-char description, and a 20-tool regression sample across proxy/WAF/logs/dashboard/certs/users/DNS/access/catalog returned `success: true` with the result cap firing correctly on `npg_list_waf_rules` (72,395 → 64,313 chars).
+- The redaction itself is **not observable on the disposable stack** (0 proxy hosts, 0 WAF events, so no stored `rules[].data` to inspect); what is verified is the part the wrapper owns — the served description. The masking happens upstream.
+- Release gates: AST parse OK with **320** decorated tools, no duplicate names, all `npg_`-prefixed; `ruff check .` clean; `mypy npg_mcp/` clean; `pytest` **731 passed**; `regenerate_all_docs.py --check` exit 0 (all prose rules and `DESC_LEN` pass, longest 460); `static_preflight.py` 320/320 unique (only 2 pre-existing low-severity `npg_get_logs` enum findings); `.env.example` tier counts match `tier_allowed()` (read 145 / standard 273 / full 320 — unchanged, this release adds no tool).
+
+### What's new
+- No new tools or parameters. `npg_get_waf_event_rules` now advertises the NPG 2.69.2 redaction contract (`'[redacted]'` for credential-named variables, name preserved) in its served description, and the vendored `swagger.yaml` tracks upstream v2.69.2.
+
+### Breaking changes
+- (none) — description text and a vendored spec file only. The tool surface stays at 320 tools with identical names, parameters, defaults and tier membership, and every call behaves exactly as in 1.12.0.
+
 ## [1.12.0] - 2026-11-13
 
 ### What changed
