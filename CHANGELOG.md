@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.2] - 2026-11-15
+
+### What changed
+- **`npg_get_dashboard` now documents the `top_ips` / `top_private_ips` split introduced in NPG 2.69.3.** The description states that top client IPs arrive in two lists — `top_ips` (public addresses only) and, from NPG 2.69.3, `top_private_ips` (loopback, Docker and private addresses that `top_ips` leaves out) — so a caller does not read an empty `top_ips` on a LAN-heavy install as "no traffic". Description rewritten (98 → 277 chars, inside the 460 `DESC_LEN` budget). The tool is a passthrough (`{"success": True, "data": data}`) and the server already carried the new field, so the request path, parameters, return shape and tier membership are all unchanged — this is contract visibility only, not a behaviour change. No mention was added about the `/__npg_canary*` exclusion in `top_ips`: ranking trivia that would only spend description budget.
+- **Vendored `swagger.yaml` re-synced to upstream NPG v2.69.3** (byte-identical to `v2.69.3:api/internal/handler/swagger.yaml`, sha256 `e4138b7eaa2db8d2df535c537948b4bf03dbdfff52b1d16d552dc68d4cae7119`; the previous vendored copy was byte-identical to v2.69.2). The whole diff is the `info.version` line plus `components.schemas.Dashboard.top_private_ips` (`type: array`, `items: $ref IPStat`, "Loopback and private addresses, which top_ips leaves out") — 6 insertions, 1 deletion, +5 net lines. No paths were added, removed or re-scoped (326 → 326 operations), no renames, no new required fields.
+- **`tool-schemas.yaml` regenerated** from `main.py` so the generated reference carries the new description; both READMEs are unchanged (they carry category counts only, and the surface is still 320 tools).
+- Verified at this commit against the disposable test stack with a **local image built from the checkout** (`local/npg-mcp:v1.12.2-verify@sha256:223d50d749c4832e45dd1e1667a161ca741973c62847ea8443a6f6e4c53bc740`, in-container `main.py` sha256 `3f498c574f83332cadf609339d95a4818355205a25c8da6995370f4708b5c70b` byte-identical to the checkout, package version `1.12.2`): the recreated `npg-test-mcp` serves **320 tools / 320 unique** with `npg_get_dashboard` carrying the new 277-char description and an unchanged `inputSchema` (`expand` only), and real MCP `tool_call`s on that build return `npg_get_instance` → `version: "2.69.3"` (nginx 1.30.6), `npg_get_dashboard` → `success: true` with both `top_ips: []` and `top_private_ips: []`, and `npg_check_dashboard_queries` → `status: "passed"`. The previously published `npg-test-mcp` image was deliberately not used as evidence for the description change.
+- Release gates: AST parse OK with **320** decorated tools, no duplicate names, all `npg_`-prefixed; `ruff check .` clean; `mypy npg_mcp/` clean; `pytest` **731 passed**; `regenerate_all_docs.py --check` exit 0 (all prose rules and `DESC_LEN` pass, longest 460); `static_preflight.py` 320/320 unique (only the 2 pre-existing low-severity `npg_get_logs` enum findings); `.env.example` tier counts match `tier_allowed()` (read 145 / standard 273 / full 320 — unchanged, this release adds no tool).
+
+### What's new
+- No new tools or parameters, and no tier movement (read 145 / standard 273 / full 320, surface stays at 320 tools). `npg_get_dashboard` now advertises the NPG 2.69.3 `top_ips` (public) vs `top_private_ips` (loopback/private) contract in its served description, and the vendored `swagger.yaml` tracks upstream v2.69.3.
+
+### Breaking changes
+- (none) — a description string and a vendored spec file only. Every tool keeps its name, parameters, defaults and tier membership, and every call behaves exactly as in 1.12.1; `top_private_ips` is an additive response field that already flowed through the passthrough.
+
 ## [1.12.1] - 2026-11-15
 
 ### What changed

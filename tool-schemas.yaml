@@ -1092,7 +1092,7 @@ npg_confirm_trusted_dns:
       required: true
 
 npg_get_dashboard:
-  description: "Get dashboard data (summary of proxy hosts, certificates, etc.). expand=true lifts the result cap."
+  description: "Get dashboard data (summary of proxy hosts, certificates, etc.). Top client IPs come in two lists: top_ips (public only) and, NPG 2.69.3+, top_private_ips (loopback/Docker/private) — an empty top_ips on a LAN-heavy install is not \"no traffic\". expand=true lifts the result cap."
   parameters:
     - name: expand
       type: boolean

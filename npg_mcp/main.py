@@ -3033,7 +3033,7 @@ async def npg_confirm_trusted_dns(hostname: str, expected_addresses: list[str], 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_dashboard", description="Get dashboard data (summary of proxy hosts, certificates, etc.). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_dashboard", description="Get dashboard data (summary of proxy hosts, certificates, etc.). Top client IPs come in two lists: top_ips (public only) and, NPG 2.69.3+, top_private_ips (loopback/Docker/private) — an empty top_ips on a LAN-heavy install is not \"no traffic\". expand=true lifts the result cap.")
 async def npg_get_dashboard(expand: bool = False) -> dict:
     c = _get_client()
     try:

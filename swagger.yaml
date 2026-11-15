@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.69.2
+  version: 2.69.3
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -13447,6 +13447,11 @@ components:
             $ref: '#/components/schemas/PathStat'
         top_ips:
           type: array
+          items:
+            $ref: '#/components/schemas/IPStat'
+        top_private_ips:
+          type: array
+          description: Loopback and private addresses, which top_ips leaves out.
           items:
             $ref: '#/components/schemas/IPStat'
         top_user_agents:
