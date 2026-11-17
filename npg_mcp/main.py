@@ -3192,7 +3192,7 @@ async def npg_get_dns_provider(provider_id: str | int, expand: bool = False) -> 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01 challenges. REQUIRED: name, provider_type (cloudflare/route53/duckdns/dynu/ionos/manual). credentials: cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} - or omit credentials for route53 (AWS default chain, use_default_credentials). Optional: is_default, kwargs (unknown rejected unless strict=false). IONOS has NO DDNS updater; DDNS: cloudflare/duckdns/dynu.")
+@mcp.tool(name="npg_create_dns_provider", description="Create a DNS provider for DNS-01. REQUIRED: name, provider_type (cloudflare/route53/duckdns/dynu/infomaniak/ionos/manual/ovh). credentials: cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} or omit (AWS chain); infomaniak {username, password} (no colon); ovh {application_key, application_secret, consumer_key, endpoint?} ovh-eu|ovh-ca|ovh-us. Optional: is_default. DDNS: cloudflare/duckdns/dynu/infomaniak.")
 async def npg_create_dns_provider(name: str, provider_type: str, credentials: dict | None = None, kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_required("name", name)
@@ -3230,7 +3230,7 @@ async def npg_delete_dns_provider(provider_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|ionos|manual), credentials (object: cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} or {use_default_credentials: true}). NOTE: body is the create payload, NOT a provider id - to test a saved provider, fetch it with npg_get_dns_provider and pass name/provider_type/credentials here.")
+@mcp.tool(name="npg_test_dns_provider", description="Test DNS provider credentials WITHOUT saving them. REQUIRED: name, provider_type (cloudflare|route53|duckdns|dynu|infomaniak|ionos|manual|ovh), credentials (cloudflare {api_token}; ionos {api_key_prefix, api_key}; route53 {access_key_id, secret_access_key} or {use_default_credentials: true}; infomaniak {username, password}; ovh {application_key, application_secret, consumer_key, endpoint?}). Body is the create payload, NOT a provider id.")
 async def npg_test_dns_provider(name: str, provider_type: str, credentials: dict, is_default: bool | None = None) -> dict:
     try:
         c = _get_client()
@@ -3907,6 +3907,24 @@ async def npg_get_logs(
         if as_of is not None and str(as_of).strip():
             params["as_of"] = str(as_of)
         data = await _api(c.get, "/api/v1/logs", params=params or None)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+@mcp.tool(name="npg_get_log_detail", description="GET the columns the log list leaves out for ONE row — request_protocol, http_referer, geo_city, geo_asn, rule_severity, attack_type, server_port (NPG 2.70.0+). REQUIRED: id (uuid) and created_at, both copied verbatim from a npg_get_logs row; created_at locates the row chunk, so a reformatted timestamp returns 404. Returns only the extra columns — merge with the list row yourself. Read-only. expand lifts cap.")
+async def npg_get_log_detail(id: str | int, created_at: str, expand: bool = False) -> dict:
+    try:
+        _validate_id("id", id)
+        _validate_required("created_at", created_at)
+        c = _get_client()
+        # created_at is the row's created_at exactly as GET /logs returned it:
+        # the handler parses it as RFC3339Nano and uses it to pick the chunk, so
+        # a reformatted or rounded timestamp misses the row (404 Log not found).
+        data = await _api(
+            c.get,
+            f"/api/v1/logs/{_id_path(id)}",
+            params={"created_at": created_at},
+        )
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -5241,7 +5259,7 @@ async def npg_confirm_global_rate_limit_dns(hostname: str, expected_addresses: l
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Ships disabled with action=log (log-only). Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log, ignore_private_ips=false (v2.70.0+: true = skip private/loopback peers). expand=true lifts the result cap.")
 async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5250,7 +5268,7 @@ async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify. strict kwargs validation: see npg_update_settings. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host.")
+@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify, ignore_private_ips (v2.70.0+: true = skip private/loopback peers). strict kwargs validation: see npg_update_settings. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host.")
 async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_kwargs("npg_update_global_fail2ban", kwargs, strict)
@@ -5506,7 +5524,7 @@ async def npg_list_ddns_records(page: int | None = None, limit: int | None = Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_ddns_record", description="CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu DNS provider). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool).")
+@mcp.tool(name="npg_create_ddns_record", description="CREATE a DDNS record. REQUIRED: hostname (the DDNS domain to keep updated), dns_provider_id (UUID of a Cloudflare/DuckDNS/Dynu/Infomaniak DNS provider — those are the only providers with a DDNS updater; IONOS/OVH/route53/manual cannot be used). Optional: proxied (bool, Cloudflare only), ttl (int, Cloudflare: 1=auto), enabled (bool).")
 async def npg_create_ddns_record(hostname: str, dns_provider_id: str | int, proxied: bool = False, ttl: int = 0, enabled: bool = True) -> dict:
     try:
         _validate_required("hostname", hostname)
@@ -5943,8 +5961,8 @@ async def npg_get_dns_provider_default(expand: bool = False) -> dict:
 
 # ── Logs Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). log_type — access|error|modsec (default access); all other fields optional and type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
-async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
+@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). log_type — access|error|modsec (default access); all other fields optional and type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, server_port (int 1-65535, nginx $server_port), etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
+async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, server_port: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
     try:
         _validate_required("log_type", log_type)
         if log_type not in ("access", "error", "modsec"):
@@ -5964,6 +5982,8 @@ async def npg_post_log(log_type: str = "access", timestamp: str | None = None, h
             "request_uri": "request_uri",
             "request_protocol": "request_protocol",
             "status_code": "status_code",
+            # v2.70.0: nginx $server_port for the row (1-65535)
+            "server_port": "server_port",
             "body_bytes_sent": "body_bytes_sent",
             "request_time": "request_time",
             "upstream_response_time": "upstream_response_time",

@@ -152,8 +152,9 @@ class TestHealthIsNotAnMCPTool:
         # 315 → 319: NPG v2.69.0 sync — npg_get_instance, npg_list_log_rules,
         # npg_get_log_rules, npg_update_log_rules (per-host access-log rules).
         # 319 → 320: npg_get_proxy_host_diagnosis (derived config diagnosis).
+        # 320 → 321: npg_get_log_detail (NPG v2.70.0 log-row extra columns).
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 320
+        assert len(names) == 321
 
 
 class TestAccessLogRequestId:

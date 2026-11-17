@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.69.3
+  version: 2.70.0
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -7764,6 +7764,41 @@ paths:
                     format: int64
                   message:
                     type: string
+  /logs/{id}:
+    get:
+      tags: [Logs]
+      summary: Columns of one log row that the list leaves out
+      description: |
+        The log list returns a trimmed set of columns. The log detail view
+        fetches the rest for the row it shows. `created_at` is the row's
+        `created_at` as `GET /logs` returned it; the lookup needs it to find the
+        row's chunk.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: created_at
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: The row's remaining columns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /logs/autocomplete/hosts:
     get:
       tags: [Logs]
@@ -10164,7 +10199,7 @@ paths:
         (Cloudflare's "auto").
 
         `dns_provider_id` must reference an existing DNS provider; only providers of type
-        `cloudflare`, `duckdns` or `dynu` have a DDNS updater. Creation does not verify the
+        `cloudflare`, `duckdns`, `dynu` or `infomaniak` have a DDNS updater. Creation does not verify the
         provider type — a record pointing at any other provider is accepted here and fails at
         sync time with `provider "<type>" not supported for DDNS` in `last_error`.
 
@@ -10279,7 +10314,7 @@ paths:
         '400':
           description: |
             `proxy_host_ids` empty, `dns_provider_id` missing, provider not found, or provider
-            type is not Cloudflare/DuckDNS/Dynu.
+            type is not Cloudflare/DuckDNS/Dynu/Infomaniak.
           content:
             application/json:
               schema:
@@ -12262,7 +12297,7 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: Required when ddns_enabled is true; the provider's type must be cloudflare, duckdns or dynu, otherwise the write is rejected with 400.
+          description: Required when ddns_enabled is true; the provider's type must be cloudflare, duckdns, dynu or infomaniak, otherwise the write is rejected with 400.
         ddns_proxied:
           type: boolean
           description: Default Cloudflare "proxied" flag for the managed DDNS records of this host.
@@ -13563,7 +13598,7 @@ components:
           type: string
         provider_type:
           type: string
-          enum: [cloudflare, route53, duckdns, dynu, ionos, manual]
+          enum: [cloudflare, route53, duckdns, dynu, infomaniak, ionos, ovh, manual]
         is_default:
           type: boolean
         has_credentials:
@@ -13576,6 +13611,10 @@ components:
           description: >-
             Route 53 only: the provider authenticates with the AWS default
             credential chain instead of an access key pair. Omitted otherwise.
+        endpoint:
+          type: string
+          enum: [ovh-eu, ovh-ca, ovh-us]
+          description: OVHcloud only, the API region of the stored keys. Omitted otherwise.
         created_at:
           type: string
           format: date-time
@@ -13590,7 +13629,7 @@ components:
           type: string
         provider_type:
           type: string
-          enum: [cloudflare, route53, duckdns, dynu, ionos, manual]
+          enum: [cloudflare, route53, duckdns, dynu, infomaniak, ionos, ovh, manual]
         credentials:
           type: object
           description: >-
@@ -13600,6 +13639,10 @@ components:
             credential chain — environment, shared config files, ECS task role, EC2
             instance role), optional region and hosted_zone_id. duckdns: token. dynu: api_key. ionos: api_key_prefix and
             api_key (IONOS public prefix and secret; sent to IONOS as prefix.secret).
+            infomaniak: username and password for a preconfigured DynDNS hostname (DDNS IPv4 only; no DNS-01).
+            The Infomaniak connection test validates credential format only.
+            ovh: application_key, application_secret and consumer_key, optional endpoint
+            (ovh-eu, ovh-ca or ovh-us; default ovh-eu).
             manual: none required.
         is_default:
           type: boolean
@@ -13943,6 +13986,12 @@ components:
           description: >-
             Ships as `log` so an operator can watch what would be banned before
             anything is.
+        ignore_private_ips:
+          type: boolean
+          default: false
+          description: >-
+            When true, no fail2ban jail, per-host or global, bans a private
+            (10/8, 172.16/12, 192.168/16, fc00::/7) or link-local address.
         created_at:
           type: string
           format: date-time
@@ -13970,6 +14019,8 @@ components:
         action:
           type: string
           enum: [block, log, notify]
+        ignore_private_ips:
+          type: boolean
 
     UpdateExploitRule:
       type: object
@@ -17412,6 +17463,9 @@ components:
           type: string
         http_x_forwarded_for:
           type: string
+        server_port:
+          type: integer
+          description: Port the request arrived on (nginx $server_port). Absent on rows logged before it was recorded.
         severity:
           type: string
           enum: [debug, info, notice, warn, error, crit, alert, emerg]
@@ -17495,6 +17549,26 @@ components:
           description: >-
             Present for `sort_by=timestamp`: the moment the pages are pinned to.
             Pass it back as the `as_of` query parameter for the next pages.
+    LogDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        request_protocol:
+          type: string
+        http_referer:
+          type: string
+        geo_city:
+          type: string
+        geo_asn:
+          type: string
+        rule_severity:
+          type: string
+        attack_type:
+          type: string
+        server_port:
+          type: integer
     CreateLog:
       type: object
       description: >-
@@ -17561,6 +17635,10 @@ components:
           type: string
         http_x_forwarded_for:
           type: string
+        server_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
         severity:
           type: string
           enum: [debug, info, notice, warn, error, crit, alert, emerg]
@@ -19648,7 +19726,7 @@ components:
           type: string
           format: uuid
           description: |
-            Only providers of type `cloudflare`, `duckdns` or `dynu` have a DDNS updater; the
+            Only providers of type `cloudflare`, `duckdns`, `dynu` or `infomaniak` have a DDNS updater; the
             type is not checked here, a mismatch surfaces as a sync error on the record.
         proxied:
           type: boolean
@@ -19699,7 +19777,7 @@ components:
           format: uuid
           description: |
             Validated once before any host is touched — the provider must exist and be of type
-            `cloudflare`, `duckdns` or `dynu`.
+            `cloudflare`, `duckdns`, `dynu` or `infomaniak`.
     DDNSSyncResponse:
       type: object
       description: |

@@ -140,6 +140,9 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
     # all pointer fields, partial update
     "npg_update_global_fail2ban": frozenset({
         "enabled", "max_retries", "find_time", "ban_time", "fail_codes", "action",
+        # v2.70.0: skip bans for RFC1918/loopback peers so LAN traffic is not
+        # jailed when Trusted Proxies is unset (pointer bool, default false).
+        "ignore_private_ips",
     }),
 }
 
