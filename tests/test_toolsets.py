@@ -3,7 +3,7 @@
 Covers:
 * tier_allowed at read/standard/full levels.
 * read-level returns only get/list/view/download/check/detect prefixed tools.
-* standard-level excludes all 47 DESTRUCTIVE_TOOLS.
+* standard-level excludes all 48 DESTRUCTIVE_TOOLS.
 * full-level returns everything.
 * resolve_level normalizes unknown values to full.
 * MCP ToolAnnotations: every tool annotated, destructive/read-only/idempotent/
@@ -139,10 +139,10 @@ class TestTierAllowed:
         ):
             assert mut not in allowed
 
-    def test_standard_excludes_all_47_destructive_tools(self):
+    def test_standard_excludes_all_48_destructive_tools(self):
         tools = _sample_tools()
         allowed = tier_allowed(tools, "standard")
-        assert len(DESTRUCTIVE_TOOLS) == 47
+        assert len(DESTRUCTIVE_TOOLS) == 48
         # every destructive tool in the sample set is hidden
         for name in tools:
             if name in DESTRUCTIVE_TOOLS:
@@ -226,23 +226,23 @@ class TestDerivedDestructiveTools:
         assert (
             len(tier_allowed(all_tools, "standard"))
             == len(all_tools) - len(DESTRUCTIVE_TOOLS)
-            == 274
+            == 276
         )
-        # Live surface guardrail (current HEAD): 321 tools, 47 destructive.
-        assert len(all_tools) == 321
-        assert len(DESTRUCTIVE_TOOLS) == 47
+        # Live surface guardrail (current HEAD): 324 tools, 48 destructive.
+        assert len(all_tools) == 324
+        assert len(DESTRUCTIVE_TOOLS) == 48
 
-    def test_destructive_count_47_exact(self):
-        # The task's hard guardrail: exactly 47 destructive tools.
-        assert len(DESTRUCTIVE_TOOLS) == 47
+    def test_destructive_count_48_exact(self):
+        # The task's hard guardrail: exactly 48 destructive tools.
+        assert len(DESTRUCTIVE_TOOLS) == 48
 
     def test_standard_and_read_counts_are_stable(self):
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(tier_allowed(all_tools, "standard")) == 274
-        assert len(tier_allowed(all_tools, "read")) == 146
-        assert len(tier_allowed(all_tools, "full")) == 321
+        assert len(tier_allowed(all_tools, "standard")) == 276
+        assert len(tier_allowed(all_tools, "read")) == 147
+        assert len(tier_allowed(all_tools, "full")) == 324
 
     def test_read_tier_has_no_mutating_verbs(self):
         """The read tier's contract: every exposed tool only issues GETs.
@@ -326,7 +326,7 @@ class TestToolAnnotations:
         from npg_mcp.toolsets import _discover_tool_names
 
         all_tools = _discover_tool_names()
-        assert len(all_tools) == 321
+        assert len(all_tools) == 324
         missing = sorted(n for n in all_tools if annotations_for(n) is None)
         assert missing == []
 
@@ -432,7 +432,7 @@ class TestToolAnnotations:
 
     def test_annotations_reach_served_tools_list(self):
         served = self._served()
-        assert len(served) == 321
+        assert len(served) == 324
         assert [n for n, t in served.items() if t.annotations is None] == []
         for name, tool in served.items():
             expected = _hints(annotations_for(name))
@@ -454,8 +454,8 @@ class TestToolAnnotations:
     def test_annotate_tools_is_idempotent(self):
         import npg_mcp.main as main_mod
 
-        assert annotate_tools(main_mod.mcp) == 321
-        assert annotate_tools(main_mod.mcp) == 321
+        assert annotate_tools(main_mod.mcp) == 324
+        assert annotate_tools(main_mod.mcp) == 324
 
     def test_annotate_tools_never_raises_on_broken_tool_manager(self):
         class Broken:

@@ -3064,10 +3064,56 @@ async def npg_get_dashboard_geoip_stats(hours: int | None = None, expand: bool =
     except Exception as e:
         return _error_result(e)
 
+# Statuses whose page an operator may replace (NPG 2.71.0+). The API rejects
+# anything else with 400 "status must be one of 403, 502, 503, 504" — checking
+# here turns that round-trip into a clear local error.
+_ERROR_PAGE_STATUSES = frozenset({403, 502, 503, 504})
+
+
+def _validate_error_page_status(status_code) -> None:
+    """Validate the status whose error page is being read/written/deleted."""
+    if isinstance(status_code, bool) or not isinstance(status_code, int):
+        raise ValueError(f"status_code must be one of 403, 502, 503, 504 (got: {status_code!r})")
+    if status_code not in _ERROR_PAGE_STATUSES:
+        raise ValueError(f"status_code must be one of 403, 502, 503, 504 (got: {status_code!r})")
+
+
+@mcp.tool(name="npg_get_error_pages", description="GET the replaceable error pages: statuses[] = which statuses may be replaced (403 = the block page, 502/503/504 = backend errors) and pages[] = the custom pages present, each {status_code, html, updated_at} — a status with no page serves NPG's built-in one. Write with npg_set_error_page, revert with npg_reset_error_page. expand=true lifts the result cap (up to 4 x 256 KB of HTML).")
+async def npg_get_error_pages(expand: bool = False) -> dict:
+    c = _get_client()
+    try:
+        data = await _api(c.get, "/api/v1/settings/error-pages")
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+
+@mcp.tool(name="npg_set_error_page", description="SET one custom error page, replacing NPG's built-in page for that status. REQUIRED: status_code (403, 502, 503 or 504 — anything else is rejected) and html (non-blank, <=256 KB, valid UTF-8, no NUL). Applies to every proxy host AND the default server: regenerates configs and RELOADS nginx on each, then returns the full page list. Pages are served sandboxed (scripts never run). Revert with npg_reset_error_page.")
+async def npg_set_error_page(status_code: int, html: str) -> dict:
+    try:
+        _validate_error_page_status(status_code)
+        _validate_required("html", html)
+        c = _get_client()
+        data = await _api(c.put, f"/api/v1/settings/error-pages/{status_code}", {"html": html})
+        return {"success": True, "data": data}
+    except Exception as e:
+        return _error_result(e)
+
+
+@mcp.tool(name="npg_reset_error_page", description="DELETE one custom error page and fall back to NPG's built-in page for that status. REQUIRED: status_code (403, 502, 503 or 504). Regenerates configs and RELOADS nginx on every host + the default server. Answers with a confirmation message, not the page list — re-read with npg_get_error_pages. Set a page with npg_set_error_page.")
+async def npg_reset_error_page(status_code: int) -> dict:
+    try:
+        _validate_error_page_status(status_code)
+        c = _get_client()
+        data = await _api(c.delete, f"/api/v1/settings/error-pages/{status_code}")
+        return _mutate_result(data, f"Error page for status {status_code} reset to the built-in page")
+    except Exception as e:
+        return _error_result(e)
+
 
 # ── Access Lists ──────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_access_lists", description="LIST access lists (authentication/restriction lists). Each row carries items[] (IP/hostname rules) and auth_users[] ({id, username} — the password hash is never returned). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_access_lists(page: int | None = None, limit: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -3077,7 +3123,7 @@ async def npg_list_access_lists(page: int | None = None, limit: int | None = Non
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_access_list", description="Get an access list by its ID. REQUIRED: list_id. Response carries items[] (IP/hostname rules) and auth_users[] ({id, username} — the password hash is never returned). expand=true lifts the result cap.")
 async def npg_get_access_list(list_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("list_id", list_id)
@@ -3087,8 +3133,8 @@ async def npg_get_access_list(list_id: str | int, expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_access_list", description="CREATE a new access list. REQUIRED: name. Optional: satisfy_any (bool, true=any rule matches, false=all must match), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address, description. hostname = domain allow rule, address is a DDNS name, deny refused; legacy = old name-rule resent as-is; without kind address must be IP/CIDR/all).")
-async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
+@mcp.tool(name="npg_create_access_list", description="CREATE an access list (IP rules + optional basic-auth accounts). REQUIRED: name. Optional: satisfy_any (default true = any rule/account admits; false = all must match), pass_auth (forward Authorization to the backend), description, items (dicts: directive=allow|deny, kind=address|hostname|legacy, address; no kind = IP/CIDR/all), auth_users (dicts {username, password}; username 1-64, no ':'/space/#, unique; password >=8 chars, required for a new account).")
+async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None, auth_users: list | None = None) -> dict:
     try:
         _validate_required("name", name)
         c = _get_client()
@@ -3098,13 +3144,14 @@ async def npg_create_access_list(name: str, satisfy_any: bool | None = None, pas
         if pass_auth is not None: body["pass_auth"] = pass_auth
         if description is not None: body["description"] = description
         if items is not None: body["items"] = items
+        if auth_users is not None: body["auth_users"] = auth_users
         data = await _api(c.post, "/api/v1/access-lists", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial update — omitted fields left as-is). REQUIRED: list_id. Optional: name, satisfy_any (bool), pass_auth, description, items (rule dicts: directive=allow|deny, kind=address|hostname|legacy, address. Rules returned as read keep what they are; legacy rules must already be in the list; hostname rules allow-only, stored lowercase).")
-async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None) -> dict:
+@mcp.tool(name="npg_update_access_list", description="UPDATE an access list (partial: omitted fields kept). REQUIRED: list_id. Optional: name, satisfy_any, pass_auth (forward the Authorization header to the backend), description, items, auth_users (dicts {username, password}). auth_users REPLACES the whole account set: [] clears it (htpasswd file removed), an account sent without a password keeps its hash. 409 when a host using the list has a ForwardAuth auth provider and accounts were sent.")
+async def npg_update_access_list(list_id: str | int, name: str | None = None, satisfy_any: bool | None = None, pass_auth: bool | None = None, description: str | None = None, items: list | None = None, auth_users: list | None = None) -> dict:
     try:
         _validate_id("list_id", list_id)
         c = _get_client()
@@ -3116,6 +3163,7 @@ async def npg_update_access_list(list_id: str | int, name: str | None = None, sa
                 "pass_auth": "pass_auth",
                 "description": "description",
                 "items": "items",
+                "auth_users": "auth_users",
             },
         )
         data = await _api(c.put, f"/api/v1/access-lists/{_id_path(list_id)}", body)

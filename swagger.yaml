@@ -4391,6 +4391,73 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '500':
           description: Update succeeded but regenerating the host configs failed
+  /settings/error-pages:
+    get:
+      tags: [Settings]
+      summary: Custom error pages
+      description: |
+        NPG's own error pages that can be replaced (`statuses`: the block page
+        403 and the backend error pages 502, 503, 504) and the custom ones set
+        (#335). A custom page replaces the built-in one on every proxy host and
+        on the default server. nginx serves it with
+        `Content-Security-Policy: default-src 'none'; ...; sandbox`: no script
+        runs, since the page appears on each proxied site's own origin.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The pages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomErrorPages'
+  /settings/error-pages/{status}:
+    parameters:
+      - name: status
+        in: path
+        required: true
+        schema:
+          type: integer
+          enum: [403, 502, 503, 504]
+    put:
+      tags: [Settings]
+      summary: Set a custom error page
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [html]
+              properties:
+                html:
+                  type: string
+                  description: UTF-8 HTML, at most 256 KB. Scripts in it do not run.
+      responses:
+        '200':
+          description: The pages after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomErrorPages'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags: [Settings]
+      summary: Go back to the built-in error page
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The pages after the change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomErrorPages'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /settings/global-fail2ban:
     get:
       tags: [Settings]
@@ -13747,20 +13814,36 @@ components:
         satisfy_any:
           type: boolean
           description: >-
-            True emits `satisfy any;` into the host config; false emits nothing and
-            nginx applies its default of `satisfy all`.
+            True emits `satisfy any;` into the host config: an address the rules allow
+            gets in without an account, and an account gets in from any address. False
+            emits nothing and nginx applies its default of `satisfy all`: both are needed.
         pass_auth:
           type: boolean
           description: >-
-            Stored and returned, but currently not read by nginx config generation — it
-            has no effect on the running proxy.
+            With `auth_users`, whether the `Authorization` header carrying the account
+            reaches the backend. Off removes it. No effect on a list without accounts.
         items:
           type: array
           description: >-
-            The rules. A list with no items is not rendered into the host config at all;
-            a list with items always ends in an implicit `deny all`.
+            The rules. A list with neither items nor accounts is not rendered into the
+            host config at all; a list with items always ends in an implicit `deny all`.
           items:
             $ref: '#/components/schemas/AccessListItem'
+        auth_users:
+          type: array
+          description: >-
+            Basic auth accounts (#387). Hosts using the list ask for one of them. The
+            password hash is never returned. A host with an auth provider (ForwardAuth)
+            cannot use a list with accounts, and the GeoIP or cloud provider challenge
+            of a host using one blocks instead of challenging.
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              username:
+                type: string
         login_bypass_hosts:
           type: object
           description: |
@@ -13800,6 +13883,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreateAccessListItem'
+        auth_users:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AccessListAuthUserInput'
     ChallengeConfig:
       type: object
       description: |
@@ -17002,7 +17090,9 @@ components:
       type: object
       description: >-
         Partial update. Supplying `items` replaces the entire rule set; omitting it
-        leaves the existing rules untouched.
+        leaves the existing rules untouched. `auth_users` works the same way; an
+        account sent without a password keeps its stored one. Adding accounts to a
+        list a host with an auth provider uses is refused with 409.
       properties:
         name:
           type: string
@@ -17016,6 +17106,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreateAccessListItem'
+        auth_users:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AccessListAuthUserInput'
+    CustomErrorPages:
+      type: object
+      properties:
+        statuses:
+          type: array
+          items:
+            type: integer
+        pages:
+          type: array
+          items:
+            type: object
+            properties:
+              status_code:
+                type: integer
+              html:
+                type: string
+              updated_at:
+                type: string
+                format: date-time
+    AccessListAuthUserInput:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: No colon, space or control character.
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: >-
+            Required for a new account. Empty or absent on an update keeps the stored
+            password of the account with this username.
     AccessListDNSConfirm:
       type: object
       description: The body of every dns-confirm route, an access list's and the exception lists'.

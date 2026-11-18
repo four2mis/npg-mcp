@@ -154,7 +154,9 @@ class TestHealthIsNotAnMCPTool:
         # 319 → 320: npg_get_proxy_host_diagnosis (derived config diagnosis).
         # 320 → 321: npg_get_log_detail (NPG v2.70.0 log-row extra columns).
         names = main_mod.mcp._tool_manager.list_tools()
-        assert len(names) == 321
+        # 321 → 324: NPG v2.71.0/2.71.1 sync — npg_get_error_pages,
+        # npg_set_error_page, npg_reset_error_page (custom error pages).
+        assert len(names) == 324
 
 
 class TestAccessLogRequestId:
