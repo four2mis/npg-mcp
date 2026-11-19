@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.14.0] - 2026-11-19
+
+### What changed
+- **NPG v2.71.x API surface sync (additive only: 327 → 330 operations, 238 → 240 paths, nothing removed).** The wrapper now covers the two endpoint families added between the previously tracked 2.70.0 spec and 2.71.1 — custom error pages under `/api/v1/settings/error-pages` and basic-auth accounts on access lists — so a caller can manage both without dropping to `curl`.
+- **`npg_create_access_list` / `npg_update_access_list` gained `auth_users`** (list of `{username, password}` dicts) and send it through the documented body map. On update the array **replaces** the stored set, an omitted array leaves the accounts untouched, and `[]` clears them; an account supplied **without** a password keeps its existing stored hash instead of being rejected or wiped, so a caller can add or rename users without knowing their passwords.
+- **Access-list descriptions rewritten for the redefined upstream semantics** — `pass_auth` no longer means "pass the password through" but "forward the client's `Authorization` header to the backend", `satisfy_any` defaults to `true`, and a **409** is returned when the list is attached to a ForwardAuth host. `npg_get_access_list` / `npg_list_access_lists` document `auth_users[]` as `{id, username}` only — the password hash is never returned. Description-only change for the readers (DESC_LEN ≤ 460).
+- **Vendored `swagger.yaml` re-synced to upstream NPG v2.71.1** (`info.version` 2.71.1), replacing the byte-identical copy of v2.70.0 — the checked-in spec now matches the release this wrapper tracks.
+- **`npg_mcp/permission_map.py` regenerated** from the 2.71.x route registry so the new error-page routes map to `settings:read` / `settings:write` and `derive_tool_permissions.py --check` stays in sync (no existing mapping changed).
+- **Tool surface 321 → 324** (read 146 → 147, standard 274 → 276, full 321 → 324; destructive 47 → 48 because `npg_reset_error_page` matches the `reset_` prefix rule), synced in `.env.example`, both READMEs (env row, Toolset Levels table and tool-count prose), `tool-schemas.yaml` and the `tests/test_health.py` / `tests/test_toolsets.py` / `tests/test_result_cap.py` pins.
+- Verified at commit `73d9e20` against the disposable test stack with a **HEAD-pinned local image** (`local/npg-mcp:73d9e20@sha256:4663ff9222c2506a6edfb4d7a833add6dee5c9d47870c26a0baa50a8a4bef6a9`; in-container `main.py`, `toolsets.py` and `client.py` sha256 byte-identical to the checkout, boot log `NPG_TOOL_LEVEL=full: exposing 324 of 324 tools`; test NPG API 2.72.0). Live MCP evidence: error-page `get → set → get → reset → get` round-trip with the stored HTML echoed back, an unsupported status rejected locally with `404`, and the access-list `auth_users` `create → get → replace → keep-hash → delete` cycle passing with no hash leakage in any response. 24/24 live MCP checks and a 10-tool regression sample across unrelated families passed, fixtures were removed afterwards (error pages back to built-in, access-list fixture deleted).
+- Release gates: AST parse OK with **324** decorated tools, no duplicate names, all `npg_`-prefixed; `pytest` **731 passed**; `regenerate_all_docs.py --check` exit 0 (all prose rules and `DESC_LEN` pass); `.env.example` tier counts match `tier_allowed()` (read 147 / standard 276 / full 324). The previously running stale `local/npg-mcp:c99e574` image (v1.12.0, 320 tools) was repointed away and deliberately not used as evidence.
+
+### What's new
+- `npg_get_error_pages` — the replaceable error pages: `statuses[]` (which statuses may be replaced: 403 block page, 502/503/504 backend errors) and `pages[]` (`{status_code, html, updated_at}`); a status absent from `pages` serves NPG's built-in page. Read-tier (GET) with an `expand` cap — `expand=true` lifts it for up to 4 × 256 KB of HTML. Requires NPG 2.71.0+.
+- `npg_set_error_page(status_code, html)` — replace the built-in page for one status (403/502/503/504 only, HTML non-blank, ≤ 256 KB, valid UTF-8, no NUL). Applies to **every** proxy host and the default server: configs are regenerated and nginx is reloaded on each, so it is a cluster-wide write. Pages are served sandboxed (scripts never execute).
+- `npg_reset_error_page(status_code)` — delete one custom page and fall back to the built-in one, with the same regenerate + reload side effect; returns a confirmation message (`_mutate_result` shape) rather than the page list — re-read with `npg_get_error_pages`. Hidden at `NPG_TOOL_LEVEL=standard` by the `reset_` destructive-name rule.
+- `auth_users` parameter on `npg_create_access_list` / `npg_update_access_list` (basic-auth accounts; replace-on-update, omitted = keep, `[]` = clear, password-less entry keeps the stored hash).
+
+### Breaking changes
+- (none) — three new tools plus an additive `auth_users` parameter and re-written description text. No tool was renamed or removed, no existing parameter changed name, type or default, and every existing call behaves as in 1.13.0. The only behavioural notes are upstream semantics now documented rather than changed by the wrapper: `pass_auth` means "forward the client `Authorization` header" (not password passthrough), `satisfy_any` defaults to `true`, and attaching an access list to a ForwardAuth host answers **409**.
+
 ## [1.13.0] - 2026-11-18
 
 ### What changed
