@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.15.0] - 2026-11-27
+
+### What changed
+- **`npg_update_proxy_host_security_headers` is now a real partial update.** The endpoint is a hybrid upsert: the boolean columns are pointers (omitted = keep) but `content_security_policy`, `permissions_policy` and `custom_headers` are **always written** upstream, so the previous forward-only body silently wiped a stored CSP whenever any other header was changed. The tool now GETs the row, re-sends the stored values for those always-written columns and layers the caller's arguments on top, so one header update no longer destroys the rest.
+- **`npg_update_proxy_host_upstream` protects omitted fields against a full-replace endpoint.** `PUT /proxy-hosts/{id}/upstream` overwrites every column (omitting `servers` empties the pool; omitting the scalars resets `round_robin` / 30 / 5 / `/` / 200 / 32), so the tool GETs the stored upstream and re-sends it before the PUT. Read-only server bookkeeping (`is_healthy`, `created_at`, …) is stripped so the pool round-trips unchanged instead of being rejected.
+- **`npg_test_proxy_host` accepts `url`** — an absolute `http(s)` URL forwarded as an in-query parameter and requested verbatim instead of the default `{http|https}://{first domain}/`. A bare path is rejected client-side, because the API answers it with an unhelpful "unsupported protocol scheme".
+- **`npg_ban_ip` gained `proxy_host_id`** for a host-scoped ban. The key is omitted entirely for a global ban — an empty string is *not* "global" upstream, it fails the UUID parse.
+- **`npg_create_api_token` gained `allowed_ips` and `rate_limit`.** `rate_limit` is validated as a positive integer (bools and `0` refused) so a typo cannot silently disable throttling on a machine credential; `allowed_ips` omitted or `[]` means no IP restriction.
+- **`npg_revoke_api_token` gained `reason`**, recorded in the audit log as `api_token_revoked`.
+- **`npg_add_proxy_host_uri_block_rule` gained `enabled`**, so a rule can be added in the disabled state.
+- **Redirect hosts reached parity with proxy hosts.** `npg_create_redirect_host` / `npg_update_redirect_host` now take `forward_path`, `ssl_enabled`, `ssl_cert_id`, `ssl_force_https`, `enabled` and `block_exploits`; `ssl_cert_id` is sent as the upstream `certificate_id` field. A new `_reject_empty_optional_id` helper refuses a blank `ssl_cert_id` locally with an actionable message (the API would answer HTTP 400 `Invalid identifier format`) while `None` still means "omit / leave unchanged". Legacy 2-argument creates keep `redirect_code=301` / `forward_scheme=auto`.
+- **All 9 affected tool descriptions were rewritten in the same commits as their signatures** (publish `validate` gate requirement), and `tool-schemas.yaml` was regenerated. The tool surface is **unchanged at 324** (read 147 / standard 276 / full 324) — this release adds parameters, not tools.
+- Verified at commit `3594b2b` with a **HEAD-pinned local image** (`local/npg-mcp:3594b2b@sha256:27717d7c0c36349e7f46d7cf745ff1f2278f007d256bb1886e6e99abdce3a9ac`; in-container `main.py` sha256 `e0d1da82…` byte-identical to the checkout) on the disposable test stack: 50/50 JSON-RPC checks. Both redirect tools expose and honour all 6 new params, `PUT /redirect-hosts/{id}` proven genuinely partial (a single-field update caused zero drift on 7 untouched fields), blank `ssl_cert_id` rejected client-side with the stored cert untouched, and a malformed `ssl_cert_id` proven to reach the API as `certificate_id` (HTTP 400). A 12-tool regression sample passed and the stack was left pristine (0 redirect/proxy hosts, `nginx -t` valid).
+- Release gates: AST parse OK with **324** decorated tools, no duplicate names; `pytest` **769 passed**; `ruff check .` clean; `regenerate_all_docs.py --check` exit 0 (all prose rules and `DESC_LEN` pass, longest 460); `.env.example` tier counts match `tier_allowed()` (read 147 / standard 276 / full 324).
+
+### What's new
+- `forward_path`, `ssl_enabled`, `ssl_cert_id`, `ssl_force_https`, `enabled`, `block_exploits` on `npg_create_redirect_host` / `npg_update_redirect_host`.
+- `permissions_policy` on `npg_update_proxy_host_security_headers` (stored CSP/`permissions_policy`/`custom_headers` now survive unrelated updates).
+- `health_check_timeout`, `health_check_expected_status`, `keepalive` and `name` (nginx upstream block name, `^[A-Za-z0-9_]+$`) on `npg_update_proxy_host_upstream`.
+- `url` on `npg_test_proxy_host`; `proxy_host_id` on `npg_ban_ip`; `reason` on `npg_revoke_api_token`.
+- `allowed_ips` and `rate_limit` on `npg_create_api_token`.
+- `enabled` on `npg_add_proxy_host_uri_block_rule`.
+
+### Breaking changes
+- (none) — additive parameters only. No tool was renamed or removed, no existing parameter changed name, type or default, and every existing call behaves as in 1.14.0. Two behaviour improvements are deliberate and documented: `npg_update_proxy_host_security_headers` and `npg_update_proxy_host_upstream` now preserve stored values for fields the caller omits (previously the upstream full/hybrid-write semantics could clear them), and a blank `ssl_cert_id` is now rejected locally instead of producing an opaque API 400.
+
 ## [1.14.0] - 2026-11-19
 
 ### What changed
