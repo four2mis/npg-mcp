@@ -3626,13 +3626,23 @@ async def npg_list_banned_ips(
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address.")
-async def npg_ban_ip(ip_address: str, reason: str = "Manual ban via API", ban_time: int = 3600) -> dict:
-    """Ban an IP address. Required: ip_address. Optional: reason, ban_time (seconds, 0=permanent)."""
+@mcp.tool(name="npg_ban_ip", description="Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600), proxy_host_id — scope the ban to one proxy host; omit for a global ban. After banning, verify with npg_list_banned_ips (its proxy_host_id filter shows the scope); release with npg_unban_ip (by ID) or npg_unban_ip_by_address.")
+async def npg_ban_ip(
+    ip_address: str,
+    reason: str = "Manual ban via API",
+    ban_time: int = 3600,
+    proxy_host_id: str | None = None,
+) -> dict:
+    """Ban an IP address. Optional: reason, ban_time (seconds, 0=permanent), proxy_host_id (host-scoped ban)."""
     try:
         _validate_required("ip_address", ip_address)
         c = _get_client()
-        data = await _api(c.post, "/api/v1/banned-ips", {"ip_address": ip_address, "reason": reason, "ban_time": ban_time})
+        body: dict = {"ip_address": ip_address, "reason": reason, "ban_time": ban_time}
+        # Omit the key entirely for a global ban — an empty string is NOT
+        # "global" to the API, it fails the UUID parse on proxy_host_id.
+        if proxy_host_id is not None and str(proxy_host_id).strip():
+            body["proxy_host_id"] = _id_str(proxy_host_id).strip()
+        data = await _api(c.post, "/api/v1/banned-ips", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -4220,8 +4230,14 @@ async def npg_get_api_token(token_id: str | int, expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_api_token", description="Create a new API token. Required: name, permissions (array). Optional: expires_in — '<n>' + unit suffix (e.g. '30d', '12h', '1y') or 'never'; omit = never expires.")
-async def npg_create_api_token(name: str, permissions: list[str], expires_in: str | None = None) -> dict:
+@mcp.tool(name="npg_create_api_token", description="Create a new API token; the secret is returned ONLY by this call — store it. Required: name, permissions (array, e.g. ['*']). Optional: expires_in — '<n>'+unit ('30d','12h','1y') or 'never', omit=never; allowed_ips — exact IPs/CIDRs allowed to use it, omit or []=no IP restriction; rate_limit — positive int, per-token request-rate override, omit=global limit. Edit later with npg_update_api_token.")
+async def npg_create_api_token(
+    name: str,
+    permissions: list[str],
+    expires_in: str | None = None,
+    allowed_ips: list[str] | None = None,
+    rate_limit: int | None = None,
+) -> dict:
     try:
         _validate_required("name", name)
         _validate_required("permissions", permissions)
@@ -4229,6 +4245,16 @@ async def npg_create_api_token(name: str, permissions: list[str], expires_in: st
         body: dict = {"name": name, "permissions": permissions}
         if expires_in is not None:
             body["expires_in"] = expires_in
+        if allowed_ips:
+            body["allowed_ips"] = list(allowed_ips)
+        if rate_limit is not None:
+            # 0 would mean "no limit" upstream — refuse it so a typo cannot
+            # silently disable throttling on a machine credential.
+            if isinstance(rate_limit, bool) or not isinstance(rate_limit, int) or rate_limit < 1:
+                raise ValueError(
+                    f"rate_limit must be a positive integer (got: {rate_limit!r})"
+                )
+            body["rate_limit"] = rate_limit
         data = await _api(c.post, "/api/v1/api-tokens", body)
         return {"success": True, "data": data}
     except Exception as e:
@@ -4245,12 +4271,13 @@ async def npg_update_api_token(token_id: str | int, kwargs: dict | None = None, 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_revoke_api_token", description="Revoke an API token by its ID. REQUIRED: token_id.")
-async def npg_revoke_api_token(token_id: str | int) -> dict:
+@mcp.tool(name="npg_revoke_api_token", description="Revoke an API token by its ID — it stops authenticating immediately (subsequent calls 401). REQUIRED: token_id. Optional: reason — free-text note recorded in the audit log as action api_token_revoked (default 'manually revoked'). Verify with npg_get_api_token (is_active=false); remove the row with npg_delete_api_token.")
+async def npg_revoke_api_token(token_id: str | int, reason: str | None = None) -> dict:
     try:
         _validate_id("token_id", token_id)
         c = _get_client()
-        data = await _api(c.post, f"/api/v1/api-tokens/{_id_path(token_id)}/revoke")
+        body = {"reason": reason} if reason is not None else None
+        data = await _api(c.post, f"/api/v1/api-tokens/{_id_path(token_id)}/revoke", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)

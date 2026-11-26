@@ -1681,7 +1681,7 @@ npg_list_banned_ips:
       default: false
 
 npg_ban_ip:
-  description: "Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600). After banning, verify with npg_list_banned_ips; release with npg_unban_ip (by ID) or npg_unban_ip_by_address."
+  description: "Ban an IP address. REQUIRED: ip_address. Optional: reason, ban_time (seconds, 0=permanent — default 3600), proxy_host_id — scope the ban to one proxy host; omit for a global ban. After banning, verify with npg_list_banned_ips (its proxy_host_id filter shows the scope); release with npg_unban_ip (by ID) or npg_unban_ip_by_address."
   parameters:
     - name: ip_address
       type: string
@@ -1694,6 +1694,9 @@ npg_ban_ip:
       type: integer
       required: false
       default: 3600
+    - name: proxy_host_id
+      type: string
+      required: false
 
 npg_unban_ip:
   description: "REMOVE a ban. REQUIRED: ip_id (the ban row's ID from npg_list_banned_ips — not the IP string). To shorten instead of lifting, use npg_update_ban_duration."
@@ -2246,7 +2249,7 @@ npg_get_api_token:
       default: false
 
 npg_create_api_token:
-  description: "Create a new API token. Required: name, permissions (array). Optional: expires_in — '<n>' + unit suffix (e.g. '30d', '12h', '1y') or 'never'; omit = never expires."
+  description: "Create a new API token; the secret is returned ONLY by this call — store it. Required: name, permissions (array, e.g. ['*']). Optional: expires_in — '<n>'+unit ('30d','12h','1y') or 'never', omit=never; allowed_ips — exact IPs/CIDRs allowed to use it, omit or []=no IP restriction; rate_limit — positive int, per-token request-rate override, omit=global limit. Edit later with npg_update_api_token."
   parameters:
     - name: name
       type: string
@@ -2256,6 +2259,12 @@ npg_create_api_token:
       required: true
     - name: expires_in
       type: string
+      required: false
+    - name: allowed_ips
+      type: array<string>
+      required: false
+    - name: rate_limit
+      type: integer
       required: false
 
 npg_update_api_token:
@@ -2273,11 +2282,14 @@ npg_update_api_token:
       default: true
 
 npg_revoke_api_token:
-  description: "Revoke an API token by its ID. REQUIRED: token_id."
+  description: "Revoke an API token by its ID — it stops authenticating immediately (subsequent calls 401). REQUIRED: token_id. Optional: reason — free-text note recorded in the audit log as action api_token_revoked (default 'manually revoked'). Verify with npg_get_api_token (is_active=false); remove the row with npg_delete_api_token."
   parameters:
     - name: token_id
       type: integer | string
       required: true
+    - name: reason
+      type: string
+      required: false
 
 npg_delete_api_token:
   description: "Delete an API token by its ID. REQUIRED: token_id."
