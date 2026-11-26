@@ -743,7 +743,7 @@ npg_get_redirect_host:
       default: false
 
 npg_create_redirect_host:
-  description: "Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, 301/302/307/308 only — 303 rejected by API v2.44.0+, default 301)."
+  description: "CREATE a redirect host. REQUIRED: domain_names, forward_domain_name. Optional: forward_scheme (auto/http/https, default auto), forward_path (appended to target), preserve_path (default True), redirect_code (301/302/307/308, default 301), ssl_enabled, ssl_cert_id (uuid), ssl_force_https, enabled, block_exploits (omit = instance default). Verify with npg_get_redirect_host."
   parameters:
     - name: domain_names
       type: array<string>
@@ -763,9 +763,27 @@ npg_create_redirect_host:
       type: integer
       required: false
       default: 301
+    - name: forward_path
+      type: string
+      required: false
+    - name: ssl_enabled
+      type: boolean
+      required: false
+    - name: ssl_cert_id
+      type: integer | string
+      required: false
+    - name: ssl_force_https
+      type: boolean
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: block_exploits
+      type: boolean
+      required: false
 
 npg_update_redirect_host:
-  description: "Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code (301/302/307/308 only — 303 rejected by API v2.44.0+). REQUIRED: host_id."
+  description: "UPDATE a redirect host (partial: omitted fields unchanged). REQUIRED: host_id. Fields: domain_names, forward_domain_name, forward_scheme, forward_path, preserve_path, redirect_code (301/302/307/308 only), ssl_enabled, ssl_cert_id (uuid; empty rejected — omit to keep), ssl_force_https, enabled, block_exploits. Verify with npg_get_redirect_host."
   parameters:
     - name: host_id
       type: integer | string
@@ -784,6 +802,24 @@ npg_update_redirect_host:
       required: false
     - name: redirect_code
       type: integer
+      required: false
+    - name: forward_path
+      type: string
+      required: false
+    - name: ssl_enabled
+      type: boolean
+      required: false
+    - name: ssl_cert_id
+      type: integer | string
+      required: false
+    - name: ssl_force_https
+      type: boolean
+      required: false
+    - name: enabled
+      type: boolean
+      required: false
+    - name: block_exploits
+      type: boolean
       required: false
 
 npg_delete_redirect_host:

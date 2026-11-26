@@ -668,6 +668,23 @@ def _validate_id(name: str, value) -> None:
         raise ValueError(f"{name} is required (got: {value!r})")
 
 
+def _reject_empty_optional_id(name: str, value) -> None:
+    """Reject an explicitly EMPTY optional id, which some endpoints cannot clear.
+
+    ``None`` means "omit the field" and passes through untouched. A blank
+    string, however, is not "clear it": upstream models decode ids as UUIDs and
+    answer HTTP 400 ``Invalid identifier format`` (verified live 2.72.0 on
+    ``PUT /redirect-hosts/{id}`` with ``certificate_id: ""``). Failing locally
+    gives the caller an actionable message instead of an opaque API 400.
+    """
+    if isinstance(value, str) and not value.strip():
+        raise ValueError(
+            f"{name} cannot be an empty string: the NPG API rejects an empty id "
+            f"(HTTP 400 'Invalid identifier format'). Omit it to leave the stored "
+            f"value unchanged."
+        )
+
+
 def _validate_required(name: str, value) -> None:
     """Validate a required (non-ID) parameter before any API call is made.
 
@@ -2718,17 +2735,24 @@ async def npg_get_redirect_host(host_id: str | int, expand: bool = False) -> dic
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_create_redirect_host", description="Create a new redirect host. Required: domain_names (list[str]), forward_domain_name (str). Optional: forward_scheme (auto/http/https, default auto), preserve_path (bool, default True), redirect_code (int, 301/302/307/308 only — 303 rejected by API v2.44.0+, default 301).")
+@mcp.tool(name="npg_create_redirect_host", description="CREATE a redirect host. REQUIRED: domain_names, forward_domain_name. Optional: forward_scheme (auto/http/https, default auto), forward_path (appended to target), preserve_path (default True), redirect_code (301/302/307/308, default 301), ssl_enabled, ssl_cert_id (uuid), ssl_force_https, enabled, block_exploits (omit = instance default). Verify with npg_get_redirect_host.")
 async def npg_create_redirect_host(
     domain_names: list[str],
     forward_domain_name: str,
     forward_scheme: str = "auto",
     preserve_path: bool = True,
     redirect_code: Literal[301, 302, 307, 308] = 301,
+    forward_path: str | None = None,
+    ssl_enabled: bool | None = None,
+    ssl_cert_id: str | int | None = None,
+    ssl_force_https: bool | None = None,
+    enabled: bool | None = None,
+    block_exploits: bool | None = None,
 ) -> dict:
     try:
         _validate_required("domain_names", domain_names)
         _validate_required("forward_domain_name", forward_domain_name)
+        _reject_empty_optional_id("ssl_cert_id", ssl_cert_id)
         c = _get_client()
         body = _build_body(
             locals(),
@@ -2738,14 +2762,21 @@ async def npg_create_redirect_host(
                 "forward_scheme": "forward_scheme",
                 "preserve_path": "preserve_path",
                 "redirect_code": "redirect_code",
+                "forward_path": "forward_path",
+                "ssl_enabled": "ssl_enabled",
+                "ssl_cert_id": "certificate_id",
+                "ssl_force_https": "ssl_force_https",
+                "enabled": "enabled",
+                "block_exploits": "block_exploits",
             },
+            id_fields={"ssl_cert_id"},
         )
         data = await _api(c.post, "/api/v1/redirect-hosts", body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_redirect_host", description="Update a redirect host. Pass only fields to change. Fields: domain_names, forward_domain_name, forward_scheme, preserve_path, redirect_code (301/302/307/308 only — 303 rejected by API v2.44.0+). REQUIRED: host_id.")
+@mcp.tool(name="npg_update_redirect_host", description="UPDATE a redirect host (partial: omitted fields unchanged). REQUIRED: host_id. Fields: domain_names, forward_domain_name, forward_scheme, forward_path, preserve_path, redirect_code (301/302/307/308 only), ssl_enabled, ssl_cert_id (uuid; empty rejected — omit to keep), ssl_force_https, enabled, block_exploits. Verify with npg_get_redirect_host.")
 async def npg_update_redirect_host(
     host_id: str | int,
     domain_names: list[str] | None = None,
@@ -2753,9 +2784,16 @@ async def npg_update_redirect_host(
     forward_scheme: str | None = None,
     preserve_path: bool | None = None,
     redirect_code: int | None = None,
+    forward_path: str | None = None,
+    ssl_enabled: bool | None = None,
+    ssl_cert_id: str | int | None = None,
+    ssl_force_https: bool | None = None,
+    enabled: bool | None = None,
+    block_exploits: bool | None = None,
 ) -> dict:
     try:
         _validate_id("host_id", host_id)
+        _reject_empty_optional_id("ssl_cert_id", ssl_cert_id)
         c = _get_client()
         body = _build_body(
             locals(),
@@ -2765,7 +2803,14 @@ async def npg_update_redirect_host(
                 "forward_scheme": "forward_scheme",
                 "preserve_path": "preserve_path",
                 "redirect_code": "redirect_code",
+                "forward_path": "forward_path",
+                "ssl_enabled": "ssl_enabled",
+                "ssl_cert_id": "certificate_id",
+                "ssl_force_https": "ssl_force_https",
+                "enabled": "enabled",
+                "block_exploits": "block_exploits",
             },
+            id_fields={"ssl_cert_id"},
         )
         data = await _api(c.put, f"/api/v1/redirect-hosts/{_id_path(host_id)}", body)
         return {"success": True, "data": data}
