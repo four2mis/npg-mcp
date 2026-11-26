@@ -1654,12 +1654,21 @@ async def npg_delete_proxy_host(host_id: str | int) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_test_proxy_host", description="RUN the full end-to-end test through a proxy host (POST /proxy-hosts/{id}/test): live GET with SSL, HTTP/2-3, cache and security-header findings plus DDNS. REQUIRED: host_id. For a fast upstream-only reachability probe use npg_probe_upstream.")
-async def npg_test_proxy_host(host_id: str | int) -> dict:
+@mcp.tool(name="npg_test_proxy_host", description="RUN the full end-to-end test through a proxy host (POST /proxy-hosts/{id}/test): live GET with SSL, HTTP/2-3, cache and security-header findings plus DDNS. REQUIRED: host_id. Optional url: absolute http(s) URL sent as a QUERY param and requested verbatim instead of the default {http|https}://{first domain}/ (a bare path is rejected). For a fast upstream-only probe use npg_probe_upstream.")
+async def npg_test_proxy_host(host_id: str | int, url: str | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
+        # The upstream handler takes `url` as an in=query parameter (absolute URL,
+        # used verbatim). A bare path silently produces "unsupported protocol
+        # scheme" inside the API, so reject it here with a useful message.
+        if url is not None and not url.startswith(("http://", "https://")):
+            raise ValueError(
+                "url must be an absolute http(s) URL (e.g. 'https://example.com/api/health'); "
+                "the NPG test endpoint does not accept a bare path"
+            )
         c = _get_client()
-        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/test")
+        params = {"url": url} if url else None
+        data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/test", None, params)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2855,28 +2864,58 @@ async def npg_get_proxy_host_security_headers(host_id: str | int, expand: bool =
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial update). REQUIRED: host_id. Optional: enabled, hsts_*, x_frame_options (DENY/SAMEORIGIN), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy, disable_global (omit=inherit, false=inherit, true=disable).")
-async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None) -> dict:
+# Fields accepted by PUT /proxy-hosts/{id}/security-headers. The endpoint is a
+# hybrid upsert: boolean fields are pointers (omitted = keep), but
+# content_security_policy / permissions_policy / custom_headers are ALWAYS
+# written, so omitting them CLEARS the stored value (verified against the live
+# 2.72.0 API). The tool therefore GETs the current row and merges before PUT —
+# otherwise updating one header would silently wipe an existing CSP.
+_SECURITY_HEADERS_BODY_FIELDS: tuple[str, ...] = (
+    "enabled",
+    "hsts_enabled",
+    "hsts_max_age",
+    "hsts_include_subdomains",
+    "hsts_preload",
+    "x_frame_options",
+    "x_content_type_options",
+    "x_xss_protection",
+    "referrer_policy",
+    "content_security_policy",
+    "permissions_policy",
+    "custom_headers",
+    "disable_global",
+)
+
+@mcp.tool(name="npg_update_proxy_host_security_headers", description="UPDATE security headers for a proxy host (partial: omitted fields keep their stored value). REQUIRED: host_id. Optional: enabled, hsts_*, x_frame_options (DENY/SAMEORIGIN), x_content_type_options, x_xss_protection, referrer_policy, content_security_policy, permissions_policy, disable_global (omit=inherit, false=inherit, true=disable). Merges the stored row first because the API clears CSP/permissions_policy when they are omitted.")
+async def npg_update_proxy_host_security_headers(host_id: str | int, enabled: bool | None = None, hsts_enabled: bool | None = None, hsts_max_age: int | None = None, hsts_include_subdomains: bool | None = None, hsts_preload: bool | None = None, x_frame_options: str | None = None, x_content_type_options: bool | None = None, x_xss_protection: bool | None = None, referrer_policy: str | None = None, content_security_policy: str | None = None, disable_global: bool | None = None, permissions_policy: str | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         c = _get_client()
-        body = _build_body(
-            locals(),
-            {
-                "enabled": "enabled",
-                "hsts_enabled": "hsts_enabled",
-                "hsts_max_age": "hsts_max_age",
-                "hsts_include_subdomains": "hsts_include_subdomains",
-                "hsts_preload": "hsts_preload",
-                "x_frame_options": "x_frame_options",
-                "x_content_type_options": "x_content_type_options",
-                "x_xss_protection": "x_xss_protection",
-                "referrer_policy": "referrer_policy",
-                "content_security_policy": "content_security_policy",
-                "disable_global": "disable_global",
-            },
+        path = f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers"
+        current = await _api(c.get, path)
+        body: dict = {}
+        if isinstance(current, dict):
+            body = {k: current[k] for k in _SECURITY_HEADERS_BODY_FIELDS if k in current}
+        body.update(
+            _build_body(
+                locals(),
+                {
+                    "enabled": "enabled",
+                    "hsts_enabled": "hsts_enabled",
+                    "hsts_max_age": "hsts_max_age",
+                    "hsts_include_subdomains": "hsts_include_subdomains",
+                    "hsts_preload": "hsts_preload",
+                    "x_frame_options": "x_frame_options",
+                    "x_content_type_options": "x_content_type_options",
+                    "x_xss_protection": "x_xss_protection",
+                    "referrer_policy": "referrer_policy",
+                    "content_security_policy": "content_security_policy",
+                    "permissions_policy": "permissions_policy",
+                    "disable_global": "disable_global",
+                },
+            )
         )
-        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/security-headers", body)
+        data = await _api(c.put, path, body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -2902,23 +2941,75 @@ async def npg_get_proxy_host_upstream(host_id: str | int, expand: bool = False) 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load-balancing for a proxy host. REQUIRED: host_id. Optional: scheme (http/https), servers (list of {address, port, weight, is_backup} - port separate field), load_balance (round_robin/least_conn/ip_hash/random), health_check_*.")
-async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None) -> dict:
+# Fields accepted by PUT /proxy-hosts/{id}/upstream. This endpoint is a
+# FULL-REPLACE upsert: every column is overwritten, so omitting `servers`
+# empties the pool and omitting the scalars restores round_robin/30/5/"/"/200/32
+# (verified against the live 2.72.0 API). The tool GETs the stored upstream and
+# re-sends it before PUT so omitted fields survive.
+_UPSTREAM_BODY_FIELDS: tuple[str, ...] = (
+    "name",
+    "scheme",
+    "servers",
+    "load_balance",
+    "health_check_enabled",
+    "health_check_interval",
+    "health_check_timeout",
+    "health_check_path",
+    "health_check_expected_status",
+    "keepalive",
+)
+
+# Subset of a stored server entry the API accepts back on PUT. Read-only
+# bookkeeping (is_healthy, created_at, ...) is dropped before re-sending.
+_UPSTREAM_SERVER_FIELDS: tuple[str, ...] = (
+    "address",
+    "port",
+    "weight",
+    "max_fails",
+    "fail_timeout",
+    "is_backup",
+    "is_down",
+)
+
+@mcp.tool(name="npg_update_proxy_host_upstream", description="UPDATE upstream/load-balancing for a proxy host (partial: omitted fields keep stored values — the tool GETs the row and re-sends it because the endpoint is full-replace). REQUIRED: host_id. Optional: scheme (http/https), servers (FULL-list replace; [{address, port, weight, is_backup}]), load_balance, health_check_enabled/path/interval/timeout/expected_status, keepalive (pool size), name (^[A-Za-z0-9_]+$).")
+async def npg_update_proxy_host_upstream(host_id: str | int, scheme: str | None = None, servers: list[dict] | None = None, load_balance: str | None = None, health_check_enabled: bool | None = None, health_check_path: str | None = None, health_check_interval: int | None = None, health_check_timeout: int | None = None, health_check_expected_status: int | None = None, keepalive: int | None = None, name: str | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
+        if name is not None and not re.fullmatch(r"[A-Za-z0-9_]+", name):
+            raise ValueError("name must match ^[A-Za-z0-9_]+$ (nginx upstream block name)")
         c = _get_client()
-        body = _build_body(
-            locals(),
-            {
-                "scheme": "scheme",
-                "servers": "servers",
-                "load_balance": "load_balance",
-                "health_check_enabled": "health_check_enabled",
-                "health_check_path": "health_check_path",
-                "health_check_interval": "health_check_interval",
-            },
+        path = f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream"
+        current = await _api(c.get, path)
+        body: dict = {}
+        if isinstance(current, dict):
+            for field in _UPSTREAM_BODY_FIELDS:
+                value = current.get(field)
+                if value is None:
+                    continue
+                if field == "servers":
+                    body["servers"] = [
+                        {k: s[k] for k in _UPSTREAM_SERVER_FIELDS if k in s} for s in value
+                    ]
+                else:
+                    body[field] = value
+        body.update(
+            _build_body(
+                locals(),
+                {
+                    "name": "name",
+                    "scheme": "scheme",
+                    "servers": "servers",
+                    "load_balance": "load_balance",
+                    "health_check_enabled": "health_check_enabled",
+                    "health_check_path": "health_check_path",
+                    "health_check_interval": "health_check_interval",
+                    "health_check_timeout": "health_check_timeout",
+                    "health_check_expected_status": "health_check_expected_status",
+                    "keepalive": "keepalive",
+                },
+            )
         )
-        data = await _api(c.put, f"/api/v1/proxy-hosts/{_id_path(host_id)}/upstream", body)
+        data = await _api(c.put, path, body)
         return {"success": True, "data": data}
     except Exception as e:
         return _error_result(e)
@@ -6512,8 +6603,8 @@ async def npg_get_ip_traffic_stats(ip: str, days: int | None = None, expand: boo
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host. REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description.")
-async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None) -> dict:
+@mcp.tool(name="npg_add_proxy_host_uri_block_rule", description="Add a single URI block rule to a proxy host (adds one rule; leaves the existing rules untouched). REQUIRED: host_id, pattern (str or regex). Optional: match_type ('exact'/'prefix'/'regex', default 'prefix'), description, enabled (default true; false adds the rule in the disabled state). Bulk-toggle via npg_update_proxy_host_uri_block.")
+async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, match_type: str = "prefix", description: str | None = None, enabled: bool | None = None) -> dict:
     try:
         _validate_id("host_id", host_id)
         _validate_required("pattern", pattern)
@@ -6522,6 +6613,8 @@ async def npg_add_proxy_host_uri_block_rule(host_id: str | int, pattern: str, ma
         body: dict = {"pattern": pattern, "match_type": match_type}
         if description is not None:
             body["description"] = description
+        if enabled is not None:
+            body["enabled"] = enabled
         data = await _api(c.post, f"/api/v1/proxy-hosts/{_id_path(host_id)}/uri-block/rules", body)
         return {"success": True, "data": data}
     except Exception as e:
