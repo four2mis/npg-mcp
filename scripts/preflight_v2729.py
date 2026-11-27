@@ -60,16 +60,19 @@ def ann(name, arg):
         return ""
     return ast.unparse(a.annotation) if a.annotation else ""
 
+def log_type_ann(name):
+    return ann(name, "log_type")
+
+
 checks = [
     ("npg_list_banned_ips has ban_type", "ban_type" in sig(get("npg_list_banned_ips"))),
     ("ban_type enum has all 7 values",
      all(v in ast.unparse(get("npg_list_banned_ips").args.args[0].annotation)
          for v in ("all", "auto", "manual", "waf", "fail2ban", "rate_limit", "bot"))),
     ("ban_type sends query type", 'params["type"] = str(ban_type)' in src),
-    ("npg_get_logs log_type has stream",
-     "stream" in ast.unparse(get("npg_get_logs").args.args[[a.arg for a in get("npg_get_logs").args.args].index("log_type")].annotation)),
+    ("npg_get_logs log_type has stream", "stream" in log_type_ann("npg_get_logs")),
     ("npg_get_log_stats log_type has stream",
-     "stream" in ast.unparse(get("npg_get_log_stats").args.args[[a.arg for a in get("npg_get_log_stats").args.args].index("log_type")].annotation)),
+     "stream" in log_type_ann("npg_get_log_stats")),
     ("npg_post_log validator accepts stream",
      'log_type not in ("access", "error", "modsec", "stream")' in src),
     ("confirm_no_proxy whitelisted",
