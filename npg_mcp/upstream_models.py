@@ -143,6 +143,10 @@ TOOL_KWARGS_WHITELIST: dict[str, frozenset[str]] = {
         # v2.70.0: skip bans for RFC1918/loopback peers so LAN traffic is not
         # jailed when Trusted Proxies is unset (pointer bool, default false).
         "ignore_private_ips",
+        # v2.72.9: switching the jail ON while Trusted Proxies resolves to no
+        # address is refused with 400 unless this is true (a directly-exposed
+        # server has no proxy to trust). Edits to an already-on jail skip the check.
+        "confirm_no_proxy",
     }),
 }
 

@@ -19,7 +19,7 @@ info:
     - `X-RateLimit-Remaining`: Remaining requests
     - `X-RateLimit-Reset`: Window reset time
 
-  version: 2.71.1
+  version: 2.72.9
   contact:
     name: Nginx Proxy Guard Support
     url: https://github.com/svrforum/nginxproxyguard
@@ -2181,6 +2181,16 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: type
+          in: query
+          description: |
+            Narrows the list to one type of ban (#394). `auto` and `manual` follow how the
+            ban was made; `waf`, `fail2ban`, `rate_limit` and `bot` follow the reason, as
+            the banned-IP screen labels it. The total, page count and counts describe the
+            narrowed list. `all` or omitting it lists every type; any other value is a 400.
+          schema:
+            type: string
+            enum: [all, auto, manual, waf, fail2ban, rate_limit, bot]
         - name: page
           in: query
           schema:
@@ -3673,7 +3683,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [access, error, modsec]
+            enum: [access, error, modsec, stream]
         - name: host
           in: query
           description: Exact match, or prefix wildcard when it starts with `*` (e.g. `*.example.com`).
@@ -4022,7 +4032,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [access, error, modsec]
+            enum: [access, error, modsec, stream]
         - name: host
           in: query
           schema:
@@ -4490,12 +4500,15 @@ paths:
       description: |
         Partial update: only the fields present are applied.
 
-        **Enabling is refused with 400 while Trusted Proxies are
-        unconfigured.** Behind a CDN with no trusted proxy set, every request
-        carries the CDN edge address, and a ban here applies to every host — so
-        one false positive would block every visitor behind that edge on every
-        site. An address-based guard cannot substitute: with the preset off the
-        CDN ranges are not in the trusted set at all.
+        **Switching the jail on is refused with 400 while Trusted Proxies are
+        unconfigured**, unless `confirm_no_proxy` is true. Behind a CDN with no
+        trusted proxy set, every request carries the CDN edge address, and a ban
+        here applies to every host — so one false positive would block every
+        visitor behind that edge on every site. An address-based guard cannot
+        substitute: with the preset off the CDN ranges are not in the trusted
+        set at all. A server the internet reaches directly has no proxy to
+        trust, so it confirms that instead (#400). Edits to a jail that is
+        already on are not checked again.
       security:
         - BearerAuth: []
       requestBody:
@@ -4513,8 +4526,8 @@ paths:
                 $ref: '#/components/schemas/GlobalFail2ban'
         '400':
           description: >-
-            Invalid value, or an attempt to enable the jail while Trusted
-            Proxies are unconfigured.
+            Invalid value, or an attempt to switch the jail on while Trusted
+            Proxies are unconfigured and `confirm_no_proxy` is not true.
 
   /settings/global-rate-limit:
     get:
@@ -8299,7 +8312,7 @@ paths:
       tags: [Logs]
       summary: List raw nginx log files on disk
       description: |
-        Only raw log files are listed (access_raw.log, error_raw.log and their rotated
+        Only raw log files are listed (access_raw.log, error_raw.log, stream_raw.log and their rotated
         copies); symlinks and other files are skipped. The live files come first, then
         the newest rotation first. `raw_log_enabled` reflects whether nginx is writing
         files at all; when the log directory is unreadable the endpoint still returns 200
@@ -8352,7 +8365,7 @@ paths:
           in: path
           required: true
           description: >-
-            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            A raw log file name (access_raw.log, error_raw.log, stream_raw.log or a rotated copy such as
             access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
@@ -8392,7 +8405,7 @@ paths:
           in: path
           required: true
           description: >-
-            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            A raw log file name (access_raw.log, error_raw.log, stream_raw.log or a rotated copy such as
             access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
@@ -8440,7 +8453,7 @@ paths:
       tags: [Logs]
       summary: Delete a rotated log file
       description: |
-        The live `access_raw.log` and `error_raw.log` cannot be deleted (nginx keeps
+        The live `access_raw.log`, `error_raw.log` and `stream_raw.log` cannot be deleted (nginx keeps
         writing to an unlinked file), nor can symlinks or files that are not raw logs.
       security:
         - BearerAuth: []
@@ -8449,7 +8462,7 @@ paths:
           in: path
           required: true
           description: >-
-            A raw log file name (access_raw.log, error_raw.log or a rotated copy such as
+            A raw log file name (access_raw.log, error_raw.log, stream_raw.log or a rotated copy such as
             access_raw.log-20261009-000000.gz). Any other name is rejected with 400.
           schema:
             type: string
@@ -8732,7 +8745,7 @@ paths:
     get:
       tags: [Proxy Hosts]
       summary: Get proxy host by domain name
-      description: Looks up a single proxy host by one of its domain names. Requires the `proxy:read` scope when called with an API token.
+      description: Looks up the proxy host that serves a domain name. An exact domain name wins; otherwise the match ignores case and a wildcard domain (`*.example.com`) covers its subdomains, the longest wildcard winning. Requires the `proxy:read` scope when called with an API token.
       security:
         - BearerAuth: []
       parameters:
@@ -14080,6 +14093,13 @@ components:
           description: >-
             When true, no fail2ban jail, per-host or global, bans a private
             (10/8, 172.16/12, 192.168/16, fc00::/7) or link-local address.
+        trusted_proxies_configured:
+          type: boolean
+          readOnly: true
+          description: >-
+            Not stored. False when Settings → Trusted Proxies resolves to no
+            address, in which case switching the jail on needs
+            `confirm_no_proxy`.
         created_at:
           type: string
           format: date-time
@@ -14109,6 +14129,11 @@ components:
           enum: [block, log, notify]
         ignore_private_ips:
           type: boolean
+        confirm_no_proxy:
+          type: boolean
+          description: >-
+            Not stored. True confirms that no CDN or reverse proxy sits in front
+            of NPG, which lets the jail be switched on with no trusted proxy set.
 
     UpdateExploitRule:
       type: object
@@ -17545,7 +17570,7 @@ components:
           format: uuid
         log_type:
           type: string
-          enum: [access, error, modsec]
+          enum: [access, error, modsec, stream]
         timestamp:
           type: string
           format: date-time
@@ -17710,7 +17735,7 @@ components:
       properties:
         log_type:
           type: string
-          enum: [access, error, modsec]
+          enum: [access, error, modsec, stream]
         timestamp:
           type: string
           format: date-time
@@ -17906,6 +17931,10 @@ components:
         enabled:
           type: boolean
           description: Whether the proxy host is enabled
+        proxy_type:
+          type: string
+          enum: [http, stream]
+          description: A stream host's sessions (#392) are matched by skip_all and skip_statuses only
         skip_all:
           type: boolean
           description: No line of the host is stored, except the ones NPG blocked
@@ -18081,7 +18110,7 @@ components:
           description: Derived from the filename prefix — access or error
         is_active:
           type: boolean
-          description: access_raw.log or error_raw.log, which nginx is writing; cannot be deleted
+          description: access_raw.log, error_raw.log or stream_raw.log, which nginx is writing; cannot be deleted
         location:
           type: string
           enum: [local, archive]
@@ -18137,7 +18166,7 @@ components:
         live_bytes:
           type: integer
           format: int64
-          description: access_raw.log and error_raw.log now
+          description: access_raw.log, error_raw.log and stream_raw.log now
         pending_bytes:
           type: integer
           format: int64

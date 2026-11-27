@@ -948,7 +948,7 @@ async def npg_get_proxy_host(host_id: str | int, expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_proxy_host_by_domain", description="LOOK UP a proxy host by one of its domain_names. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_proxy_host_by_domain", description="LOOK UP the proxy host serving a domain. v2.72.9+: an exact domain name wins; otherwise the match ignores case and a wildcard domain (*.example.com) covers its subdomains, the longest wildcard winning. REQUIRED: domain. NOTE: success:false for a missing domain is the correct post-DELETE verification signal (delete with npg_delete_proxy_host, then confirm here). expand lifts cap.")
 async def npg_get_proxy_host_by_domain(domain: str, expand: bool = False) -> dict:
     try:
         _validate_required("domain", domain)
@@ -3742,8 +3742,10 @@ async def npg_verify_challenge(
 
 # ── Security (banned IPs, etc.) ───────────────────────────────────────
 
-@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — narrow to one host's bans). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_banned_ips", description="LIST banned IP addresses. Optional: ban_type (server-side, v2.72.9+: all|auto|manual|waf|fail2ban|rate_limit|bot; auto|manual = how the ban was made, the rest follow the reason; other values = 400), filter (global=only host-unattached bans, host=only host-scoped bans), proxy_host_id (UUID — one host's bans). Paging (page/limit, per_page 1-100 default 20, metadata) and zero-arg behaviour: same as npg_list_redirect_hosts. expand=true lifts the result cap.")
 async def npg_list_banned_ips(
+    ban_type: Literal["all", "auto", "manual", "waf", "fail2ban", "rate_limit", "bot"]
+    | None = None,
     filter: Literal["global", "host"] | None = None,
     proxy_host_id: str | None = None,
     page: int | None = None,
@@ -3755,6 +3757,8 @@ async def npg_list_banned_ips(
         params = _list_params_per_page(limit=limit, page=page)
         if filter is not None:
             params["filter"] = str(filter)
+        if ban_type is not None:
+            params["type"] = str(ban_type)
         if proxy_host_id is not None and str(proxy_host_id).strip():
             params["proxy_host_id"] = str(proxy_host_id)
         data = await _api(c.get, "/api/v1/banned-ips", params=params or None)
@@ -3966,7 +3970,7 @@ async def npg_enable_waf_rule(host_id: str | int, rule_id: str | int) -> dict:
 
 # ── Logs ──────────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (per_page cap 200), offset; cursor (next_cursor verbatim) only for default/created_at sort. sort_by=timestamp: offset pages pinned by as_of (RFC3339, page 1's data.as_of), cursor ignored. Filters: hosts, log_type (access|error|modsec), status/method, client_ip/uri/user_agent, geo, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search; sort_by, sort_order. No args = last 24h. expand lifts cap.")
+@mcp.tool(name="npg_get_logs", description="GET access/error/WAF logs. Paging: limit (cap 200), offset; cursor (next_cursor verbatim) only for default/created_at sort. sort_by=timestamp: offset pages pinned by as_of (RFC3339, page 1's data.as_of), cursor ignored. Filters: hosts, log_type (access|error|modsec|stream=TCP/UDP), status/method, client_ip/uri/user_agent, geo, severity, rule_id, proxy_host_id, start/end (RFC3339; 24h default), search; sort_by, sort_order. No args = 24h. expand lifts cap.")
 async def npg_get_logs(
     host: str | None = None,
     status: int | None = None,
@@ -3977,7 +3981,7 @@ async def npg_get_logs(
     limit: int | None = None,
     offset: int | None = None,
     cursor: str | None = None,
-    log_type: Literal["access", "error", "modsec"] | None = None,
+    log_type: Literal["access", "error", "modsec", "stream"] | None = None,
     hosts: list[str] | None = None,
     client_ip: str | None = None,
     client_ips: list[str] | None = None,
@@ -4144,7 +4148,7 @@ async def npg_update_log_settings(kwargs: dict | None = None, strict: bool = Tru
 
 # ── Access-log collection rules per host (NPG 2.69.0+, #347) ───────────
 
-@mcp.tool(name="npg_list_log_rules", description="LIST every non-stream proxy host with its access-log collection rules: proxy_host_id, domain_names, enabled, skip_all, skip_statuses, skip_methods, skip_paths, updated_at (absent when the host has no rules). NPG 2.69.0+. Lines NPG blocked are always stored and fail2ban counts every line. One host: npg_get_log_rules; change: npg_update_log_rules. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_log_rules", description="LIST every proxy host (http and stream) with its access-log collection rules: proxy_host_id, domain_names, proxy_type (http|stream), enabled, skip_all, skip_statuses, skip_methods, skip_paths, updated_at (absent when the host has no rules). Stream hosts match skip_all/skip_statuses only. NPG 2.69.0+. Lines NPG blocked are always stored and fail2ban counts every line. One host: npg_get_log_rules; change: npg_update_log_rules. expand lifts cap.")
 async def npg_list_log_rules(expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -4153,7 +4157,7 @@ async def npg_list_log_rules(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_rules", description="GET one proxy host's access-log collection rules by host_id (UUID): skip_all, skip_statuses, skip_methods, skip_paths, plus domain_names, enabled and updated_at (absent when no rules). 404 = no such host. NPG 2.69.0+. Change with npg_update_log_rules; every host with npg_list_log_rules. expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_rules", description="GET one proxy host's access-log collection rules by host_id (UUID): skip_all, skip_statuses, skip_methods, skip_paths, plus domain_names, proxy_type (http|stream), enabled and updated_at (absent when no rules). Stream hosts (v2.72.x+) match skip_all/skip_statuses only. 404 = no such host. NPG 2.69.0+. Change with npg_update_log_rules; every host with npg_list_log_rules. expand lifts cap.")
 async def npg_get_log_rules(host_id: str | int, expand: bool = False) -> dict:
     try:
         _validate_id("host_id", host_id)
@@ -4179,9 +4183,9 @@ async def npg_update_log_rules(host_id: str | int, skip_all: bool | None = None,
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_log_stats", description="GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago> for weekly stats). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_log_stats", description="GET aggregated log statistics. Optional filters: log_type ('access'/'error'/'modsec'/'stream' — stream sessions count only in total_logs), host, client_ip, start_time, end_time (RFC3339 strings passed verbatim), proxy_host_id, block_reason, search. NOTES: without start_time/end_time the API defaults the window to the LAST 24 HOURS — always pass an explicit window for anything wider (e.g. start_time=<RFC3339 7d ago>). expand=true lifts the result cap.")
 async def npg_get_log_stats(
-    log_type: Literal["access", "error", "modsec"] | None = None,
+    log_type: Literal["access", "error", "modsec", "stream"] | None = None,
     host: str | None = None,
     client_ip: str | None = None,
     start_time: str | None = None,
@@ -4779,7 +4783,7 @@ async def npg_test_sso_provider(issuer_url: str, scopes: str | None = None) -> d
 
 # ── Log Files ──────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files (access/error; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file. expand=true lifts the result cap.")
+@mcp.tool(name="npg_list_log_files", description="LIST raw nginx log files (access/error/stream — stream_raw.log is the TCP/UDP session log; rotated entries newest first). Optional: location ('local' default, 'archive' — upstream 409 when unavailable), limit (1-1000; omit = all), offset. Response includes disk-usage projection and archive status. Companion tools: npg_view_log_file, npg_download_log_file, npg_delete_log_file. expand lifts cap.")
 async def npg_list_log_files(location: str = "local", limit: int | None = None, offset: int | None = None, expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -4793,7 +4797,7 @@ async def npg_list_log_files(location: str = "local", limit: int | None = None, 
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_download_log_file", description="Download a log file by filename (raw log names only — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Content is capped at 256 KB: at-or-below returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes, returned_bytes and a hint to page the rest via npg_view_log_file.")
+@mcp.tool(name="npg_download_log_file", description="Download a log file by filename (raw log names only: access_raw.log, error_raw.log, stream_raw.log or a rotated copy — upstream rejects anything else with 400). Optional: location ('local' default or 'archive'). Content is capped at 256 KB: at-or-below returned verbatim; larger logs return the FIRST 256 KB with truncated=true, total_bytes, returned_bytes and a hint to page the rest via npg_view_log_file.")
 async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
@@ -4805,7 +4809,7 @@ async def npg_download_log_file(filename: str, location: str = "local") -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_view_log_file", description="View the contents of a log file (raw log names only — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s. expand=true lifts the result cap.")
+@mcp.tool(name="npg_view_log_file", description="View the contents of a log file (raw log names only: access_raw.log, error_raw.log, stream_raw.log or a rotated copy — upstream rejects anything else with 400). REQUIRED: filename. Optional: lines (default 100), location ('local' default or 'archive'). Upstream responds 504 when reading takes longer than 60s. expand lifts cap.")
 async def npg_view_log_file(filename: str, lines: int = 100, location: str = "local", expand: bool = False) -> dict:
     try:
         _validate_required("filename", filename)
@@ -4824,7 +4828,7 @@ async def npg_rotate_log_file() -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_delete_log_file", description="PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the active access.log/error.log and symlinks are refused upstream by design. Optional: location ('local' default or 'archive'). Enumerate with npg_list_log_files.")
+@mcp.tool(name="npg_delete_log_file", description="PERMANENTLY delete a log file by its filename (no confirmation). DESTRUCTIVE: only rotated files can be deleted — the live access_raw.log/error_raw.log/stream_raw.log and symlinks are refused upstream by design. Optional: location ('local' default or 'archive'). Enumerate with npg_list_log_files.")
 async def npg_delete_log_file(filename: str, location: str = "local") -> dict:
     try:
         _validate_required("filename", filename)
@@ -5470,7 +5474,7 @@ async def npg_confirm_global_rate_limit_dns(hostname: str, expected_addresses: l
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log, ignore_private_ips=false (v2.70.0+: true = skip private/loopback peers). expand=true lifts the result cap.")
+@mcp.tool(name="npg_get_global_fail2ban", description="GET the global fail2ban jail — bans IPs that hit direct-IP/unknown-hostname traffic (the 444/400 catch-all); applies to ALL hosts, unlike per-host fail2ban. Never 404 — returns shipped defaults if unset. Defaults: max_retries=5, find_time=600, ban_time=3600 (0=permanent), fail_codes=\"400,444\", action=log, ignore_private_ips=false. Read-only trusted_proxies_configured=false => turning the jail on needs confirm_no_proxy. expand lifts cap.")
 async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     c = _get_client()
     try:
@@ -5479,7 +5483,7 @@ async def npg_get_global_fail2ban(expand: bool = False) -> dict:
     except Exception as e:
         return _error_result(e)
 
-@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial update via kwargs; omitted fields unchanged). kwargs: enabled, max_retries (min 1), find_time (sec, min 1), ban_time (sec, 0=permanent), fail_codes (comma-separated HTTP codes), action: block|log|notify, ignore_private_ips (v2.70.0+: true = skip private/loopback peers). strict kwargs validation: see npg_update_settings. WARNINGS: enabling REFUSED (400) while Trusted Proxies unconfigured; bans apply to EVERY host.")
+@mcp.tool(name="npg_update_global_fail2ban", description="UPDATE the global fail2ban jail (partial via kwargs; omitted fields unchanged). kwargs: enabled, max_retries, find_time (sec), ban_time (sec, 0=permanent), fail_codes (HTTP codes), action: block|log|notify, ignore_private_ips (skip RFC1918/loopback), confirm_no_proxy (v2.72.9+: true = no trusted proxy, direct-exposed). Strict check: see npg_update_settings. WARNING: enabling 400s with no Trusted Proxies unless confirm_no_proxy=true; bans hit EVERY host.")
 async def npg_update_global_fail2ban(kwargs: dict | None = None, strict: bool = True) -> dict:
     try:
         _validate_kwargs("npg_update_global_fail2ban", kwargs, strict)
@@ -6172,12 +6176,12 @@ async def npg_get_dns_provider_default(expand: bool = False) -> dict:
 
 # ── Logs Extras ────────────────────────────────────────────────────────
 
-@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). log_type — access|error|modsec (default access); all other fields optional and type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, server_port (int 1-65535, nginx $server_port), etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
+@mcp.tool(name="npg_post_log", description="INSERT a log entry manually (CreateLog model). log_type — access|error|modsec|stream (default access; stream = TCP/UDP rows); other fields optional, type-specific: error uses severity (debug..emerg) + error_message; modsec uses rule_id/rule_message/attack_type/action_taken/block_reason; access uses host, client_ip, status_code, server_port (nginx $server_port), etc. NO 'level'/'message'/'source'/'component' fields — use severity/error_message instead.")
 async def npg_post_log(log_type: str = "access", timestamp: str | None = None, host: str | None = None, client_ip: str | None = None, geo_country: str | None = None, geo_country_code: str | None = None, geo_city: str | None = None, geo_asn: str | None = None, geo_org: str | None = None, request_method: str | None = None, request_uri: str | None = None, request_protocol: str | None = None, status_code: int | None = None, server_port: int | None = None, body_bytes_sent: int | None = None, request_time: float | None = None, upstream_response_time: float | None = None, upstream_addr: str | None = None, upstream_status: str | None = None, http_referer: str | None = None, http_user_agent: str | None = None, http_x_forwarded_for: str | None = None, severity: str | None = None, error_message: str | None = None, rule_id: int | None = None, rule_message: str | None = None, rule_severity: str | None = None, rule_data: str | None = None, attack_type: str | None = None, action_taken: str | None = None, block_reason: str | None = None, bot_category: str | None = None, exploit_rule: str | None = None, proxy_host_id: str | None = None, raw_log: str | None = None) -> dict:
     try:
         _validate_required("log_type", log_type)
-        if log_type not in ("access", "error", "modsec"):
-            raise ValueError("log_type must be one of: access, error, modsec")
+        if log_type not in ("access", "error", "modsec", "stream"):
+            raise ValueError("log_type must be one of: access, error, modsec, stream")
         c = _get_client()
         body = _build_body(locals(), {
             "log_type": "log_type",
