@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.16.0] - 2026-11-28
+
+### What changed
+- **Synced the wrapper to the upstream NPG v2.72.9 API surface** (previously tracking v2.71.1). Additive only: no path was removed or re-scoped, and the vendored `swagger.yaml` was refreshed to the v2.72.9 spec so the checked-in copy matches the release this wrapper targets.
+- **`npg_list_banned_ips` gained a server-side `ban_type` filter**, forwarded as the API query parameter `type` (the parameter is renamed because `filter` was already taken by the `global`/`host` scope selector). The enum separates *how* a ban was made (`auto`, `manual`) from *what* triggered it (`waf`, `fail2ban`, `rate_limit`, `bot`); `all` is the unfiltered default and any other value is a 400 upstream. Filtering happens in the API rather than through the paging window, so a filtered listing no longer silently misses matches that fell outside the current page.
+- **`log_type=stream` is now accepted by `npg_get_logs`, `npg_get_log_stats` and `npg_post_log`**, so TCP/UDP session rows written by stream proxy hosts are readable and insertable through the wrapper. `npg_get_log_stats` documents the upstream aggregation quirk: stream sessions contribute to `total_logs` only, because they carry no HTTP status/method to group by.
+- **`confirm_no_proxy` was added to the strict kwargs whitelist of `npg_update_global_fail2ban`** (`npg_mcp/upstream_models.py`, tagged `# v2.72.9`). Without the entry the documented escape hatch for a directly-exposed server failed client-side with `unknown field(s)` while the same call with `strict=false` applied upstream — the setting was effectively uncallable at the default `strict=True`.
+- **Fail2ban descriptions now explain the trusted-proxy gate.** `npg_get_global_fail2ban` documents the read-only `trusted_proxies_configured` flag and `npg_update_global_fail2ban` states the rule: switching the jail **on** is refused with 400 when Trusted Proxies resolves to no address unless `confirm_no_proxy=true`; edits to an already-enabled jail skip the check.
+- **Access-log collection rules now cover stream hosts.** `npg_list_log_rules` no longer describes itself as http-only and both it and `npg_get_log_rules` document the new `proxy_type` (`http`|`stream`) response field, plus the upstream restriction that stream hosts match `skip_all`/`skip_statuses` only (there is no HTTP status or method to skip).
+- **Raw log-file tooling documents the stream log.** `npg_list_log_files`, `npg_view_log_file`, `npg_download_log_file` and `npg_delete_log_file` now name `access_raw.log`, `error_raw.log` and `stream_raw.log` (or a rotated copy) as the accepted filenames, and the delete description points at the real on-disk names for the files it refuses to remove instead of the old `access.log`/`error.log` aliases.
+- **`npg_get_proxy_host_by_domain` documents the v2.72.9 matching order**: an exact domain name wins; otherwise the lookup ignores case and a wildcard domain (`*.example.com`) covers its subdomains, with the longest wildcard winning.
+- **Every changed signature landed in the same commit as its `description=` update** (publish `validate` gate) and all touched descriptions were trimmed to remain under `DESC_LEN` 460. The tool surface is **unchanged at 324** (read 147 / standard 276 / full 324) — this release adds parameters and response fields, not tools.
+- Verified at commit `d6b8b1c` with a **HEAD-pinned local image** (`local/npg-mcp:d6b8b1c@sha256:718380e5ee2902ebe4474896e5df40962fa5734ba1e8de8331dbdd428f42f7df`; in-container `main.py`/`upstream_models.py`/`client.py` sha256 byte-identical to the checkout) fronting the **test** NPG stack: 52/52 independent JSON-RPC checks. `ban_type` proven against a live fixture pair (a `manual` ban included, the `waf` ban excluded), `log_type=stream` read back through `npg_get_logs`/`npg_get_log_stats` and a real stream row inserted with `npg_post_log`, `confirm_no_proxy` accepted by the strict whitelist while an unknown key is still rejected, `trusted_proxies_configured` and `proxy_type` present in the live payloads, all 7 description corrections present in the served surface, and a 13-tool read regression sample clean. Fixtures were removed afterwards (ban lifted, test host deleted → 404).
+- Release gates: AST parse OK with **324** decorated tools, no duplicate names; `regenerate_all_docs.py --check` exit 0 (all prose rules and `DESC_LEN` pass); `.env.example` tier counts match `tier_allowed()` (read 147 / standard 276 / full 324).
+
+### What's new
+- `ban_type` on `npg_list_banned_ips` (`all`|`auto`|`manual`|`waf`|`fail2ban`|`rate_limit`|`bot`).
+- `log_type="stream"` on `npg_get_logs`, `npg_get_log_stats` and `npg_post_log`.
+- `confirm_no_proxy` on `npg_update_global_fail2ban` (strict kwargs) — enable the global jail on a directly-exposed server with no Trusted Proxies.
+- `proxy_type` (`http`|`stream`) and stream-host coverage in `npg_list_log_rules` / `npg_get_log_rules`.
+- Wildcard, case-insensitive fallback matching documented and served by `npg_get_proxy_host_by_domain`.
+
+### Breaking changes
+- (none) — this release is additive. No tool was renamed or removed, no parameter changed name, type or default, and every existing call behaves as in 1.15.0. The one API-level rename (`ban_type` → query `type`) is internal to the tool; callers pass `ban_type`. The only behaviour change is at the upstream level, documented here rather than introduced by the wrapper: `ban_type` rejects unknown values with 400, and enabling the global fail2ban jail without Trusted Proxies now needs `confirm_no_proxy=true`.
+
 ## [1.15.0] - 2026-11-27
 
 ### What changed
